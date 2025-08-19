@@ -12,11 +12,13 @@ from database import Database
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 SCREENSHOTS_DIR = os.path.join(DATA_DIR, "screenshots")
+VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
 DB_PATH = os.path.join(DATA_DIR, "tasks.db")
 
 
 def ensure_data_dirs():
     os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
+    os.makedirs(VIDEOS_DIR, exist_ok=True)
 
 
 def iso_now() -> str:
@@ -27,6 +29,7 @@ def build_event_injection_script() -> str:
     # Minimal client-side recorder for user actions. Throttles scroll events.
     return r"""
 (() => {
+  console.log('[RECORDER] Event injection script loaded');
   function safeSelector(el) {
     if (!el || !el.nodeType || el.nodeType !== 1) return null;
     if (el.id) return '#' + CSS.escape(el.id);
@@ -47,9 +50,10 @@ def build_event_injection_script() -> str:
 
   function send(type, payload) {
     try {
+      console.log('[RECORDER] Sending event:', type, payload);
       window.__record_event(type, JSON.stringify({ ts: Date.now(), ...payload }));
     } catch (e) {
-      // ignore
+      console.error('[RECORDER] Failed to send event:', e);
     }
   }
 
@@ -155,6 +159,7 @@ class TaskRecorder:
         self.request_map = {}
         self._db_lock = threading.Lock()
         self._page_event_handlers = {}
+        self._last_action_step_id = None  # Track last user action to link requests
 
         self.playwright = sync_playwright().start()
         self.context = self._create_context()
@@ -162,8 +167,11 @@ class TaskRecorder:
 
         # Bindings and scripts
         # Expose for all pages in context
+        print("[INIT] Exposing __record_event binding")
         self.context.expose_binding("__record_event", self._on_user_event)
+        print("[INIT] Adding event injection script")
         self.context.add_init_script(build_event_injection_script())
+        print("[INIT] Adding stealth script")
         self.context.add_init_script(build_stealth_script())
 
         # Network listeners (context-wide)
@@ -181,6 +189,10 @@ class TaskRecorder:
         return os.path.join(SCREENSHOTS_DIR, filename)
 
     def _create_context(self):
+        # Video recording settings
+        video_path = os.path.join(VIDEOS_DIR, f"task_{self.task_id}")
+        os.makedirs(video_path, exist_ok=True)
+        
         # Prefer system Chrome with a persistent user profile; reduce automation fingerprints
         preferred_channel = (
             os.environ.get("RECORDER_BROWSER_CHANNEL", "chrome").strip() or None
@@ -204,6 +216,8 @@ class TaskRecorder:
                     headless=False,
                     args=args,
                     ignore_default_args=ignore_default_args,
+                    record_video_dir=video_path,
+                    record_video_size={"width": 1280, "height": 720}
                 )
             except Exception as e:
                 last_error = e
@@ -213,6 +227,8 @@ class TaskRecorder:
                 headless=False,
                 args=args,
                 ignore_default_args=ignore_default_args,
+                record_video_dir=video_path,
+                record_video_size={"width": 1280, "height": 720}
             )
         except Exception as e:
             last_error = e
@@ -221,7 +237,10 @@ class TaskRecorder:
             browser = self.playwright.chromium.launch(
                 headless=False, args=args, ignore_default_args=ignore_default_args
             )
-            return browser.new_context()
+            return browser.new_context(
+                record_video_dir=video_path,
+                record_video_size={"width": 1280, "height": 720}
+            )
         except Exception:
             raise last_error
 
@@ -237,10 +256,27 @@ class TaskRecorder:
                 self._record_state_change("domcontentloaded", {"url": p.url}, page=p)
 
             def _on_load(p=page):
-                self._record_state_change("load", {"url": p.url}, page=p)
+                # Record page load as a high-level event
+                step_id = self._record_step(
+                    event_type="page:loaded",
+                    event_data={"url": p.url},
+                    prefix="page_loaded",
+                    page=p
+                )
+                # This becomes the context for subsequent requests
+                with self._db_lock:
+                    self._last_action_step_id = step_id
 
             def _on_framenavigated(frame, p=page):
-                self._record_state_change("framenavigated", {"url": frame.url}, page=p)
+                if frame == p.main_frame:  # Only track main frame navigation
+                    step_id = self._record_step(
+                        event_type="page:navigated",
+                        event_data={"url": frame.url},
+                        prefix="page_navigated",
+                        page=p
+                    )
+                    with self._db_lock:
+                        self._last_action_step_id = step_id
 
             handlers = [
                 ("domcontentloaded", _on_domcontentloaded),
@@ -265,62 +301,75 @@ class TaskRecorder:
             pass
 
     def _capture_dom_and_screenshot(self, prefix: str, page=None):
+        # Skip capture if we're shutting down
+        if self._shutting_down:
+            print("[CAPTURE] Skipping DOM/screenshot during shutdown")
+            return "", None
+            
         # Capture from the provided page if available; otherwise fall back to the last active page
         active_page = page or self.page
         dom_html = ""
         screenshot_path = None
+        
+        # Capture DOM
         try:
-            if active_page:
+            if active_page and not active_page.is_closed():
                 dom_html = active_page.content()
-        except Exception:
-            pass
+                print(f"[DOM] Captured {len(dom_html)} chars of DOM")
+        except Exception as e:
+            print(f"[DOM] Failed to capture DOM: {e}")
+            dom_html = ""
+        
+        # Capture screenshot
         try:
-            if active_page:
+            if active_page and not active_page.is_closed():
                 screenshot_path = self._screenshot_path(prefix)
                 try:
                     active_page.screenshot(path=screenshot_path, full_page=True)
+                    print(f"[SCREENSHOT] Saved to {screenshot_path}")
                 except Exception:
-                    # Fallback to viewport-only screenshot if full page fails (e.g., about:blank)
-                    active_page.screenshot(path=screenshot_path, full_page=False)
-        except Exception:
+                    # Fallback to viewport-only screenshot if full page fails
+                    try:
+                        active_page.screenshot(path=screenshot_path, full_page=False)
+                        print(f"[SCREENSHOT] Saved viewport to {screenshot_path}")
+                    except:
+                        screenshot_path = None
+        except Exception as e:
+            print(f"[SCREENSHOT] Failed to capture: {e}")
             screenshot_path = None
+        
         return dom_html, screenshot_path
 
     def _record_step(
         self, event_type: str, event_data: dict, prefix: str, page=None
     ) -> int:
-        print("_record_step", event_type, event_data, prefix)
-        # Avoid heavy capture during shutdown
-        if self.stop_event.is_set() or self._shutting_down:
-            dom_html, screenshot_path = "", None
-        else:
-            dom_html, screenshot_path = self._capture_dom_and_screenshot(
-                prefix, page=page
-            )
+        timestamp = iso_now()
+        print(f"[RECORD_STEP] Recording {event_type} at {timestamp}")
+        # Always capture DOM and screenshot for user events
+        dom_html, screenshot_path = self._capture_dom_and_screenshot(
+            prefix, page=page
+        )
         with self._db_lock:
             step_id = self.db.insert_step(
                 task_id=self.task_id,
-                timestamp=iso_now(),
+                timestamp=timestamp,
                 event_type=event_type,
                 event_data=json.dumps(event_data, ensure_ascii=False),
                 dom_snapshot=dom_html,
                 screenshot_path=screenshot_path,
             )
+            print(f"[RECORD_STEP] Saved step {step_id} to database immediately")
         return step_id
 
     # User actions coming from page binding
     def _on_user_event(self, source, event_type: str, payload_json: str):
-        print(
-            "_on_user_event",
-            source,
-            event_type,
-            "self.stop_event",
-            self.stop_event,
-            "self._shutting_down",
-            self._shutting_down,
-        )
-        if self.stop_event.is_set() or self._shutting_down:
-            return
+        # Skip low-level mouse events - we only care about the high-level ones
+        if event_type in ("pointerdown", "pointerup", "mousedown", "mouseup"):
+            return  # Skip these, we'll capture 'click' instead
+        
+        print(f"[EVENT] Received {event_type}")
+        
+        # Always process user events - they're important!
         try:
             payload = (
                 json.loads(payload_json)
@@ -329,14 +378,20 @@ class TaskRecorder:
             )
         except Exception:
             payload = {"raw": str(payload_json)}
+        
         # Record against the originating page if available
         page = getattr(source, "page", None)
-        self._record_step(
+        print(f"[EVENT] Recording {event_type}")
+        step_id = self._record_step(
             event_type=f"action:{event_type}",
             event_data=payload,
             prefix=f"action_{event_type}",
             page=page,
         )
+        
+        # Remember this action for linking subsequent requests
+        with self._db_lock:
+            self._last_action_step_id = step_id
 
     # Network request/response
     def _on_request(self, request):
@@ -348,8 +403,9 @@ class TaskRecorder:
                 return
         except Exception:
             return
-
-        print("_on_request", request)
+        
+        print(f"[REQUEST] Recording {request.method} {request.url[:50]}... triggered by step {self._last_action_step_id}")
+        
         self.request_counter += 1
         request_uid = f"req_{self.request_counter}"
 
@@ -366,9 +422,7 @@ class TaskRecorder:
             post_data = None
 
         url = request.url
-        parsed = urlparse(url)
-        query_params = dict(parse_qsl(parsed.query))
-
+        
         # Capture cookies at time of request
         cookies_json = []
         try:
@@ -376,31 +430,11 @@ class TaskRecorder:
         except Exception:
             cookies_json = []
 
-        event_data = {
-            "uid": request_uid,
-            "url": url,
-            "method": request.method,
-            "resource_type": request.resource_type,
-            "headers": headers,
-            "query": query_params,
-            "post_data": post_data,
-            "cookies": cookies_json,
-        }
-
-        # Try to associate with the page that initiated the request
-        try:
-            req_page = getattr(getattr(request, "frame", None), "page", None)
-        except Exception:
-            req_page = None
-
-        step_id = self._record_step(
-            event_type="request", event_data=event_data, prefix="request", page=req_page
-        )
-
+        # Don't create a step - just insert into requests table
         with self._db_lock:
             request_id = self.db.insert_request(
                 task_id=self.task_id,
-                step_id=step_id,
+                step_id=self._last_action_step_id,  # Link to the action that triggered this
                 request_uid=request_uid,
                 url=url,
                 method=request.method,
@@ -410,6 +444,7 @@ class TaskRecorder:
                 timestamp=iso_now(),
             )
             self.request_map[request] = request_id
+            print(f"[REQUEST] Saved request {request_id} to database")
 
     def _on_response(self, response):
         if self.stop_event.is_set() or self._shutting_down:
@@ -422,6 +457,10 @@ class TaskRecorder:
             return
 
         request_id = self.request_map.get(req)
+        if not request_id:
+            return  # No matching request found
+        
+        print(f"[RESPONSE] Recording response for request {request_id}")
 
         headers = {}
         try:
@@ -442,33 +481,9 @@ class TaskRecorder:
         except Exception:
             status = None
 
-        try:
-            from_sw = getattr(response, "from_service_worker", False)
-        except Exception:
-            from_sw = False
-
-        event_data = {
-            "url": req.url,
-            "status": status,
-            "headers": headers,
-            "from_service_worker": bool(from_sw),
-        }
-
-        # Try to associate with the page that initiated the response
-        try:
-            res_page = getattr(getattr(req, "frame", None), "page", None)
-        except Exception:
-            res_page = None
-
-        step_id = self._record_step(
-            event_type="response",
-            event_data=event_data,
-            prefix="response",
-            page=res_page,
-        )
-
+        # Don't create a step - just insert into responses table
         with self._db_lock:
-            self.db.insert_response(
+            response_id = self.db.insert_response(
                 task_id=self.task_id,
                 request_id=request_id,
                 status=status,
@@ -476,9 +491,9 @@ class TaskRecorder:
                 body=body_bytes,
                 timestamp=iso_now(),
             )
+            print(f"[RESPONSE] Saved response {response_id} to database")
 
     def _record_state_change(self, name: str, details: dict, page=None):
-        print("_record_state_change", name, details)
         if self.stop_event.is_set() or self._shutting_down:
             return
         self._record_step(
@@ -488,11 +503,26 @@ class TaskRecorder:
     def run(self):
         print("\nTask Recorder - Minimal MVP")
         print("- A Chromium browser will open. Interact to perform the task.")
-        print('- When finished, return to this terminal and type "save" then Enter.')
+        print('- When finished, return to this terminal and type "stop" then Enter.')
         # Screenshots/DOM are captured automatically for every recorded step
 
-        # Navigate after scripts are ready
+        # First go to blank page to initialize
         self.page.goto("about:blank")
+        
+        # Create initial navigation step (this will be used for all initial requests)
+        print("[INIT] Creating initial navigation step")
+        initial_step_id = self._record_step(
+            event_type="page:navigate_start",
+            event_data={"url": "https://www.google.com", "initial": True},
+            prefix="initial_navigation",
+            page=self.page
+        )
+        with self._db_lock:
+            self._last_action_step_id = initial_step_id
+        
+        # Now navigate to the actual page
+        print("[INIT] Navigating to initial page")
+        self.page.goto("https://www.google.com")
 
         # Input thread for commands
         def stdin_listener():
@@ -501,22 +531,17 @@ class TaskRecorder:
                     cmd = input().strip().lower()
                 except EOFError:
                     break
-                if cmd == "save":
-                    try:
-                        confirm = (
-                            input("Confirm save and close? (y/N): ").strip().lower()
-                        )
-                    except EOFError:
-                        confirm = "n"
-                    if confirm in ("y", "yes"):
-                        # Begin shutdown immediately to avoid late callbacks
-                        self._begin_shutdown()
-                        self.stop_event.set()
-                        break
-                    else:
-                        print("Canceled. Continue recording. Type 'save' to end.")
-                if cmd in ("quit", "exit"):
-                    print("Use 'save' to end the task so it is persisted.")
+                if cmd in ("stop", "quit", "exit", "done"):
+                    print("Stopping recording...")
+                    # Mark as shutting down to prevent hanging on DOM capture
+                    self._shutting_down = True
+                    # Give browser time to send any final events
+                    time.sleep(0.5)
+                    # Then stop
+                    self.stop_event.set()
+                    break
+                else:
+                    print(f"Unknown command '{cmd}'. Type 'stop' to end recording.")
 
         t = threading.Thread(target=stdin_listener, daemon=True)
         t.start()
@@ -550,6 +575,18 @@ class TaskRecorder:
     def shutdown(self):
         # Ensure listeners are removed and shutdown gating is on
         self._begin_shutdown()
+        
+        # Save video path
+        video_files = []
+        try:
+            video_dir = os.path.join(VIDEOS_DIR, f"task_{self.task_id}")
+            if os.path.exists(video_dir):
+                video_files = [f for f in os.listdir(video_dir) if f.endswith('.webm')]
+                if video_files:
+                    print(f"[VIDEO] Saved recording to {os.path.join(video_dir, video_files[0])}")
+        except Exception as e:
+            print(f"[VIDEO] Error checking video: {e}")
+        
         try:
             with self._db_lock:
                 self.db.end_task(self.task_id)
