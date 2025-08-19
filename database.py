@@ -51,7 +51,8 @@ CREATE TABLE IF NOT EXISTS responses (
 class Database:
     def __init__(self, db_path: str):
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        self.conn = sqlite3.connect(db_path)
+        # Allow access from multiple threads; guarded by higher-level locks in recorder
+        self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.conn.execute("PRAGMA foreign_keys = ON;")
         self._ensure_schema()
 
@@ -68,6 +69,7 @@ class Database:
 
     def start_task(self, description: str) -> int:
         from datetime import datetime
+
         created_at = datetime.utcnow().isoformat(timespec="milliseconds") + "Z"
         cur = self.conn.cursor()
         cur.execute(
@@ -79,11 +81,22 @@ class Database:
 
     def end_task(self, task_id: int):
         from datetime import datetime
+
         ended_at = datetime.utcnow().isoformat(timespec="milliseconds") + "Z"
-        self.conn.execute("UPDATE tasks SET ended_at = ? WHERE id = ?", (ended_at, task_id))
+        self.conn.execute(
+            "UPDATE tasks SET ended_at = ? WHERE id = ?", (ended_at, task_id)
+        )
         self.conn.commit()
 
-    def insert_step(self, task_id: int, timestamp: str, event_type: str, event_data: str, dom_snapshot: str, screenshot_path: str) -> int:
+    def insert_step(
+        self,
+        task_id: int,
+        timestamp: str,
+        event_type: str,
+        event_data: str,
+        dom_snapshot: str,
+        screenshot_path: str,
+    ) -> int:
         cur = self.conn.cursor()
         cur.execute(
             "INSERT INTO steps(task_id, timestamp, event_type, event_data, dom_snapshot, screenshot_path) VALUES (?, ?, ?, ?, ?, ?)",
@@ -92,16 +105,45 @@ class Database:
         self.conn.commit()
         return cur.lastrowid
 
-    def insert_request(self, task_id: int, step_id: int, request_uid: str, url: str, method: str, headers: str, post_data: str, cookies: str, timestamp: str) -> int:
+    def insert_request(
+        self,
+        task_id: int,
+        step_id: int,
+        request_uid: str,
+        url: str,
+        method: str,
+        headers: str,
+        post_data: str,
+        cookies: str,
+        timestamp: str,
+    ) -> int:
         cur = self.conn.cursor()
         cur.execute(
             "INSERT INTO requests(task_id, step_id, request_uid, url, method, headers, post_data, cookies, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (task_id, step_id, request_uid, url, method, headers, post_data, cookies, timestamp),
+            (
+                task_id,
+                step_id,
+                request_uid,
+                url,
+                method,
+                headers,
+                post_data,
+                cookies,
+                timestamp,
+            ),
         )
         self.conn.commit()
         return cur.lastrowid
 
-    def insert_response(self, task_id: int, request_id: int, status: int, headers: str, body: bytes, timestamp: str) -> int:
+    def insert_response(
+        self,
+        task_id: int,
+        request_id: int,
+        status: int,
+        headers: str,
+        body: bytes,
+        timestamp: str,
+    ) -> int:
         cur = self.conn.cursor()
         cur.execute(
             "INSERT INTO responses(task_id, request_id, status, headers, body, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
@@ -109,5 +151,3 @@ class Database:
         )
         self.conn.commit()
         return cur.lastrowid
-
-
