@@ -28,6 +28,7 @@ class TaskManager:
         """Initialize the singleton (only once)"""
         if not self._initialized:
             self.tasks = None
+            self.last_task_path = None
             self.task_repository = TaskRepository()
             TaskManager._initialized = True
     
@@ -43,12 +44,21 @@ class TaskManager:
 
     def set_actual_task(self, task: Task):
         self.tasks = task
-
+    
+    def get_last_task_path(self) -> str:
+        return self.last_task_path
+    
+    def set_last_task_path(self, path: str):
+        self.last_task_path = path
+    
     def end_actual_task(self):
-        self.tasks = None
+        self.task_repository.update_task_ended_at(self.tasks.id)
 
     def save_task(self, task: CreateTaskDto) -> int:
         return self.task_repository.save(task)
+
+    def save_task_video(self, video_path: str):
+        self.task_repository.save_task_video(self.tasks.id, video_path)
 
 class TaskRepository:
     def __init__(self):
@@ -57,4 +67,10 @@ class TaskRepository:
     def save(self, task: CreateTaskDto) -> int:
         task_id = self.db.start_task(task.description)
         return task_id
+    
+    def update_task_ended_at(self, task_id: int):
+        self.db.end_task(task_id)
+
+    def save_task_video(self, task_id: int, video_path: str):
+        self.db.save_task_video(task_id, video_path)
 

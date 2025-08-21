@@ -21,9 +21,19 @@ class CreateStepDto:
         self.screenshot_path = screenshot_path
 
 class StepManager:
+    _instance = None
+    _initialized = False
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(StepManager, cls).__new__(cls)
+        return cls._instance
+
     def __init__(self):
-        self.actual_step = None
-        self.step_repository = StepRepository()
+        if not self._initialized:
+            self.actual_step = None
+            self.step_repository = StepRepository()
+            StepManager._initialized = True
 
     def save_step(self, step: CreateStepDto):
         return self.step_repository.save(step)
@@ -36,6 +46,17 @@ class StepManager:
 
     def end_actual_step(self):
         self.actual_step = None
+
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    @classmethod
+    def reset_instance(cls):
+        cls._instance = None
+        cls._initialized = False
 
 class StepRepository: 
     def __init__(self):

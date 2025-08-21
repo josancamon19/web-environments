@@ -4,6 +4,9 @@ from typing import Optional
 from utils.get_iso_datetime import get_iso_datetime
 from source_data.schema import SCHEMA_SQL
 from storage_config import DB_PATH
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Database:
     """
@@ -143,3 +146,11 @@ class Database:
         )
         self.conn.commit()
         return cur.lastrowid
+
+    def save_task_video(self, task_id: int, video_path: str):
+        cur = self.conn.cursor()
+        cur.execute(
+            "UPDATE tasks SET video_path = ? WHERE id = ?", (video_path, task_id)
+        )
+        self.conn.commit()
+        

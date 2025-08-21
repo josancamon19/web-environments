@@ -1,5 +1,4 @@
 # Browser configuration constants
-
 BROWSER_ARGS = [
     '--no-first-run',
     '--no-default-browser-check',
@@ -37,6 +36,9 @@ BROWSER_ARGS = [
     '--password-store=basic',
     '--use-mock-keychain'
 ]
+
+
+
 
 CONTEXT_CONFIG = {
     'viewport': {'width': 1366, 'height': 768},

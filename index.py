@@ -47,6 +47,8 @@ async def main():
         def signal_handler(signum, frame):
             print(f'\n🛑 Task completed: "{task_description}"')
             print('🔄 Closing browser...')
+            task_manager.end_actual_task()
+            task_manager.save_task_video(task_manager.get_last_task_path())
             asyncio.create_task(stealth_browser.close())
             sys.exit(0)
         
@@ -56,6 +58,7 @@ async def main():
         await stealth_browser.page.goto('https://www.google.com')
         
         await stealth_browser.page.wait_for_load_state('domcontentloaded')
+
         
         await asyncio.Event().wait()
         
