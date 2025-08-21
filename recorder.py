@@ -2,13 +2,27 @@ import os
 import json
 import threading
 import time
+import logging
 from datetime import datetime
 from urllib.parse import urlparse, parse_qsl
+import sys
 
 from playwright.sync_api import sync_playwright
 
-from database import Database
+from source_data.database import Database
 
+class ImmediateFlushStreamHandler(logging.StreamHandler):
+    def emit(self, record):
+        super().emit(record)
+        sys.stdout.flush()  # Forzar flush automático después de cada log
+
+# Configuración básica del logger
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] - %(message)s",
+    handlers=[ImmediateFlushStreamHandler(sys.stdout),  logging.FileHandler("recorder.log")]  # Usar el handler personalizado
+)
+logger = logging.getLogger(__name__)
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 SCREENSHOTS_DIR = os.path.join(DATA_DIR, "screenshots")
@@ -51,7 +65,7 @@ def build_event_injection_script() -> str:
   function send(type, payload) {
     try {
       console.log('[RECORDER] Sending event:', type, payload);
-      window.__record_event(type, JSON.stringify({ ts: Date.now(), ...payload }));
+      window.__record_event(type, JSON.stringify({ ts: Date.now(), ...payload, dom: document.documentElement.outerHTML }));
     } catch (e) {
       console.error('[RECORDER] Failed to send event:', e);
     }
@@ -167,11 +181,11 @@ class TaskRecorder:
 
         # Bindings and scripts
         # Expose for all pages in context
-        print("[INIT] Exposing __record_event binding")
+        logger.info("Exposing __record_event binding")
         self.context.expose_binding("__record_event", self._on_user_event)
-        print("[INIT] Adding event injection script")
+        logger.info("Adding event injection script")
         self.context.add_init_script(build_event_injection_script())
-        print("[INIT] Adding stealth script")
+        logger.info("Adding stealth script")
         self.context.add_init_script(build_stealth_script())
 
         # Network listeners (context-wide)
@@ -180,8 +194,12 @@ class TaskRecorder:
 
         # Lifecycle listeners
         self.page = self.context.new_page()
+        self.page.on("console", self.handle_console_message)
         self._attach_page(self.page)
         self.context.on("page", self._attach_page)
+
+    def handle_console_message(self, message):
+        logger.debug(f"Console message: {message.text}")
 
     def _screenshot_path(self, prefix: str) -> str:
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")
@@ -245,6 +263,7 @@ class TaskRecorder:
             raise last_error
 
     def _attach_page(self, page):
+        print("Attach page: ", page)
         # Treat the most recently seen page as the active page for screenshots/DOM
         self.page = page
         try:
@@ -261,7 +280,8 @@ class TaskRecorder:
                     event_type="page:loaded",
                     event_data={"url": p.url},
                     prefix="page_loaded",
-                    page=p
+                    page=p,
+                    dom=p.content()
                 )
                 # This becomes the context for subsequent requests
                 with self._db_lock:
@@ -273,7 +293,8 @@ class TaskRecorder:
                         event_type="page:navigated",
                         event_data={"url": frame.url},
                         prefix="page_navigated",
-                        page=p
+                        page=p,
+                        dom=p.content()
                     )
                     with self._db_lock:
                         self._last_action_step_id = step_id
@@ -303,21 +324,24 @@ class TaskRecorder:
     def _capture_dom_and_screenshot(self, prefix: str, page=None):
         # Skip capture if we're shutting down
         if self._shutting_down:
-            print("[CAPTURE] Skipping DOM/screenshot during shutdown")
+            logger.debug("Skipping DOM/screenshot during shutdown")
             return "", None
             
         # Capture from the provided page if available; otherwise fall back to the last active page
         active_page = page or self.page
+        logger.info(f"Active page: {active_page.url}")
         dom_html = ""
         screenshot_path = None
         
         # Capture DOM
         try:
             if active_page and not active_page.is_closed():
+                logger.debug(f"Capturing DOM from {active_page}")
                 dom_html = active_page.content()
-                print(f"[DOM] Captured {len(dom_html)} chars of DOM")
+                logger.debug(f"DOM: {dom_html}")
+                logger.debug(f"Captured {len(dom_html)} chars of DOM")
         except Exception as e:
-            print(f"[DOM] Failed to capture DOM: {e}")
+            logger.error(f"Failed to capture DOM: {e}")
             dom_html = ""
         
         # Capture screenshot
@@ -326,25 +350,26 @@ class TaskRecorder:
                 screenshot_path = self._screenshot_path(prefix)
                 try:
                     active_page.screenshot(path=screenshot_path, full_page=True)
-                    print(f"[SCREENSHOT] Saved to {screenshot_path}")
+                    logger.debug(f"Screenshot saved to {screenshot_path}")
                 except Exception:
                     # Fallback to viewport-only screenshot if full page fails
                     try:
                         active_page.screenshot(path=screenshot_path, full_page=False)
-                        print(f"[SCREENSHOT] Saved viewport to {screenshot_path}")
+                        logger.debug(f"Viewport screenshot saved to {screenshot_path}")
                     except:
                         screenshot_path = None
         except Exception as e:
-            print(f"[SCREENSHOT] Failed to capture: {e}")
+            logger.error(f"Failed to capture screenshot: {e}")
             screenshot_path = None
         
         return dom_html, screenshot_path
 
     def _record_step(
-        self, event_type: str, event_data: dict, prefix: str, page=None
+        self, event_type: str, event_data: dict, prefix: str, page=None, dom=None
     ) -> int:
         timestamp = iso_now()
-        print(f"[RECORD_STEP] Recording {event_type} at {timestamp}")
+        logger.info(f"Recording {event_type} at {timestamp}")
+        logger.info(f"Page: {page.url}")
         # Always capture DOM and screenshot for user events
         dom_html, screenshot_path = self._capture_dom_and_screenshot(
             prefix, page=page
@@ -355,19 +380,22 @@ class TaskRecorder:
                 timestamp=timestamp,
                 event_type=event_type,
                 event_data=json.dumps(event_data, ensure_ascii=False),
-                dom_snapshot=dom_html,
+                dom_snapshot=dom,
+                # dom_snapshot=dom_html,
                 screenshot_path=screenshot_path,
             )
-            print(f"[RECORD_STEP] Saved step {step_id} to database immediately")
+            logger.info(f"Saved step {step_id} to database")
         return step_id
 
     # User actions coming from page binding
-    def _on_user_event(self, source, event_type: str, payload_json: str):
+    def _on_user_event(self, source, event_type: str, payload_json: str, dom: str):
+        logger.info(f"Hola entre evento, {repr(source)}")
+
         # Skip low-level mouse events - we only care about the high-level ones
         if event_type in ("pointerdown", "pointerup", "mousedown", "mouseup"):
             return  # Skip these, we'll capture 'click' instead
         
-        print(f"[EVENT] Received {event_type}")
+        logger.info(f"Received user event: {event_type}")
         
         # Always process user events - they're important!
         try:
@@ -381,12 +409,13 @@ class TaskRecorder:
         
         # Record against the originating page if available
         page = getattr(source, "page", None)
-        print(f"[EVENT] Recording {event_type}")
+        logger.info(f"Recording user event: {event_type}")
         step_id = self._record_step(
             event_type=f"action:{event_type}",
             event_data=payload,
             prefix=f"action_{event_type}",
             page=page,
+            dom=dom
         )
         
         # Remember this action for linking subsequent requests
@@ -395,6 +424,7 @@ class TaskRecorder:
 
     # Network request/response
     def _on_request(self, request):
+        logger.debug(f"Request: {request}")
         if self.stop_event.is_set() or self._shutting_down:
             return
         try:
@@ -404,7 +434,7 @@ class TaskRecorder:
         except Exception:
             return
         
-        print(f"[REQUEST] Recording {request.method} {request.url[:50]}... triggered by step {self._last_action_step_id}")
+        logger.info(f"Recording {request.method} {request.url[:50]}... triggered by step {self._last_action_step_id}")
         
         self.request_counter += 1
         request_uid = f"req_{self.request_counter}"
@@ -444,7 +474,7 @@ class TaskRecorder:
                 timestamp=iso_now(),
             )
             self.request_map[request] = request_id
-            print(f"[REQUEST] Saved request {request_id} to database")
+            logger.debug(f"Saved request {request_id} to database")
 
     def _on_response(self, response):
         if self.stop_event.is_set() or self._shutting_down:
@@ -460,7 +490,7 @@ class TaskRecorder:
         if not request_id:
             return  # No matching request found
         
-        print(f"[RESPONSE] Recording response for request {request_id}")
+        logger.info(f"Recording response for request {request_id}")
 
         headers = {}
         try:
@@ -491,37 +521,38 @@ class TaskRecorder:
                 body=body_bytes,
                 timestamp=iso_now(),
             )
-            print(f"[RESPONSE] Saved response {response_id} to database")
+            logger.debug(f"Saved response {response_id} to database")
 
-    def _record_state_change(self, name: str, details: dict, page=None):
+    def _record_state_change(self, name: str, details: dict, page=None, dom=None):
         if self.stop_event.is_set() or self._shutting_down:
             return
         self._record_step(
-            event_type=f"state:{name}", event_data=details, prefix=name, page=page
+            event_type=f"state:{name}", event_data=details, prefix=name, page=page, dom=dom
         )
 
     def run(self):
-        print("\nTask Recorder - Minimal MVP")
-        print("- A Chromium browser will open. Interact to perform the task.")
-        print('- When finished, return to this terminal and type "stop" then Enter.')
+        logger.info("Task Recorder - Starting")
+        logger.info("A Chromium browser will open. Interact to perform the task.")
+        logger.info('When finished, return to this terminal and type "stop" then Enter.')
         # Screenshots/DOM are captured automatically for every recorded step
 
         # First go to blank page to initialize
         self.page.goto("about:blank")
         
         # Create initial navigation step (this will be used for all initial requests)
-        print("[INIT] Creating initial navigation step")
+        logger.info("Creating initial navigation step")
         initial_step_id = self._record_step(
             event_type="page:navigate_start",
             event_data={"url": "https://www.google.com", "initial": True},
             prefix="initial_navigation",
-            page=self.page
+            page=self.page,
+            dom=self.page.content()
         )
         with self._db_lock:
             self._last_action_step_id = initial_step_id
         
         # Now navigate to the actual page
-        print("[INIT] Navigating to initial page")
+        logger.info("Navigating to initial page")
         self.page.goto("https://www.google.com")
 
         # Input thread for commands
@@ -532,16 +563,16 @@ class TaskRecorder:
                 except EOFError:
                     break
                 if cmd in ("stop", "quit", "exit", "done"):
-                    print("Stopping recording...")
+                    logger.info("Stopping recording...")
                     # Mark as shutting down to prevent hanging on DOM capture
-                    self._shutting_down = True
+                    # self._shutting_down = True
                     # Give browser time to send any final events
                     time.sleep(0.5)
                     # Then stop
                     self.stop_event.set()
                     break
                 else:
-                    print(f"Unknown command '{cmd}'. Type 'stop' to end recording.")
+                    logger.warning(f"Unknown command '{cmd}'. Type 'stop' to end recording.")
 
         t = threading.Thread(target=stdin_listener, daemon=True)
         t.start()
@@ -551,6 +582,7 @@ class TaskRecorder:
         self.shutdown()
 
     def _begin_shutdown(self):
+        print("Begin shutdown")
         self._shutting_down = True
         # Detach context-level listeners
         try:
@@ -583,9 +615,9 @@ class TaskRecorder:
             if os.path.exists(video_dir):
                 video_files = [f for f in os.listdir(video_dir) if f.endswith('.webm')]
                 if video_files:
-                    print(f"[VIDEO] Saved recording to {os.path.join(video_dir, video_files[0])}")
+                    logger.info(f"Video recording saved to {os.path.join(video_dir, video_files[0])}")
         except Exception as e:
-            print(f"[VIDEO] Error checking video: {e}")
+            logger.error(f"Error checking video: {e}")
         
         try:
             with self._db_lock:
@@ -607,17 +639,16 @@ class TaskRecorder:
                 self.db.close()
             except Exception:
                 pass
-        print(f"Saved task #{self.task_id} to {DB_PATH}")
+        logger.info(f"Saved task #{self.task_id} to {DB_PATH}")
 
 
 def main():
-    print(
-        "Enter a short description for this task (e.g., 'Buy me a coffee in DoorDash'):"
-    )
+    print("Enter a short description for this task (e.g., 'Buy me a coffee in DoorDash'):")
     description = input("> ").strip()
     if not description:
         description = f"Task started {iso_now()}"
 
+    logger.info(f"Starting task: {description}")
     recorder = TaskRecorder(description)
     recorder.run()
 
