@@ -63,7 +63,7 @@ async def main():
         await asyncio.Event().wait()
         
     except Exception as error:
-        print(f'Error: {error}')
+        print(f'Ha ocurrido un error al ejecutar la tarea: {error}')
         await stealth_browser.close()
 
 if __name__ == "__main__":

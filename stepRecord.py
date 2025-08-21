@@ -17,7 +17,7 @@ class StepRecord:
         self.actual_page = ActualPage()
         self.step_manager = StepManager()
 
-    async def record_step(self, step_info: dict):
+    async def record_step(self, step_info: dict, omit_screenshot: bool = False):
         timestamp = get_iso_datetime()
         actual_task = self.task_manager.get_actual_task()
 
@@ -28,27 +28,32 @@ class StepRecord:
         logger.info(f"Actual task: {actual_task.id}")
         logger.info(f"Timestamp: {timestamp}")
 
-        screenshot_path = get_screenshot_path(actual_task.id, step_info['prefix_action'])
+        context_type_action = f"{step_info['event_info']['event_context']}:{step_info['event_info']['event_type']}"
+        context_type_action_formatted = context_type_action.replace(":", "_")
+        
+        screenshot_path = get_screenshot_path(actual_task.id, context_type_action_formatted)
         logger.info(f"Screenshot path: {screenshot_path}")
-        await self.take_screenshot(screenshot_path)
+
+        if not omit_screenshot:
+            await self.take_screenshot(screenshot_path)
 
         step_id = self.db.insert_step(
                 task_id=actual_task.id,
                 timestamp=timestamp,
-                event_type=step_info['event_info']['event_type'],
+                event_type=context_type_action,
                 event_data=json.dumps(step_info['event_info']['event_data'], ensure_ascii=False),
                 dom_snapshot=step_info['event_info']['dom_snapshot'] or '',
-                screenshot_path=screenshot_path,
+                screenshot_path=screenshot_path if not omit_screenshot else '',
             )
         
         self.step_manager.set_actual_step(Step(
             id=step_id,
             task_id=actual_task.id,
             timestamp=timestamp,
-            event_type=step_info['event_info']['event_type'],
+            event_type=context_type_action,
             event_data=json.dumps(step_info['event_info']['event_data'], ensure_ascii=False),
             dom_snapshot='',
-            screenshot_path=screenshot_path,
+            screenshot_path=screenshot_path if not omit_screenshot else '',
         ))        
 
     async def take_screenshot(self, screenshot_path: str):
