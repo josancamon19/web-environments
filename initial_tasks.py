@@ -5,8 +5,8 @@ from source_data.database import Database
 
 logger = logging.getLogger(__name__)
 
-class InitialTasks:
 
+class InitialTasks:
     def __init__(self):
         pass
 
@@ -19,4 +19,3 @@ class InitialTasks:
 
     def run(self):
         self.create_storage_dirs()
- 
