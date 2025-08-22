@@ -17,15 +17,13 @@ python -m playwright install chromium
 Run
 ```
 source .venv/bin/activate
-RECORDER_BROWSER_CHANNEL=chrome python recorder.py
+RECORDER_BROWSER_CHANNEL=chrome python index.py
 ```
 
 Usage
 - Enter a task description when prompted (e.g., "Buy me a coffee in DoorDash").
 - A Chromium window opens. Interact freely.
-- In the terminal:
-  - Type `shot` to force a screenshot step.
-  - Type `save`, then confirm with `y` to persist the task and close the browser.
+- For now ctrl + z to finish
 
 What gets recorded
 - Actions: click, contextmenu, keydown, input, scroll
@@ -36,6 +34,7 @@ What gets recorded
 Storage
 - SQLite DB at `data/tasks.db`
 - Screenshots at `data/screenshots/`
+- Video Tasks at `data/videos`
 
 Notes
 - This is an MVP and will capture response bodies which can be large. For production, consider size limits and redaction.
