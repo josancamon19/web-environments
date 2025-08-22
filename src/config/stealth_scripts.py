@@ -49,7 +49,6 @@ console.log('🎯 Page event listener script loaded');
 
  function sendEventPage(type, context, payload) {
     try {
-      console.log('[RECORDER] Sending event:', type, payload);
       window.onPageEvent({
         event_type: type,
         event_context: context,
@@ -78,7 +77,6 @@ function setupPageEventListener() {
             x: window.scrollX,
             y: window.scrollY
         };
-        console.log('📤 Sending scroll info:', info);
         sendEventPage('scroll', 'action:user', info);
 
         setTimeout(() => { scrollArmed = true; }, 500);
@@ -95,7 +93,6 @@ function setupPageEventListener() {
             x: e.clientX,
             y: e.clientY
         };
-        console.log('📤 Sending click info:', info);
         sendEventPage('click', 'action:user', info);
     }, { capture: true });
 
@@ -110,7 +107,6 @@ function setupPageEventListener() {
             y: e.clientY,
             button: e.button
         };
-        console.log('📤 Sending mousedown info:', info);
         sendEventPage('mousedown', 'action:user', info);
     }, { capture: true });
 
@@ -125,7 +121,6 @@ function setupPageEventListener() {
             y: e.clientY,
             button: e.button
         };
-        console.log('📤 Sending mouseup info:', info);
         sendEventPage('mouseup', 'action:user', info);
     }, { capture: true });
 
@@ -141,7 +136,6 @@ function setupPageEventListener() {
             button: e.button,
             pointerType: e.pointerType
         };
-        console.log('📤 Sending pointerdown info:', info);
         sendEventPage('pointerdown', 'action:user', info);
     }, { capture: true });
 
@@ -157,7 +151,6 @@ function setupPageEventListener() {
             button: e.button,
             pointerType: e.pointerType
         };
-        console.log('📤 Sending pointerup info:', info);
         sendEventPage('pointerup', 'action:user', info);
     }, { capture: true });
 
@@ -171,7 +164,6 @@ function setupPageEventListener() {
             x: e.clientX,
             y: e.clientY
         };
-        console.log('📤 Sending contextmenu info:', info);
         sendEventPage('contextmenu', 'action:user', info);
     }, { capture: true });
 
@@ -185,7 +177,6 @@ function setupPageEventListener() {
                 className: element.className,
                 value: element.value || ''
             };
-            console.log('📤 Sending input info:', info);
             sendEventPage('input', 'action:user', info);
         } catch (_) {}
     }, { capture: true });
@@ -201,12 +192,10 @@ function setupPageEventListener() {
             altKey: e.altKey,
             shiftKey: e.shiftKey
         };
-        console.log('📤 Sending keydown info:', info);
         sendEventPage('keydown', 'action:user', info);
     }, { capture: true });
 
     document.addEventListener('click', (event) => {
-        console.log('👆 Click event triggered');
         const element = event.target;
         const info = {
             tag: element.tagName,
@@ -216,24 +205,20 @@ function setupPageEventListener() {
             x: event.clientX,
             y: event.clientY
         };
-        console.log('📤 Sending click info:', info);
         sendEventPage('click', 'action:user', info);
     });
 
     document.addEventListener('DOMContentLoaded', (event) => {
-        console.log('📄 DOMContentLoaded event triggered');
         const info = {
             message: 'DOM fully loaded and parsed',
             url: window.location.href, // Get the current URL
             title: document.title, // Get the title of the page
             timestamp: Date.now() // Capture the timestamp for when the event occurred
         };
-        console.log('📤 Sending DOMContentLoaded info:', info);
         sendEventPage('domcontentloaded', 'state:page', info);
     });
 
     window.addEventListener('load', (event) => {
-    console.log('🌐 Load event triggered');
     const info = {
         message: 'Page fully loaded',
         url: window.location.href, // Get the current URL

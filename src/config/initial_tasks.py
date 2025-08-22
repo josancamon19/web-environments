@@ -1,7 +1,7 @@
 import os
 import logging
-from storage_config import *
-from source_data.database import Database
+from src.config.storage_config import *
+from src.source_data.database import Database
 
 logger = logging.getLogger(__name__)
 

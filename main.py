@@ -2,10 +2,10 @@ import asyncio
 import signal
 import sys
 import logging
-from stealth_browser import StealthBrowser
-from initial_tasks import InitialTasks
-from task import TaskManager, CreateTaskDto, Task
-from utils.get_task_description import get_task_description_from_user
+from src.browser.stealth_browser import StealthBrowser
+from src.config.initial_tasks import InitialTasks
+from src.tasks.task import TaskManager, CreateTaskDto, Task
+from src.utils.get_task_description import get_task_description_from_user
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"

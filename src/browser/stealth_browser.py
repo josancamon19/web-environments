@@ -1,18 +1,17 @@
-import asyncio
 import logging
 from playwright.async_api import async_playwright
-from browser_config import BROWSER_ARGS, CONTEXT_CONFIG
-from stealth_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
-from stepRecord import StepRecord
-from actual_page import ActualPage
-from utils.get_tasks_video_path import get_tasks_video_path
-from task import TaskManager
+from src.config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
+from src.config.stealth_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
+from src.steps.stepRecord import StepRecord
+from src.page.actual_page import ActualPage
+from src.utils.get_tasks_video_path import get_tasks_video_path
+from src.tasks.task import TaskManager
 import sys
-from request_event import Request_Event
-from response_event import Response_Event
-from new_page_event import NewPageEvent
+from src.requests.request_event import Request_Event
+from src.responses.response_event import Response_Event
+from src.page.new_page_event import NewPageEvent
 import os
-from storage_config import DATA_DIR
+from src.config.storage_config import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -32,68 +31,20 @@ class StealthBrowser:
         self.playwright = await async_playwright().start()
         
  # Prefer system Chrome with a persistent user profile; reduce automation fingerprints
-        preferred_channel = (
-            os.environ.get("RECORDER_BROWSER_CHANNEL", "chrome").strip() or None
-        )
-        user_data_dir = os.environ.get("RECORDER_USER_DATA_DIR") or os.path.join(
-            DATA_DIR, "user-data"
-        )
-        # args = ["--disable-blink-features=AutomationControlled"]
-        ignore_default_args = [
-            "--enable-automation",
-            "--use-mock-keychain",
-            "--password-store=basic",
-        ]
-        VIDEO_TASK_PATH = get_tasks_video_path()\
+
+        VIDEO_TASK_PATH = get_tasks_video_path()
         
         task_manager = TaskManager()
         task_manager.set_last_task_path(VIDEO_TASK_PATH)  
 
-        if preferred_channel:
-            try:
-                self.context = await self.playwright.chromium.launch_persistent_context(
-                    user_data_dir=user_data_dir,
-                    channel=preferred_channel,
-                    headless=False,
-                    args=BROWSER_ARGS,
-                    ignore_default_args=ignore_default_args,
-                    record_video_dir=VIDEO_TASK_PATH,
-                    record_video_size={"width": 1280, "height": 720},
-                )
-            except Exception as e:
-                logger.error(f"[LAUNCH_BROWSER] Error launching browser: {e}")
-        try:
-            self.context = await self.playwright.chromium.launch_persistent_context(
-                user_data_dir=user_data_dir,
-                headless=False,
-                args=BROWSER_ARGS,
-                ignore_default_args=ignore_default_args,
-                record_video_dir=VIDEO_TASK_PATH,
-                record_video_size={"width": 1280, "height": 720},
-            )
-        except Exception as e:
-            logger.error(f"[LAUNCH_BROWSER] Error launching browser: {e}")
-
-        try:
-            # Launch browser with stealth args
-            self.browser = await self.playwright.chromium.launch(
-                headless=False,
-                args=BROWSER_ARGS
-            )
-            # self.browser.on("close", self.manual_browser_close)
-            # Create context
-            self.context = await self.browser.new_context(**CONTEXT_CONFIG, record_video_dir=VIDEO_TASK_PATH, record_video_size={'width': 1280, 'height': 720})
-
-        except Exception as e:
-            logger.error(f"[LAUNCH_BROWSER] Error launching browser: {e}")
-            raise e
+        self.context = await self.open_browser_context(VIDEO_TASK_PATH)
 
         self.context.on("request", self.request_event.listen_for_request)
         self.context.on("response", self.response_event.listen_for_response)
 
         self.page = await self.context.new_page()
 
-        self.page_event.attach_page(self.page)
+        await self.page_event.attach_page(self.page)
 
         self.context.on("page", self.page_event.attach_page)
 
@@ -148,7 +99,63 @@ class StealthBrowser:
             await self.playwright.stop()
         if self.page_event:
             self.page_event.detach_all_page_listeners()
-      
+    
+    async def open_browser_context(self, video_task_path: str):
+        """Open browser context"""
+        preferred_channel = (
+            os.environ.get("RECORDER_BROWSER_CHANNEL", "chrome").strip() or None
+        )
+        user_data_dir = os.environ.get("RECORDER_USER_DATA_DIR") or os.path.join(
+            DATA_DIR, "user-data"
+        )
+        # args = ["--disable-blink-features=AutomationControlled"]
+        ignore_default_args = [
+            "--enable-automation",
+            "--use-mock-keychain",
+            "--password-store=basic",
+        ]
+        if preferred_channel:
+            try:
+                self.context = await self.playwright.chromium.launch_persistent_context(
+                    user_data_dir=user_data_dir,
+                    channel=preferred_channel,
+                    headless=False,
+                    args=BROWSER_ARGS,
+                    ignore_default_args=ignore_default_args,
+                    record_video_dir=video_task_path,
+                    record_video_size={"width": 1280, "height": 720},
+                )
+                return self.context
+            except Exception as e:
+                logger.error(f"[LAUNCH_BROWSER] Error launching browser: {e}")
+
+        try:
+            self.context = await self.playwright.chromium.launch_persistent_context(
+                user_data_dir=user_data_dir,
+                headless=False,
+                args=BROWSER_ARGS,
+                ignore_default_args=ignore_default_args,
+                record_video_dir=video_task_path,
+                record_video_size={"width": 1280, "height": 720},
+            )
+            return self.context
+        
+        except Exception as e:
+            logger.error(f"[LAUNCH_BROWSER] Error launching browser: {e}")
+
+        try:
+            # Launch browser with stealth args
+            self.browser = await self.playwright.chromium.launch(
+                headless=False,
+                args=BROWSER_ARGS
+            )
+            # self.browser.on("close", self.manual_browser_close)
+            # Create context
+            self.context = await self.browser.new_context(**CONTEXT_CONFIG, record_video_dir=video_task_path, record_video_size={'width': 1280, 'height': 720})
+            return self.context
+        except Exception as e:
+            logger.error(f"[LAUNCH_BROWSER] Error launching browser: {e}")
+            raise e
 
     async def manual_browser_close(self):
         logger.info("Browser closed manually")

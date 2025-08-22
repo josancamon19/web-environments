@@ -1,8 +1,8 @@
 import os
 
-from utils.get_iso_datetime import get_iso_datetime
-from storage_config import VIDEOS_DIR
-from task import TaskManager
+from src.utils.get_iso_datetime import get_iso_datetime
+from src.config.storage_config import VIDEOS_DIR
+from src.tasks.task import TaskManager
 import logging
 
 logger = logging.getLogger(__name__)
