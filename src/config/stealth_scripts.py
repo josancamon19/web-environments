@@ -195,6 +195,7 @@ function setupPageEventListener() {
         sendEventPage('keydown', 'action:user', info);
     }, { capture: true });
 
+
     document.addEventListener('DOMContentLoaded', (event) => {
         const info = {
             message: 'DOM fully loaded and parsed',
