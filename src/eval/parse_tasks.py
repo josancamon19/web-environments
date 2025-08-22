@@ -102,27 +102,18 @@ def create_selector(event_data: Dict[str, Any]) -> str:
     return tag if tag else "*"
 
 
-def task_to_eval(
-    task_id: int, db_path: str = "data/tasks.db", output_path: str = "data/tasks.jsonl"
-):
+def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str, Any]:
     """
-    Convert a task from the database into a list of tool calls.
+    Process a single task and convert it to tool calls.
 
     Args:
+        cursor: Database cursor
         task_id: The ID of the task to convert
-        db_path: Path to the SQLite database
-        output_path: Path to the output JSONL file
+        task_description: Description of the task
+
+    Returns:
+        Dictionary with task data and tool calls
     """
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    # Get task description
-    cursor.execute("SELECT description FROM tasks WHERE id = ?", (task_id,))
-    task_result = cursor.fetchone()
-    if not task_result:
-        raise ValueError(f"Task with id {task_id} not found")
-
-    task_description = task_result[0]
 
     # Get all steps for the task with DOM snapshots
     cursor.execute(
@@ -136,7 +127,6 @@ def task_to_eval(
     )
 
     steps = cursor.fetchall()
-    conn.close()
 
     tool_calls = []
     typing_buffer = None
@@ -304,31 +294,60 @@ def task_to_eval(
     if click_buffer:
         tool_calls.append(click_buffer)
 
-    # Prepare output data
-    output_data = {
+    # Return output data
+    return {
         "task_id": task_id,
         "task_description": task_description,
         "tool_calls": [tc.to_dict() for tc in tool_calls],
     }
 
-    # Append to JSONL file
+
+def parse(db_path: str = "data/tasks.db", output_path: str = "data/tasks.jsonl"):
+    """
+    Convert all tasks from the database into tool calls and write to JSONL file.
+
+    Args:
+        db_path: Path to the SQLite database
+        output_path: Path to the output JSONL file
+    """
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Get all tasks
+    cursor.execute("SELECT id, description FROM tasks ORDER BY id")
+    tasks = cursor.fetchall()
+
+    if not tasks:
+        print("No tasks found in database")
+        return
+
+    all_results = []
+
+    for task_id, task_description in tasks:
+        try:
+            print(f"Processing task {task_id}: {task_description}")
+            result = process_single_task(cursor, task_id, task_description)
+            all_results.append(result)
+            print(f"  Found {len(result['tool_calls'])} tool calls")
+        except Exception as e:
+            print(f"  Error processing task {task_id}: {e}")
+            continue
+
+    conn.close()
+
+    # Write all results to file at once (not append)
     output_file = Path(output_path)
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(output_file, "a") as f:
-        f.write(json.dumps(output_data) + "\n")
+    with open(output_file, "w") as f:
+        for result in all_results:
+            f.write(json.dumps(result) + "\n")
 
-    return output_data
+    print(f"\nSuccessfully processed {len(all_results)} tasks")
+    print(f"Results written to {output_path}")
+
+    return all_results
 
 
 if __name__ == "__main__":
-    import sys
-
-    if len(sys.argv) < 2:
-        print("Usage: python task_to_eval.py <task_id>")
-        sys.exit(1)
-
-    task_id = int(sys.argv[1])
-    result = task_to_eval(task_id)
-    print(f"Converted task {task_id} to evaluation format")
-    print(f"Found {len(result['tool_calls'])} tool calls")
+    parse()
