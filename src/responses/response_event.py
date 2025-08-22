@@ -1,9 +1,9 @@
 import logging
-from task import TaskManager
-from request_event import Request_Event
+from src.tasks.task import TaskManager
+from src.requests.request_event import Request_Event
 import json
-from utils.get_iso_datetime import get_iso_datetime
-from source_data.database import Database
+from src.utils.get_iso_datetime import get_iso_datetime
+from src.source_data.database import Database
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +33,10 @@ class Response_Event:
 
         request_id = self.request_event.request_map.get(req)
         if not request_id:
-            logger.warning(f"[RESPONSE] No matching request found for response {response.url}")
+            # logger.warning(f"[RESPONSE] No matching request found for response {response.url}")
             return  # No matching request found
 
-        logger.info(f"[RESPONSE] Recording response for request {request_id}")
+        # logger.info(f"[RESPONSE] Recording response for request {request_id}")
 
         headers = {}
         try:
@@ -66,4 +66,4 @@ class Response_Event:
             body=body_bytes,
             timestamp=get_iso_datetime(),
         )
-        logger.info(f"[RESPONSE] Saved response {response_id} to database")
+        # logger.info(f"[RESPONSE] Saved response {response_id} to database")

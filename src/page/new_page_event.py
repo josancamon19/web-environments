@@ -1,5 +1,5 @@
 import logging
-from stepRecord import StepRecord
+from src.steps.stepRecord import StepRecord
 logger = logging.getLogger(__name__)
 
 class NewPageEvent:
@@ -10,20 +10,17 @@ class NewPageEvent:
     async def attach_page(self, page):
         
         await page.wait_for_load_state("load")  # Esto garantiza que todos los recursos de la página se han cargado
-
         # Treat the most recently seen page as the active page for screenshots/DOM
-        logger.info(f"[ATTACH_PAGE] Attaching listeners to page: {page.url}")
-
+        # logger.info(f"[ATTACH_PAGE] Attaching listeners to page: {page.url}")
         try:
             # No need to re-inject scripts here since context.add_init_script handles it
             # Just ensure the page-specific binding is there (defensive)
             # The context-level expose_binding should already work, but add page-level too
-            logger.info("[ATTACH_PAGE] Page attached with context-level scripts already active")
-
+            # logger.info("[ATTACH_PAGE] Page attached with context-level scripts already active")
             # Bind page at definition time to avoid late-binding issues
-            def on_domcontentloaded(p=page):
-                logger.info(f"[PAGE_EVENT] DOM content loaded for {p.url}")
-                self.step_record.record_step(
+            async def on_domcontentloaded(p=page):
+                # logger.info(f"[PAGE_EVENT] DOM content loaded for {p.url}")
+                await self.step_record.record_step(
                     {
                         "event_info": {
                             "event_type": "domcontentloaded",
@@ -34,12 +31,12 @@ class NewPageEvent:
                     }
                 )
 
-            def on_load(p=page):
-                logger.info(f"[PAGE_EVENT] Page loaded: {p.url}")
+            async def on_load(p=page):
+                # logger.info(f"[PAGE_EVENT] Page loaded: {p.url}")
                 # Scripts are already injected by context.add_init_script
 
                 # Record page load as a high-level event
-                self.step_record.record_step(
+                await self.step_record.record_step(
                     {
                         "event_info": {
                             "event_type": "loaded",
@@ -51,11 +48,11 @@ class NewPageEvent:
                 )
 
 
-            def on_framenavigated(frame, p=page):
+            async def on_framenavigated(frame, p=page):
                 if frame == p.main_frame:  # Only track main frame navigation
-                    logger.info(f"[PAGE_EVENT] Main frame navigated to {frame.url}")
+                    # logger.info(f"[PAGE_EVENT] Main frame navigated to {frame.url}")
                     # Scripts are already injected by context.add_init_script
-                    self.step_record.record_step(
+                    await self.step_record.record_step(
                         {
                             "event_info": {
                                 "event_type": "navigated",
@@ -87,7 +84,7 @@ class NewPageEvent:
                     page.off(event_name, handler)
                 except Exception as e:
                     logger.error(f"[DETACH_PAGE] Error detaching page listeners: {e}")
-            logger.info(f"[DETACH_PAGE] Page listeners detached")
+            # logger.info(f"[DETACH_PAGE] Page listeners detached")
         except Exception as e:
             logger.error(f"[DETACH_PAGE] Error detaching page listeners: {e}")
     

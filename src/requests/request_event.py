@@ -1,9 +1,9 @@
 import logging
-from task import TaskManager
-from step import StepManager
+from src.tasks.task import TaskManager
+from src.steps.step import StepManager
 import json
-from utils.get_iso_datetime import get_iso_datetime
-from source_data.database import Database   
+from src.utils.get_iso_datetime import get_iso_datetime
+from src.source_data.database import Database   
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +32,10 @@ class Request_Event:
                 return
         except Exception:
             return
-        logger.info(f"StepManager: {self.stepManager.get_actual_step()}")
-        logger.info(
-            f"[REQUEST] Recording {request.method} {request.url[:50]}... triggered by step {self.stepManager.get_actual_step().id}"
-        )
+        # logger.info(f"StepManager: {self.stepManager.get_actual_step()}")
+        # logger.info(
+        #     f"[REQUEST] Recording {request.method} {request.url[:50]}... triggered by step {self.stepManager.get_actual_step().id}"
+        # )
 
         self.request_step_counter += 1
         request_uid = f"req_{self.request_step_counter}"
@@ -74,4 +74,4 @@ class Request_Event:
             timestamp=get_iso_datetime(),
         )
         self.request_map[request] = request_id
-        logger.info(f"[REQUEST] Saved request {request_id} to database")
+        # logger.info(f"[REQUEST] Saved request {request_id} to database")

@@ -1,6 +1,6 @@
 import os
-from utils.get_iso_datetime import get_iso_datetime
-from storage_config import SCREENSHOTS_DIR
+from src.utils.get_iso_datetime import get_iso_datetime
+from src.config.storage_config import SCREENSHOTS_DIR
 
 
 def get_screenshot_path(task_id: int, prefix: str):
