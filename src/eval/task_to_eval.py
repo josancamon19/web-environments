@@ -2,8 +2,9 @@ from enum import Enum
 import sqlite3
 import json
 from dataclasses import dataclass
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pathlib import Path
+from html.parser import HTMLParser
 
 
 class ToolCall(Enum):
@@ -20,6 +21,70 @@ class ToolCallData:
 
     def to_dict(self):
         return {"type": self.type, "params": self.params, "step_ids": self.step_ids}
+
+
+class ElementExtractor(HTMLParser):
+    """Extract element attributes from DOM HTML."""
+
+    def __init__(self, target_id: str = None, target_classes: List[str] = None):
+        super().__init__()
+        self.target_id = target_id
+        self.target_classes = set(target_classes) if target_classes else set()
+        self.found_element = None
+        self.current_attrs = {}
+
+    def handle_starttag(self, tag, attrs):
+        attrs_dict = dict(attrs)
+        element_id = attrs_dict.get("id", "")
+        element_classes = set(attrs_dict.get("class", "").split())
+
+        # Check if this is our target element
+        if (self.target_id and element_id == self.target_id) or (
+            self.target_classes and self.target_classes.issubset(element_classes)
+        ):
+            self.found_element = {
+                "tag": tag,
+                "id": element_id,
+                "class": attrs_dict.get("class", ""),
+                "name": attrs_dict.get("name", ""),
+                "type": attrs_dict.get("type", ""),
+                "role": attrs_dict.get("role", ""),
+                "aria-label": attrs_dict.get("aria-label", ""),
+                "placeholder": attrs_dict.get("placeholder", ""),
+                "title": attrs_dict.get("title", ""),
+                "value": attrs_dict.get("value", ""),
+                "href": attrs_dict.get("href", ""),
+                "text": attrs_dict.get("text", ""),
+            }
+            # Remove empty attributes
+            self.found_element = {k: v for k, v in self.found_element.items() if v}
+
+
+def extract_element_context(
+    dom_snapshot: str, event_data: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Extract rich context about an element from DOM snapshot."""
+    if not dom_snapshot:
+        return {}
+
+    element_id = event_data.get("id", "")
+    class_name = event_data.get("className", "")
+
+    if not element_id and not class_name:
+        return {}
+
+    classes = class_name.split() if class_name else []
+
+    try:
+        parser = ElementExtractor(target_id=element_id, target_classes=classes)
+        parser.feed(dom_snapshot)
+
+        if parser.found_element:
+            return parser.found_element
+    except Exception:
+        pass
+
+    return {}
 
 
 def create_selector(event_data: Dict[str, Any]) -> str:
@@ -59,10 +124,10 @@ def task_to_eval(
 
     task_description = task_result[0]
 
-    # Get all steps for the task
+    # Get all steps for the task with DOM snapshots
     cursor.execute(
         """
-        SELECT id, event_type, event_data 
+        SELECT id, event_type, event_data, dom_snapshot 
         FROM steps 
         WHERE task_id = ? 
         ORDER BY id
@@ -77,7 +142,7 @@ def task_to_eval(
     typing_buffer = None
     click_buffer = None  # Buffer to accumulate related click events
 
-    for step_id, event_type, event_data_str in steps:
+    for step_id, event_type, event_data_str, dom_snapshot in steps:
         if event_data_str:
             try:
                 event_data = json.loads(event_data_str)
@@ -108,9 +173,13 @@ def task_to_eval(
             # Start or continue accumulating click-related events
             if click_buffer is None:
                 selector = create_selector(event_data)
+                context = extract_element_context(dom_snapshot, event_data)
+                params = {"selector": selector}
+                if context:
+                    params["selector_details"] = context
                 click_buffer = ToolCallData(
                     type=ToolCall.CLICK.value,
-                    params={"selector": selector},
+                    params=params,
                     step_ids=[step_id],
                 )
             else:
@@ -124,16 +193,23 @@ def task_to_eval(
                 typing_buffer = None
 
             selector = create_selector(event_data)
+            context = extract_element_context(dom_snapshot, event_data)
 
             # If we have a click buffer and it's for the same element, add to it
             if click_buffer and click_buffer.params.get("selector") == selector:
                 click_buffer.step_ids.append(step_id)
+                # Update context if we have better info
+                if context and "selector_details" not in click_buffer.params:
+                    click_buffer.params["selector_details"] = context
             elif click_buffer:
                 # Different element, save the old buffer and start new
                 tool_calls.append(click_buffer)
+                params = {"selector": selector}
+                if context:
+                    params["selector_details"] = context
                 click_buffer = ToolCallData(
                     type=ToolCall.CLICK.value,
-                    params={"selector": selector},
+                    params=params,
                     step_ids=[step_id],
                 )
             else:
@@ -144,10 +220,16 @@ def task_to_eval(
                     and tool_calls[-1].params.get("selector") == selector
                 ):
                     tool_calls[-1].step_ids.append(step_id)
+                    # Update context if we have better info
+                    if context and "selector_details" not in tool_calls[-1].params:
+                        tool_calls[-1].params["selector_details"] = context
                 else:
+                    params = {"selector": selector}
+                    if context:
+                        params["selector_details"] = context
                     click_buffer = ToolCallData(
                         type=ToolCall.CLICK.value,
-                        params={"selector": selector},
+                        params=params,
                         step_ids=[step_id],
                     )
 
@@ -193,10 +275,28 @@ def task_to_eval(
                 typing_buffer.params["text"] = event_data.get("value", "")
                 typing_buffer.step_ids.append(step_id)
 
-                # Also update selector if we have better info
+                # Also update selector and context if we have better info
                 selector = create_selector(event_data)
                 if selector != "*":
                     typing_buffer.params["selector"] = selector
+
+                # Add element context if not already present
+                if "selector_details" not in typing_buffer.params:
+                    context = extract_element_context(dom_snapshot, event_data)
+                    if context:
+                        typing_buffer.params["selector_details"] = context
+                    # If still no context, try to get it from the previous click
+                    elif tool_calls:
+                        for tc in reversed(tool_calls):
+                            if (
+                                tc.type == ToolCall.CLICK.value
+                                and tc.params.get("selector") == selector
+                            ):
+                                if "selector_details" in tc.params:
+                                    typing_buffer.params["selector_details"] = (
+                                        tc.params["selector_details"]
+                                    )
+                                break
 
     # Don't forget any pending buffers at the end
     if typing_buffer:
