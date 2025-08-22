@@ -195,19 +195,6 @@ function setupPageEventListener() {
         sendEventPage('keydown', 'action:user', info);
     }, { capture: true });
 
-    document.addEventListener('click', (event) => {
-        const element = event.target;
-        const info = {
-            tag: element.tagName,
-            id: element.id,
-            className: element.className,
-            text: element.innerText?.substring(0, 50) || '',
-            x: event.clientX,
-            y: event.clientY
-        };
-        sendEventPage('click', 'action:user', info);
-    });
-
     document.addEventListener('DOMContentLoaded', (event) => {
         const info = {
             message: 'DOM fully loaded and parsed',
