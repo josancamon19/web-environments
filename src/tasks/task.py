@@ -6,14 +6,16 @@ logger = logging.getLogger(__name__)
 
 
 class Task:
-    def __init__(self, id: int, description: str):
+    def __init__(self, id: int, description: str, task_type: str = "action"):
         self.id = id
         self.description = description
+        self.task_type = task_type
 
 
 class CreateTaskDto:
-    def __init__(self, description: str):
+    def __init__(self, description: str, task_type: str = "action"):
         self.description = description
+        self.task_type = task_type
 
 
 class TaskManager:
@@ -78,7 +80,7 @@ class TaskRepository:
         self.db = Database.get_instance()
 
     def save(self, task: CreateTaskDto) -> int:
-        task_id = self.db.start_task(task.description)
+        task_id = self.db.start_task(task.description, task.task_type)
         return task_id
 
     def update_task_ended_at(self, task_id: int):

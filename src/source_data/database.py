@@ -65,15 +65,15 @@ class Database:
         """Get database file path"""
         return self.db_path if hasattr(self, 'db_path') else ""
 
-    def start_task(self, description: str) -> int:
+    def start_task(self, description: str, task_type: str = "action") -> int:
         created_at = get_iso_datetime()
         cur = self.conn.cursor()
         cur.execute(
-            "INSERT INTO tasks(description, created_at) VALUES (?, ?)",
-            (description, created_at),
+            "INSERT INTO tasks(description, task_type, created_at) VALUES (?, ?, ?)",
+            (description, task_type, created_at),
         )
         self.conn.commit()
-        print(f"Task started: {cur.lastrowid}")
+        print(f"Task started: {cur.lastrowid} (Type: {task_type})")
         return cur.lastrowid
 
     def end_task(self, task_id: int):

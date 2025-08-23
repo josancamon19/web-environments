@@ -399,3 +399,6 @@ if __name__ == "__main__":
     asyncio.run(main())
     # - note: submit/enter vs click depends on how agents generally do it, for now is already saved in typing
     # TODO: hover events (?)
+    # TODO: completion evaluation
+    # - info retrieval str match or llm as judge
+    # - action based, DOM/final state? llm as judge?

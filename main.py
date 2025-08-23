@@ -5,7 +5,7 @@ import logging
 from src.browser.stealth_browser import StealthBrowser
 from src.config.initial_tasks import InitialTasks
 from src.tasks.task import TaskManager, CreateTaskDto, Task
-from src.utils.get_task_description import get_task_description_from_user
+from src.utils.get_task_description import get_task_description_from_user, get_task_type_from_user
 
 logging.basicConfig(
     level=logging.DEBUG,  # Changed to DEBUG to see all logs
@@ -26,16 +26,17 @@ async def main():
     initial_tasks.run()
     print("Initial tasks completed")
 
-    # Get task description from user
+    # Get task type and description from user
+    task_type = get_task_type_from_user()
     task_description = get_task_description_from_user()
 
     try:
         # Get TaskManager singleton instance
         task_manager = TaskManager.get_instance()
 
-        new_task = CreateTaskDto(task_description)
+        new_task = CreateTaskDto(task_description, task_type)
         task_id = task_manager.save_task(new_task)
-        task_manager.set_actual_task(Task(task_id, task_description))
+        task_manager.set_actual_task(Task(task_id, task_description, task_type))
 
         logger.info(f"Task saved: {task_id}")
 
