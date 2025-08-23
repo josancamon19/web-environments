@@ -1,6 +1,7 @@
 from enum import Enum
 import sqlite3
 import json
+import urllib.parse
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
 from pathlib import Path
@@ -152,6 +153,40 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
                         step_ids=[step_id],
                     )
                 )
+        # Also handle direct navigation to a new domain (not initial)
+        elif event_type == "state:browser:navigated":
+            url = event_data.get("url", "")
+            # Check if this is a significant navigation (new domain)
+            if url and tool_calls:
+                # Get the last recorded URL
+                last_url = None
+                for tc in reversed(tool_calls):
+                    if tc.type == ToolCall.GO_TO.value:
+                        last_url = tc.params.get("url", "")
+                        break
+                
+                # Extract domain from URLs
+                if last_url:
+                    last_domain = urllib.parse.urlparse(last_url).netloc
+                    new_domain = urllib.parse.urlparse(url).netloc
+                    
+                    # If navigating to a different domain, record it as a GO_TO
+                    if last_domain != new_domain and new_domain:
+                        # Flush any pending buffers first
+                        if click_buffer:
+                            tool_calls.append(click_buffer)
+                            click_buffer = None
+                        if typing_buffer:
+                            tool_calls.append(typing_buffer)
+                            typing_buffer = None
+                            
+                        tool_calls.append(
+                            ToolCallData(
+                                type=ToolCall.GO_TO.value,
+                                params={"url": url},
+                                step_ids=[step_id],
+                            )
+                        )
 
         # Handle mouse/pointer events that lead to clicks
         elif event_type in [

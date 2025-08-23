@@ -13,7 +13,7 @@ class ActualPage:
 
     def get_page(self):
         return self.page
-    
+
     def set_page(self, page):
         self.page = page
 
