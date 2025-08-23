@@ -171,6 +171,18 @@ function setupPageEventListener() {
         sendEventPage('contextmenu', 'action:user', info);
     }, { capture: true });
 
+    document.addEventListener('mouseover', (e) => {
+        const element = e.target;
+        const info = {
+            tag: element.tagName,
+            id: element.id,
+            className: element.className,
+            x: e.clientX,
+            y: e.clientY
+        };
+        sendEventPage('mouseover', 'action:user', info);
+    }, { capture: true });
+
     // Input event with throttling
     let inputTimeout = null;
     document.addEventListener('input', (e) => {
