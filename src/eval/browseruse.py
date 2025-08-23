@@ -75,11 +75,10 @@ def save_results(results: List[Dict[str, Any]], model: str) -> Path:
 
 
 async def main():
-    output_file = await process_all_tasks("o3-2025-04-16", limit=5)
+    output_file = await process_all_tasks("o3-2025-04-16")
     print(f"\nFull data saved to: {output_file}")
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-    # TODO: hover events, back events
     # TODO completion eval ~ info = str/llm judge, action = dom/final state, llm judge

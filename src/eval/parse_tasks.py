@@ -105,9 +105,16 @@ def create_selector(event_data: Dict[str, Any]) -> str:
 
 def find_navigation_after_step(steps_list, current_idx, max_lookahead=10):
     """Find navigation URL after a click or Enter key event."""
-    for i in range(current_idx + 1, min(current_idx + max_lookahead + 1, len(steps_list))):
+    for i in range(
+        current_idx + 1, min(current_idx + max_lookahead + 1, len(steps_list))
+    ):
         _, event_type, event_data_str, _ = steps_list[i]
-        if event_type in ["state:browser:navigated", "state:page:navigate_start", "state:page:load", "state:page:loaded"]:
+        if event_type in [
+            "state:browser:navigated",
+            "state:page:navigate_start",
+            "state:page:load",
+            "state:page:loaded",
+        ]:
             if event_data_str:
                 try:
                     event_data = json.loads(event_data_str)
@@ -148,11 +155,14 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
     tool_calls = []
     typing_buffer = None
     click_buffer = None  # Buffer to accumulate related click events
-    
+    first_navigation_handled = False  # Track if we've handled the first navigation
+
     # Convert steps to list for lookahead
     steps_list = list(steps)
 
-    for idx, (step_id, event_type, event_data_str, dom_snapshot) in enumerate(steps_list):
+    for idx, (step_id, event_type, event_data_str, dom_snapshot) in enumerate(
+        steps_list
+    ):
         if event_data_str:
             try:
                 event_data = json.loads(event_data_str)
@@ -165,6 +175,19 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
         if event_type == "state:page:navigate_start" and event_data.get("initial"):
             url = event_data.get("url", "")
             if url:
+                first_navigation_handled = True
+                tool_calls.append(
+                    ToolCallData(
+                        type=ToolCall.GO_TO.value,
+                        params={"url": url},
+                        step_ids=[step_id],
+                    )
+                )
+        # Handle the first browser navigation (often the initial page load)
+        elif event_type == "state:browser:navigated" and not first_navigation_handled:
+            url = event_data.get("url", "")
+            if url and url != "about:blank":
+                first_navigation_handled = True
                 tool_calls.append(
                     ToolCallData(
                         type=ToolCall.GO_TO.value,
@@ -173,7 +196,7 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
                     )
                 )
         # Also handle direct navigation to a new domain (not initial)
-        elif event_type == "state:browser:navigated":
+        elif event_type == "state:browser:navigated" and first_navigation_handled:
             url = event_data.get("url", "")
             # Check if this is a significant navigation (new domain)
             if url and tool_calls:
@@ -183,12 +206,12 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
                     if tc.type == ToolCall.GO_TO.value:
                         last_url = tc.params.get("url", "")
                         break
-                
+
                 # Extract domain from URLs
                 if last_url:
                     last_domain = urllib.parse.urlparse(last_url).netloc
                     new_domain = urllib.parse.urlparse(url).netloc
-                    
+
                     # If navigating to a different domain, record it as a GO_TO
                     if last_domain != new_domain and new_domain:
                         # Flush any pending buffers first
@@ -198,7 +221,7 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
                         if typing_buffer:
                             tool_calls.append(typing_buffer)
                             typing_buffer = None
-                            
+
                         tool_calls.append(
                             ToolCallData(
                                 type=ToolCall.GO_TO.value,
@@ -241,7 +264,7 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
 
             selector = create_selector(event_data)
             context = extract_element_context(dom_snapshot, event_data)
-            
+
             # Check for navigation after this click
             nav_url = find_navigation_after_step(steps_list, idx)
 
