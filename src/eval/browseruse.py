@@ -14,6 +14,172 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def extract_tool_calls(history: list[dict]) -> List[Dict[str, Any]]:
+    """Extract tool calls from browser-use history"""
+    tool_calls = []
+
+    for step in history:
+        if "model_output" in step and "action" in step["model_output"]:
+            actions = step["model_output"]["action"]
+
+            # Get interacted element info from state if available
+            interacted_element = None
+            if "state" in step and "interacted_element" in step["state"]:
+                elements = step["state"]["interacted_element"]
+                if elements and len(elements) > 0 and elements[0]:
+                    interacted_element = elements[0]
+
+            # Get click coordinates from result metadata if available
+            click_coords = None
+            if "result" in step:
+                for result in step["result"]:
+                    if "metadata" in result and "click_x" in result["metadata"]:
+                        click_coords = {
+                            "x": result["metadata"]["click_x"],
+                            "y": result["metadata"]["click_y"],
+                        }
+
+            for action in actions:
+                # Convert browser-use action format to our tool call format
+                if isinstance(action, dict):
+                    for action_type, params in action.items():
+                        if action_type == "search_google":
+                            tool_calls.append(
+                                {
+                                    "type": "search",
+                                    "params": {"query": params.get("query", "")},
+                                }
+                            )
+                        elif action_type == "go_to_url":
+                            tool_calls.append(
+                                {
+                                    "type": "go_to",
+                                    "params": {"url": params.get("url", "")},
+                                }
+                            )
+                        elif (
+                            action_type == "click_element"
+                            or action_type == "click_element_by_index"
+                        ):
+                            click_params = {}
+
+                            # Try to extract selector from interacted element
+                            if interacted_element:
+                                # Build selector from element attributes
+                                node_name = interacted_element.get(
+                                    "node_name", ""
+                                ).lower()
+                                attrs = interacted_element.get("attributes", {})
+
+                                # Priority order for selectors: id > jsname > class > href > node
+                                if "id" in attrs and attrs["id"]:
+                                    click_params["selector"] = f"#{attrs['id']}"
+                                elif "jsname" in attrs and attrs["jsname"]:
+                                    # jsname is Google's custom attribute that acts like an ID
+                                    click_params["selector"] = (
+                                        f"[jsname='{attrs['jsname']}']"
+                                    )
+                                elif "class" in attrs and attrs["class"]:
+                                    classes = attrs["class"].replace(" ", ".")
+                                    click_params["selector"] = f"{node_name}.{classes}"
+                                elif "href" in attrs:
+                                    click_params["selector"] = (
+                                        f"{node_name}[href='{attrs['href']}']"
+                                    )
+                                else:
+                                    click_params["selector"] = node_name or "*"
+
+                                # Add element details including all attributes
+                                click_params["element_details"] = {
+                                    "node_name": node_name,
+                                    "attributes": attrs,
+                                    "xpath": interacted_element.get("x_path", ""),
+                                }
+                            elif "selector" in params:
+                                click_params["selector"] = params["selector"]
+                            elif "index" in params:
+                                click_params["selector"] = f"[index:{params['index']}]"
+
+                            # Add click coordinates if available
+                            if click_coords:
+                                click_params["coordinates"] = click_coords
+
+                            tool_calls.append(
+                                {
+                                    "type": "click",
+                                    "params": click_params,
+                                }
+                            )
+                        elif action_type == "input_text":
+                            tool_calls.append(
+                                {
+                                    "type": "type",
+                                    "params": {
+                                        "selector": params.get("selector", ""),
+                                        "text": params.get("text", ""),
+                                    },
+                                }
+                            )
+                        elif action_type == "scroll":
+                            scroll_params = {}
+                            if "down" in params:
+                                scroll_params["direction"] = (
+                                    "down" if params["down"] else "up"
+                                )
+                            if "num_pages" in params:
+                                scroll_params["pages"] = params["num_pages"]
+                            tool_calls.append(
+                                {
+                                    "type": "scroll",
+                                    "params": scroll_params,
+                                }
+                            )
+                        elif action_type == "done":
+                            # Task completion marker, not a tool call
+                            pass
+
+    return tool_calls
+
+
+def extract_final_answer(history: list[dict], task_type: str) -> Optional[str]:
+    """Extract the final answer for information retrieval tasks"""
+    if task_type != "information_retrieval":
+        return None
+
+    # Look for the final result that marks task completion
+    for step in reversed(history):
+        if "result" in step:
+            for result in step["result"]:
+                # Check if task is done and has extracted content
+                if result.get("is_done") and "extracted_content" in result:
+                    extracted = result["extracted_content"]
+                    # Return the extracted content as the answer
+                    if extracted and extracted != "None":
+                        return extracted
+
+    # If no explicit answer found in results, check the final model output's memory
+    # as it might contain the collected information
+    for step in reversed(history):
+        if "model_output" in step and "memory" in step["model_output"]:
+            memory = step["model_output"]["memory"]
+            # Only return memory if it seems to contain actual information (not just status)
+            if (
+                memory and len(memory) > 50
+            ):  # Arbitrary threshold for meaningful content
+                # Check if this is likely the final answer (not intermediate status)
+                status_keywords = [
+                    "searching",
+                    "navigating",
+                    "clicking",
+                    "loading",
+                    "looking",
+                ]
+                if not any(keyword in memory.lower() for keyword in status_keywords):
+                    return memory
+
+    return None
+
+
 async def run_task_with_agent(
     task: Dict[str, Any], model: str = "gpt-5-2025-08-07"
 ) -> Dict[str, Any]:
@@ -24,14 +190,23 @@ async def run_task_with_agent(
     history = await agent.run()
     duration = (datetime.now() - start_time).total_seconds()
 
+    # Extract tool calls instead of full history
+    history_dump = history.model_dump()["history"]
+    tool_calls = extract_tool_calls(history_dump)
+    task_type = task.get("task_type")
+    print("task", task)
+    answer = extract_final_answer(history_dump, task_type)
+
     return {
         "task_id": task["task_id"],
         "task_description": task["task_description"],
-        "task_type": task.get("task_type", "unknown"),
+        "task_type": task_type,
         "success": True,
         "duration_seconds": duration,
         "action_count": len(history.model_actions()),
-        "full_history": history.model_dump(),
+        "tool_calls": tool_calls,
+        "history": history.model_dump()["history"],
+        "answer": answer,
     }
 
 

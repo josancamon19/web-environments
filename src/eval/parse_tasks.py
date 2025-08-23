@@ -126,7 +126,7 @@ def find_navigation_after_step(steps_list, current_idx, max_lookahead=10):
     return None
 
 
-def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str, Any]:
+def process_single_task(cursor, task_id: int, task_description: str, task_type: str = None, answer: str = None) -> Dict[str, Any]:
     """
     Process a single task and convert it to tool calls.
 
@@ -134,6 +134,8 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
         cursor: Database cursor
         task_id: The ID of the task to convert
         task_description: Description of the task
+        task_type: Type of the task (e.g., "information_retrieval", "action")
+        answer: Answer for information retrieval tasks
 
     Returns:
         Dictionary with task data and tool calls
@@ -408,11 +410,20 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
         tool_calls.append(click_buffer)
 
     # Return output data
-    return {
+    result = {
         "task_id": task_id,
         "task_description": task_description,
+        "task_type": task_type,  # Include task type
         "tool_calls": [tc.to_dict() for tc in tool_calls],
     }
+    
+    # Add answer field for information retrieval tasks
+    if task_type == "information_retrieval" and answer:
+        result["answer"] = answer
+    else:
+        result["answer"] = None
+    
+    return result
 
 
 def parse(db_path: str = "data/tasks.db", output_path: str = "data/tasks.jsonl"):
@@ -426,8 +437,8 @@ def parse(db_path: str = "data/tasks.db", output_path: str = "data/tasks.jsonl")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # Get all tasks
-    cursor.execute("SELECT id, description FROM tasks ORDER BY id")
+    # Get all tasks with task_type and answer
+    cursor.execute("SELECT id, description, task_type, answer FROM tasks ORDER BY id")
     tasks = cursor.fetchall()
 
     if not tasks:
@@ -436,12 +447,14 @@ def parse(db_path: str = "data/tasks.db", output_path: str = "data/tasks.jsonl")
 
     all_results = []
 
-    for task_id, task_description in tasks:
+    for task_id, task_description, task_type, answer in tasks:
         try:
             print(f"Processing task {task_id}: {task_description}")
-            result = process_single_task(cursor, task_id, task_description)
+            result = process_single_task(cursor, task_id, task_description, task_type, answer)
             all_results.append(result)
             print(f"  Found {len(result['tool_calls'])} tool calls")
+            if task_type == "information_retrieval":
+                print(f"  Task type: {task_type}, Answer: {answer[:50] if answer else 'None'}...")
         except Exception as e:
             print(f"  Error processing task {task_id}: {e}")
             continue
