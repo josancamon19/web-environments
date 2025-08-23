@@ -50,7 +50,7 @@ console.log('🎯 Page event listener script loaded');
  function sendEventPage(type, context, payload) {
     try {
       // Only capture DOM snapshot for important events to reduce overhead
-      const importantEvents = ['click', 'load', 'navigate_start', 'navigated', 'domcontentloaded', 'contextmenu', 'loaded'];
+      const importantEvents = ['click', 'load', 'navigate_start', 'navigated', 'domcontentloaded', 'contextmenu', 'loaded', 'back', 'hover'];
       const shouldCaptureDom = importantEvents.includes(type);
       
       window.onPageEvent({
@@ -171,6 +171,36 @@ function setupPageEventListener() {
         sendEventPage('contextmenu', 'action:user', info);
     }, { capture: true });
 
+    // Hover event (mouseover with throttling)
+    let hoverTimeout = null;
+    let lastHoveredElement = null;
+    document.addEventListener('mouseover', (e) => {
+        const element = e.target;
+        
+        // Only track if hovering over a different element
+        if (element === lastHoveredElement) return;
+        lastHoveredElement = element;
+        
+        // Clear previous timeout
+        if (hoverTimeout) {
+            clearTimeout(hoverTimeout);
+        }
+        
+        // Throttle hover events to reduce frequency
+        hoverTimeout = setTimeout(() => {
+            const info = {
+                tag: element.tagName,
+                id: element.id,
+                className: element.className,
+                text: (element.innerText || '').substring(0, 50),
+                href: element.href || null,
+                x: e.clientX,
+                y: e.clientY
+            };
+            sendEventPage('hover', 'action:user', info);
+        }, 300); // Send after 300ms of stable hover
+    }, { capture: true });
+
     // Input event with throttling
     let inputTimeout = null;
     document.addEventListener('input', (e) => {
@@ -230,6 +260,46 @@ function setupPageEventListener() {
     console.log('📤 Sending load info:', info);
     sendEventPage('load', 'state:page', info);
 });
+
+    // Back/Forward navigation detection using popstate
+    window.addEventListener('popstate', (event) => {
+        const info = {
+            url: window.location.href,
+            title: document.title,
+            state: event.state,
+            timestamp: Date.now(),
+            message: 'Browser back/forward navigation'
+        };
+        sendEventPage('back', 'action:user', info);
+    }, { capture: true });
+    
+    // Tab visibility change detection (tab switching)
+    document.addEventListener('visibilitychange', () => {
+        const info = {
+            hidden: document.hidden,
+            visibilityState: document.visibilityState,
+            url: window.location.href,
+            title: document.title,
+            timestamp: Date.now(),
+            message: document.hidden ? 'Tab switched away' : 'Tab became active'
+        };
+        sendEventPage('tab_visibility_changed', 'state:browser', info);
+    });
+
+    // Also detect history navigation using performance navigation API
+    if (window.performance && window.performance.navigation) {
+        // Check if page was loaded via back/forward on initial load
+        if (window.performance.navigation.type === 2) {
+            const info = {
+                url: window.location.href,
+                title: document.title,
+                timestamp: Date.now(),
+                message: 'Page loaded via back/forward button',
+                navigationType: 'back_forward'
+            };
+            sendEventPage('back', 'action:user', info);
+        }
+    }
 }
 
 // Setup immediately if DOM is already loaded

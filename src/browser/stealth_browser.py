@@ -47,7 +47,25 @@ class StealthBrowser:
 
         await self.page_event.attach_page(self.page)
 
-        self.context.on("page", self.page_event.attach_page)
+        # Track new tab/page creation
+        async def on_page_created(page):
+            await self.step_record.record_step(
+                {
+                    "event_info": {
+                        "event_type": "tab_opened",
+                        "event_context": "state:browser",
+                        "event_data": {
+                            "url": page.url,
+                            "timestamp": page.main_frame.name,
+                        },
+                    },
+                    "prefix_action": "state:browser",
+                },
+                omit_screenshot=True,
+            )
+            await self.page_event.attach_page(page)
+        
+        self.context.on("page", on_page_created)
 
         actual_page = ActualPage()
         actual_page.set_page(self.page)

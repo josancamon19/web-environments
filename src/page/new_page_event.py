@@ -65,11 +65,26 @@ class NewPageEvent:
                         },
                         omit_screenshot=True,
                     )
+            
+            async def on_close(p=page):
+                # logger.info(f"[PAGE_EVENT] Tab/page closed: {p.url}")
+                await self.step_record.record_step(
+                    {
+                        "event_info": {
+                            "event_type": "tab_closed",
+                            "event_context": "state:browser",
+                            "event_data": {"url": p.url, "final_url": p.url},
+                        },
+                        "prefix_action": f"state:browser",
+                    },
+                    omit_screenshot=True,
+                )
 
             handlers = [
                 ("domcontentloaded", on_domcontentloaded),
                 ("load", on_load),
                 ("framenavigated", on_framenavigated),
+                ("close", on_close),
             ]
             self._page_event_handlers[page] = handlers
             for event_name, handler in handlers:

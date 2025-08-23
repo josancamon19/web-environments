@@ -32,35 +32,14 @@ async def run_task_with_agent(
         "duration_seconds": duration,
         "action_count": len(history.model_actions()),
         "full_history": history.model_dump(),
-        # TODO: anything else here?
     }
 
 
-async def process_all_tasks(
-    model: str = "o3-2025-04-16", limit: Optional[int] = None
-):
-    """Process all tasks from tasks.jsonl and save comprehensive data"""
-
-    # Load tasks
-    tasks_file = Path("data/tasks.jsonl")
-    if not tasks_file.exists():
-        logger.error(f"Tasks file not found: {tasks_file}")
-        return
-
-    tasks = []
-    with open(tasks_file, "r") as f:
-        for line in f:
-            if line.strip():
-                tasks.append(json.loads(line))
+async def process_all_tasks(model: str):
+    with open(Path("data/tasks.jsonl"), "r") as f:
+        tasks = [json.loads(line) for line in f if line.strip()]
 
     logger.info(f"Loaded {len(tasks)} tasks")
-
-    # Apply limit if specified
-    if limit:
-        tasks = tasks[:limit]
-        logger.info(f"Processing only first {limit} tasks")
-
-    # Process each task
     results = []
     for i, task in enumerate(tasks):
         logger.info(
@@ -75,7 +54,6 @@ async def process_all_tasks(
         )
 
         save_results(results, model)
-
     return save_results(results, model)
 
 
