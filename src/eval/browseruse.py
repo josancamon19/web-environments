@@ -205,51 +205,91 @@ async def run_task_with_agent(
         "duration_seconds": duration,
         "action_count": len(history.model_actions()),
         "tool_calls": tool_calls,
-        "history": history.model_dump()["history"],
         "answer": answer,
+        "dump": history_dump,
     }
 
 
+def load_completed_tasks(output_file: Path) -> set:
+    """Load task IDs that have already been processed from the output file"""
+    completed_task_ids = set()
+    if output_file.exists():
+        with open(output_file, "r") as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        result = json.loads(line)
+                        completed_task_ids.add(result["task_id"])
+                    except json.JSONDecodeError:
+                        continue
+    return completed_task_ids
+
+
 async def process_all_tasks(model: str):
+    """Process all tasks and save to JSONL, skipping already completed ones"""
+    # Load tasks from input file
     with open(Path("data/tasks.jsonl"), "r") as f:
         tasks = [json.loads(line) for line in f if line.strip()]
 
-    logger.info(f"Loaded {len(tasks)} tasks")
-    results = []
-    for i, task in enumerate(tasks):
-        logger.info(
-            f"Processing task {i + 1}/{len(tasks)}: {task['task_description'][:100]}..."
-        )
-        result = await run_task_with_agent(task, model)
-        results.append(result)
-        logger.info(
-            f"Task {task['task_id']} - Success: {result['success']}, "
-            f"Actions: {result['action_count']}, "
-            f"Duration: {result['duration_seconds']:.2f}s"
-        )
-
-        save_results(results, model)
-    return save_results(results, model)
-
-
-def save_results(results: List[Dict[str, Any]], model: str) -> Path:
-    """Save results to a JSON file with all captured data"""
+    # Setup output file path
     output_dir = Path("src/eval/results")
     output_dir.mkdir(parents=True, exist_ok=True)
+    output_file = output_dir / f"browseruse-{model.replace('/', '-')}.jsonl"
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = (
-        output_dir / f"browseruse_data_{model.replace('/', '-')}_{timestamp}.json"
-    )
+    # Load already completed tasks
+    completed_task_ids = load_completed_tasks(output_file)
 
-    with open(output_file, "w") as f:
-        json.dump(results, f, indent=2, default=str)
+    # Filter out already completed tasks
+    tasks_to_process = [t for t in tasks if t["task_id"] not in completed_task_ids]
 
-    logger.info(f"Results saved to {output_file}")
+    logger.info(f"Loaded {len(tasks)} total tasks")
+    logger.info(f"Already completed: {len(completed_task_ids)} tasks")
+    logger.info(f"Tasks to process: {len(tasks_to_process)}")
+
+    if not tasks_to_process:
+        logger.info("All tasks already processed!")
+        return output_file
+
+    # Process remaining tasks
+    for i, task in enumerate(tasks_to_process):
+        logger.info(
+            f"Processing task {i + 1}/{len(tasks_to_process)}: "
+            f"ID={task['task_id']}, {task['task_description'][:100]}..."
+        )
+
+        try:
+            result = await run_task_with_agent(task, model)
+
+            # Append result to JSONL file immediately
+            with open(output_file, "a") as f:
+                f.write(json.dumps(result, default=str) + "\n")
+
+            logger.info(
+                f"Task {task['task_id']} - Success: {result['success']}, "
+                f"Actions: {result['action_count']}, "
+                f"Duration: {result['duration_seconds']:.2f}s"
+            )
+        except Exception as e:
+            logger.error(f"Failed to process task {task['task_id']}: {e}")
+            # Save error result
+            error_result = {
+                "task_id": task["task_id"],
+                "task_description": task["task_description"],
+                "task_type": task.get("task_type"),
+                "success": False,
+                "error": str(e),
+                "tool_calls": [],
+                "answer": None,
+            }
+            with open(output_file, "a") as f:
+                f.write(json.dumps(error_result, default=str) + "\n")
+
+    logger.info(f"All results saved to {output_file}")
     return output_file
 
 
 async def main():
+    # Process tasks with browser-use
     output_file = await process_all_tasks("o3-2025-04-16")
     print(f"\nFull data saved to: {output_file}")
 
