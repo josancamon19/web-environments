@@ -15,6 +15,7 @@ from src.config.storage_config import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
+
 class StealthBrowser:
     def __init__(self):
         self.playwright = None
@@ -29,13 +30,13 @@ class StealthBrowser:
     async def launch(self):
         """Launch stealth browser"""
         self.playwright = await async_playwright().start()
-        
- # Prefer system Chrome with a persistent user profile; reduce automation fingerprints
+
+        # Prefer system Chrome with a persistent user profile; reduce automation fingerprints
 
         VIDEO_TASK_PATH = get_tasks_video_path()
-        
+
         task_manager = TaskManager()
-        task_manager.set_last_task_path(VIDEO_TASK_PATH)  
+        task_manager.set_last_task_path(VIDEO_TASK_PATH)
 
         self.context = await self.open_browser_context(VIDEO_TASK_PATH)
 
@@ -53,18 +54,18 @@ class StealthBrowser:
 
         await self.step_record.record_step(
             {
-                'event_info': {
-                    'event_type': "navigate_start",
-                    'event_context': "state:page",
-                    'event_data': {"url": "https://www.google.com", "initial": True},
-                    'dom_snapshot': None,
+                "event_info": {
+                    "event_type": "navigate_start",
+                    "event_context": "state:page",
+                    "event_data": {"url": "https://www.google.com", "initial": True},
+                    "dom_snapshot": None,
                 },
-                "prefix_action" : "state:page"
+                "prefix_action": "state:page",
             }
         )
         # Listen to console messages from the browser
         # self.page.on("console", lambda msg: print(f"🌐 Browser console: {msg.text}"))
-        
+
         await self.apply_stealth_techniques()
         await self.setup_dom_listeners()
 
@@ -84,15 +85,14 @@ class StealthBrowser:
     async def page_event_handler(self, event_info):
         """Handle page events from browser"""
         try:
-            event_type = event_info.get('event_type', 'unknown')
-            event_context = event_info.get('event_context', 'unknown')
+            event_type = event_info.get("event_type", "unknown")
+            event_context = event_info.get("event_context", "unknown")
             logger.debug(f"[PAGE_EVENT] Received: {event_context}:{event_type}")
-            
+
             step_record = StepRecord()
-            await step_record.record_step({
-                'event_info': event_info,
-                "prefix_action" : f"{event_context}"
-            })
+            await step_record.record_step(
+                {"event_info": event_info, "prefix_action": f"{event_context}"}
+            )
         except Exception as e:
             logger.error(f"[PAGE_EVENT] Error handling event: {e}", exc_info=True)
 
@@ -106,7 +106,7 @@ class StealthBrowser:
             await self.playwright.stop()
         if self.page_event:
             self.page_event.detach_all_page_listeners()
-    
+
     async def open_browser_context(self, video_task_path: str):
         """Open browser context"""
         preferred_channel = (
@@ -146,19 +146,22 @@ class StealthBrowser:
                 record_video_size={"width": 1280, "height": 720},
             )
             return self.context
-        
+
         except Exception as e:
             logger.error(f"[LAUNCH_BROWSER] Error launching browser: {e}")
 
         try:
             # Launch browser with stealth args
             self.browser = await self.playwright.chromium.launch(
-                headless=False,
-                args=BROWSER_ARGS
+                headless=False, args=BROWSER_ARGS
             )
             # self.browser.on("close", self.manual_browser_close)
             # Create context
-            self.context = await self.browser.new_context(**CONTEXT_CONFIG, record_video_dir=video_task_path, record_video_size={'width': 1280, 'height': 720})
+            self.context = await self.browser.new_context(
+                **CONTEXT_CONFIG,
+                record_video_dir=video_task_path,
+                record_video_size={"width": 1280, "height": 720},
+            )
             return self.context
         except Exception as e:
             logger.error(f"[LAUNCH_BROWSER] Error launching browser: {e}")
