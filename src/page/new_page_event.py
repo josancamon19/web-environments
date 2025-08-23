@@ -1,5 +1,5 @@
 import logging
-from src.steps.stepRecord import StepRecord
+from src.steps.step_record import StepRecord
 logger = logging.getLogger(__name__)
 
 class NewPageEvent:

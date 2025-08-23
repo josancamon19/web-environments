@@ -2,7 +2,7 @@ import logging
 from playwright.async_api import async_playwright
 from src.config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
 from src.config.stealth_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
-from src.steps.stepRecord import StepRecord
+from src.steps.step_record import StepRecord
 from src.page.actual_page import ActualPage
 from src.utils.get_tasks_video_path import get_tasks_video_path
 from src.tasks.task import TaskManager
