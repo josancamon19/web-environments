@@ -59,10 +59,9 @@ async def main():
 
         signal.signal(signal.SIGINT, signal_handler)
 
-        # Navigate to a page to start
-        await stealth_browser.page.goto("https://www.google.com")
-
-        await stealth_browser.page.wait_for_load_state("domcontentloaded")
+        # Leave it on about:blank
+        # await stealth_browser.page.goto("https://www.google.com")
+        # await stealth_browser.page.wait_for_load_state("domcontentloaded")
 
         await asyncio.Event().wait()
 

@@ -397,6 +397,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-    # tasks.jsonl, should load about:blank first, not google.com
-    # tasks.jsonl, go_to is for when you use the search bar on top, loaded page shouldn't be a tool_call, cause is just a result
-    # TODO: lots of bs code here, store the agent steps, and then play with the evaluation separate
+    # - note: submit/enter vs click depends on how agents generally do it, for now is already saved in typing
+    # TODO: hover events (?)

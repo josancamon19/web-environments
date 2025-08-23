@@ -103,6 +103,22 @@ def create_selector(event_data: Dict[str, Any]) -> str:
     return tag if tag else "*"
 
 
+def find_navigation_after_step(steps_list, current_idx, max_lookahead=10):
+    """Find navigation URL after a click or Enter key event."""
+    for i in range(current_idx + 1, min(current_idx + max_lookahead + 1, len(steps_list))):
+        _, event_type, event_data_str, _ = steps_list[i]
+        if event_type in ["state:browser:navigated", "state:page:navigate_start", "state:page:load", "state:page:loaded"]:
+            if event_data_str:
+                try:
+                    event_data = json.loads(event_data_str)
+                    url = event_data.get("url", "")
+                    if url and url != "about:blank":
+                        return url
+                except json.JSONDecodeError:
+                    pass
+    return None
+
+
 def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str, Any]:
     """
     Process a single task and convert it to tool calls.
@@ -132,8 +148,11 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
     tool_calls = []
     typing_buffer = None
     click_buffer = None  # Buffer to accumulate related click events
+    
+    # Convert steps to list for lookahead
+    steps_list = list(steps)
 
-    for step_id, event_type, event_data_str, dom_snapshot in steps:
+    for idx, (step_id, event_type, event_data_str, dom_snapshot) in enumerate(steps_list):
         if event_data_str:
             try:
                 event_data = json.loads(event_data_str)
@@ -214,11 +233,17 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
         elif event_type == "action:user:click":
             # Save any pending typing before the click
             if typing_buffer:
+                # Typing interrupted by click, so no Enter was pressed
+                if "submit" not in typing_buffer.params:
+                    typing_buffer.params["submit"] = False
                 tool_calls.append(typing_buffer)
                 typing_buffer = None
 
             selector = create_selector(event_data)
             context = extract_element_context(dom_snapshot, event_data)
+            
+            # Check for navigation after this click
+            nav_url = find_navigation_after_step(steps_list, idx)
 
             # If we have a click buffer and it's for the same element, add to it
             if click_buffer and click_buffer.params.get("selector") == selector:
@@ -226,12 +251,17 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
                 # Update context if we have better info
                 if context and "selector_details" not in click_buffer.params:
                     click_buffer.params["selector_details"] = context
+                # Add navigation URL if found
+                if nav_url and "navigates_to" not in click_buffer.params:
+                    click_buffer.params["navigates_to"] = nav_url
             elif click_buffer:
                 # Different element, save the old buffer and start new
                 tool_calls.append(click_buffer)
                 params = {"selector": selector}
                 if context:
                     params["selector_details"] = context
+                if nav_url:
+                    params["navigates_to"] = nav_url
                 click_buffer = ToolCallData(
                     type=ToolCall.CLICK.value,
                     params=params,
@@ -248,10 +278,15 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
                     # Update context if we have better info
                     if context and "selector_details" not in tool_calls[-1].params:
                         tool_calls[-1].params["selector_details"] = context
+                    # Add navigation URL if found
+                    if nav_url and "navigates_to" not in tool_calls[-1].params:
+                        tool_calls[-1].params["navigates_to"] = nav_url
                 else:
                     params = {"selector": selector}
                     if context:
                         params["selector_details"] = context
+                    if nav_url:
+                        params["navigates_to"] = nav_url
                     click_buffer = ToolCallData(
                         type=ToolCall.CLICK.value,
                         params=params,
@@ -270,6 +305,12 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
             # Enter key typically submits, so save the buffer first
             if key == "Enter":
                 if typing_buffer:
+                    # Mark that this typing was submitted with Enter
+                    typing_buffer.params["submit"] = True
+                    # Check for navigation after Enter key
+                    nav_url = find_navigation_after_step(steps_list, idx)
+                    if nav_url:
+                        typing_buffer.params["navigates_to"] = nav_url
                     tool_calls.append(typing_buffer)
                     typing_buffer = None
             else:
@@ -325,8 +366,22 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
 
     # Don't forget any pending buffers at the end
     if typing_buffer:
+        # If typing buffer wasn't submitted with Enter, mark submit as False
+        if "submit" not in typing_buffer.params:
+            typing_buffer.params["submit"] = False
         tool_calls.append(typing_buffer)
     if click_buffer:
+        # Check if the last click buffer has a navigation
+        if click_buffer.step_ids:
+            last_step_idx = None
+            for i, (sid, _, _, _) in enumerate(steps_list):
+                if sid == click_buffer.step_ids[-1]:
+                    last_step_idx = i
+                    break
+            if last_step_idx is not None:
+                nav_url = find_navigation_after_step(steps_list, last_step_idx)
+                if nav_url and "navigates_to" not in click_buffer.params:
+                    click_buffer.params["navigates_to"] = nav_url
         tool_calls.append(click_buffer)
 
     # Return output data

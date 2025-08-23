@@ -52,19 +52,19 @@ class StealthBrowser:
         actual_page = ActualPage()
         actual_page.set_page(self.page)
 
-        await self.step_record.record_step(
-            {
-                "event_info": {
-                    "event_type": "navigate_start",
-                    "event_context": "state:page",
-                    "event_data": {"url": "https://www.google.com", "initial": True},
-                    "dom_snapshot": None,
-                },
-                "prefix_action": "state:page",
-            }
-        )
+        # await self.step_record.record_step(
+        #     {
+        #         "event_info": {
+        #             "event_type": "navigate_start",
+        #             "event_context": "state:page",
+        #             "event_data": {"url": "https://www.google.com", "initial": True},
+        #             "dom_snapshot": None,
+        #         },
+        #         "prefix_action": "state:page",
+        #     }
+        # )
         # Listen to console messages from the browser
-        # self.page.on("console", lambda msg: print(f"🌐 Browser console: {msg.text}"))
+        self.page.on("console", lambda msg: print(f"🌐 Browser console: {msg.text}"))
 
         await self.apply_stealth_techniques()
         await self.setup_dom_listeners()
