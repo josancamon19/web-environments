@@ -69,7 +69,6 @@ async def main():
     agent = Agent(
         task=task,  # Usar la tarea proporcionada por input()
         llm=llm,  # Usa el modelo apropiado
-        verbose=True,  # Activar el modo verbose para ver las interacciones
     )
 
     # Registrar el inicio de la tarea

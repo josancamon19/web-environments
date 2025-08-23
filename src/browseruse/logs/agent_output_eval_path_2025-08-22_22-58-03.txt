@@ -1,0 +1,1023 @@
+[2025-08-22 22:58:13] [INFO] service: Using anonymized telemetry, see https://docs.browser-use.com/development/telemetry.
+[2025-08-22 22:58:13] [DEBUG] service: LLM instance 140024352374544 (openai_gpt-4.1-mini) is already registered
+[2025-08-22 22:58:13] [DEBUG] service: 💾 File system path: /tmp/browser_use_agent_068a93c5-54b3-76c3-8000-86ad803be599_1755921493
+[2025-08-22 22:58:13] [DEBUG] service: 📸 Screenshot service initialized in: /tmp/browser_use_agent_068a93c5-54b3-76c3-8000-86ad803be599_1755921493/screenshots
+[2025-08-22 22:58:13] [INFO] Agent: 🧠 Starting a browser-use version 0.6.1 with model=gpt-4.1-mini
+[2025-08-22 22:58:13] [DEBUG] service:  +vision extraction_model=gpt-4.1-mini +file_system
+[2025-08-22 22:58:13] [DEBUG] Agent: 📁 Initialized download tracking for agent
+[2025-08-22 22:58:13] [INFO] browser_use: Iniciando la tarea del agente.
+[2025-08-22 22:58:13] [INFO] Agent: [34m🚀 Task: Search for a book on Amazon, add it to the cart, and confirm the addition.[0m
+[2025-08-22 22:58:13] [DEBUG] Agent: 🤖 Browser-Use Library Version 0.6.1 (pip)
+[2025-08-22 22:58:13] [DEBUG] Agent: 🔧 Agent setup: Task ID e599, Session ID 1a43, Browser Session ID e599
+[2025-08-22 22:58:13] [DEBUG] Agent: 📡 Dispatching CreateAgentSessionEvent...
+[2025-08-22 22:58:13] [DEBUG] Agent: 📡 Dispatching CreateAgentTaskEvent...
+[2025-08-22 22:58:13] [DEBUG] Agent: 🌐 Starting browser session...
+[2025-08-22 22:58:14] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_BrowserStartEvent(#6b45)]           ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:58:14] [DEBUG] BrowserSession: 📄 PDF auto-download enabled for this session
+[2025-08-22 22:58:14] [DEBUG] BrowserSession: 🚀 PopupsWatchdog initialized with browser_session=BrowserSession🆂 e599:no-cdp #40, ID=140024244290816
+[2025-08-22 22:58:14] [DEBUG] BrowserSession: [96m🚌 [DownloadsWatchdog.on_BrowserLaunchEvent(#614e)]       ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#6b45[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:14] [DEBUG] BrowserSession: [DownloadsWatchdog] Received BrowserLaunchEvent, EventBus ID: 140024244847568
+[2025-08-22 22:58:14] [DEBUG] BrowserSession: [DownloadsWatchdog] Ensured downloads directory exists: /tmp/browser-use-downloads-8hi_et23
+[2025-08-22 22:58:14] [DEBUG] BrowserSession: [92m🚌 [DownloadsWatchdog.on_BrowserLaunchEvent(#614e)]       ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#6b45[0m
+[2025-08-22 22:58:14] [DEBUG] BrowserSession: [96m🚌 [LocalBrowserWatchdog.on_BrowserLaunchEvent(#614e)]    ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#6b45[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:14] [DEBUG] BrowserSession: [LocalBrowserWatchdog] Received BrowserLaunchEvent, EventBus ID: 140024244847568, launching local browser
+[2025-08-22 22:58:14] [DEBUG] BrowserSession: [LocalBrowserWatchdog] Calling _launch_browser...
+[2025-08-22 22:58:14] [DEBUG] utils: [BrowserProfile] 🧩 Extensions loaded (3): [uBlock Origin, I still don't care about cookies, ClearURLs]
+[2025-08-22 22:58:14] [DEBUG] BrowserSession: [LocalBrowserWatchdog] 📦 Found local browser installed at executable_path= /home/darcdev/.cache/ms-playwright/chromium-1181/chrome-linux/chrome
+[2025-08-22 22:58:14] [DEBUG] BrowserSession: [LocalBrowserWatchdog] 🚀 Launching browser subprocess with 65 args...
+[2025-08-22 22:58:14] [DEBUG] BrowserSession: [LocalBrowserWatchdog] 🎭 Browser subprocess launched with browser_pid= 53148
+[2025-08-22 22:58:15] [DEBUG] BrowserSession: [LocalBrowserWatchdog] _launch_browser returned: process=psutil.Process(pid=53148, name='chrome', status='sleeping', started='22:58:13'), cdp_url=http://localhost:60017/
+[2025-08-22 22:58:15] [DEBUG] BrowserSession: [LocalBrowserWatchdog] Browser launched successfully at http://localhost:60017/, PID: 53148
+[2025-08-22 22:58:15] [DEBUG] BrowserSession: [92m🚌 [LocalBrowserWatchdog.on_BrowserLaunchEvent(#614e)]    ✅ Succeeded (1.03s)[0m ➡️ [95m<BrowserLaunchResult>[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#6b45[0m
+[2025-08-22 22:58:15] [DEBUG] BrowserSession: 🌎 Connecting to existing chromium-based browser via CDP: ws://localhost:60017/devtools/browser/a36fc2ef-ca90-4d47-9917-7d77a87de669 -> (local browser)
+[2025-08-22 22:58:16] [DEBUG] BrowserSession: CDP client connected successfully
+[2025-08-22 22:58:16] [DEBUG] BrowserSession: 🔄 Redirecting chrome://newtab/ to about:blank for target C2D76656B3BEF9A415808ADA497B9C49
+[2025-08-22 22:58:16] [DEBUG] BrowserSession: Redirected 1 chrome://newtab pages to about:blank
+[2025-08-22 22:58:16] [DEBUG] BrowserSession: 📄 Using existing page with target ID: C2D76656B3BEF9A415808ADA497B9C49
+[2025-08-22 22:58:16] [DEBUG] BrowserSession: Reusing redirect session for target C2D76656B3BEF9A415808ADA497B9C49
+[2025-08-22 22:58:16] [DEBUG] BrowserSession: Proxy credentials not provided; skipping proxy auth setup
+[2025-08-22 22:58:16] [DEBUG] BrowserSession: Dispatching TabCreatedEvent for initial tab 0: about:blank
+[2025-08-22 22:58:16] [DEBUG] BrowserSession: Initial agent focus set to tab 0: about:blank
+[2025-08-22 22:58:16] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_BrowserStartEvent(#6b45)]           ✅ Succeeded (2.55s)[0m ➡️ [95m<dict>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [96m🚌 [DownloadsWatchdog.on_TabCreatedEvent(#f35b)]          ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#6b45[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [DownloadsWatchdog] Set up CDP download listeners
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [92m🚌 [DownloadsWatchdog.on_TabCreatedEvent(#f35b)]          ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#6b45[0m
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [96m🚌 [SecurityWatchdog.on_TabCreatedEvent(#f35b)]           ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#6b45[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [92m🚌 [SecurityWatchdog.on_TabCreatedEvent(#f35b)]           ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#6b45[0m
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [96m🚌 [AboutBlankWatchdog.on_TabCreatedEvent(#f35b)]         ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#6b45[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [92m🚌 [AboutBlankWatchdog.on_TabCreatedEvent(#f35b)]         ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#6b45[0m
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [96m🚌 [PopupsWatchdog.on_TabCreatedEvent(#f35b)]             ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#6b45[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: 🎯 PopupsWatchdog received TabCreatedEvent for target C2D76656B3BEF9A415808ADA497B9C49
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: 📌 Starting dialog handler setup for target C2D76656B3BEF9A415808ADA497B9C49
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: Successfully registered Page.javascriptDialogOpening handler for session 4805DCFF5B2DE854E8302BDD47D81627
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: Set up JavaScript dialog handling for tab C2D76656B3BEF9A415808ADA497B9C49
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [92m🚌 [PopupsWatchdog.on_TabCreatedEvent(#f35b)]             ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#6b45[0m
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [96m🚌 [DOMWatchdog.on_TabCreatedEvent(#f35b)]                ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#6b45[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: 💉 Injecting DOM Service init script to track event listeners added to DOM elements by JS...
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [92m🚌 [DOMWatchdog.on_TabCreatedEvent(#f35b)]                ✅ Succeeded (0.01s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#6b45[0m
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_AgentFocusChangedEvent(#d43c)]      ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#6b45[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: 🔄 AgentFocusChangedEvent received: target_id=...9C49 url=about:blank
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: 🔄 Cached browser state cleared
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: 🔄 Updated agent focus to tab target_id=...9C49
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: 🔄 Testing tab responsiveness...
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_AgentFocusChangedEvent(#d43c)]      ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#6b45[0m
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [96m🚌 [PermissionsWatchdog.on_BrowserConnectedEvent(#e383)]  ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#6b45[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: 🔓 Granting browser permissions: ['clipboardReadWrite', 'notifications']
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: ✅ Successfully granted permissions: ['clipboardReadWrite', 'notifications']
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [92m🚌 [PermissionsWatchdog.on_BrowserConnectedEvent(#e383)]  ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#6b45[0m
+[2025-08-22 22:58:17] [DEBUG] Agent: 🔧 Browser session started with watchdogs attached
+[2025-08-22 22:58:17] [DEBUG] Agent: 📍 Task mentions "google" or "search", defaulting to https://google.com
+[2025-08-22 22:58:17] [INFO] Agent: 🔗 Found URL in task: https://google.com, adding as initial action...
+[2025-08-22 22:58:17] [DEBUG] Agent: ✅ Added navigation to https://google.com as initial action
+[2025-08-22 22:58:17] [DEBUG] Agent: ⚡ Executing 1 initial actions...
+[2025-08-22 22:58:17] [INFO] Agent:   🦾 [34m[ACTION 1/1][0m go_to_url: url: https://google.com, new_tab: False
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_NavigateToUrlEvent(#f7d8)]          ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [on_NavigateToUrlEvent] Received NavigateToUrlEvent: url=https://google.com, new_tab=False
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [on_NavigateToUrlEvent] Processing new_tab=False
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_SwitchTabEvent(#3199)]              ⏳ Starting...      [0m [93m↲  triggered by [96mon_NavigateToUrlEvent#f7d8[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_AgentFocusChangedEvent(#093a)]      ⏳ Starting...      [0m [93m↲  triggered by [96mon_SwitchTabEvent#3199[0m [93m↲  under [96mNavigateToUrlEvent#f7d8[0m
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: 🔄 AgentFocusChangedEvent received: target_id=...9C49 url=chrome://newtab/
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: 🔄 Cached browser state cleared
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: 🔄 Updated agent focus to tab target_id=...9C49
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: 🔄 Testing tab responsiveness...
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_AgentFocusChangedEvent(#093a)]      ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_SwitchTabEvent#3199[0m
+[2025-08-22 22:58:17] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_SwitchTabEvent(#3199)]              ✅ Succeeded (0.01s)[0m ➡️ [95m<str>[0m [93m⤴  [92mreturned to  [96m[96mon_NavigateToUrlEvent#f7d8[0m
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: Dispatching NavigationCompleteEvent for https://google.com (tab #9C49)
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: [96m🚌 [DownloadsWatchdog.on_NavigationCompleteEvent(#7fc6)]  ⏳ Starting...      [0m [93m↲  triggered by [96mon_NavigateToUrlEvent#f7d8[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: [DownloadsWatchdog] NavigationCompleteEvent received for https://google.com, tab #9C49
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: [DownloadsWatchdog] Got target_id=C2D76656B3BEF9A415808ADA497B9C49 for tab #9C49
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: [DownloadsWatchdog] Checking if target C2D76656B3BEF9A415808ADA497B9C49 is PDF viewer...
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: [92m🚌 [DownloadsWatchdog.on_NavigationCompleteEvent(#7fc6)]  ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_NavigateToUrlEvent#f7d8[0m
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: [96m🚌 [SecurityWatchdog.on_NavigationCompleteEvent(#7fc6)]   ⏳ Starting...      [0m [93m↲  triggered by [96mon_NavigateToUrlEvent#f7d8[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: [92m🚌 [SecurityWatchdog.on_NavigationCompleteEvent(#7fc6)]   ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_NavigateToUrlEvent#f7d8[0m
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_AgentFocusChangedEvent(#af3d)]      ⏳ Starting...      [0m [93m↲  triggered by [96mon_NavigateToUrlEvent#f7d8[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: 🔄 AgentFocusChangedEvent received: target_id=...9C49 url=https://google.com
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: 🔄 Cached browser state cleared
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: 🔄 Updated agent focus to tab target_id=...9C49
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: 🔄 Testing tab responsiveness...
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_AgentFocusChangedEvent(#af3d)]      ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_NavigateToUrlEvent#f7d8[0m
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_NavigateToUrlEvent(#f7d8)]          ✅ Succeeded (0.94s)[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: [96m🚌 [SecurityWatchdog.on_NavigateToUrlEvent(#f7d8)]        ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: [92m🚌 [SecurityWatchdog.on_NavigateToUrlEvent(#f7d8)]        ✅ Succeeded (0.00s)[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:58:18] [INFO] controller: 🔗 Navigated to https://google.com
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: ⏳ execute_action() took 0.95s
+[2025-08-22 22:58:18] [DEBUG] Agent: ☑️ Executed action 1/1: [92mgo_to_url: url: https://google.com, new_tab: False[0m in 0.95s
+[2025-08-22 22:58:18] [DEBUG] Agent: ⏳ multi_act() took 0.95s
+[2025-08-22 22:58:18] [DEBUG] Agent: ✅ Initial actions completed
+[2025-08-22 22:58:18] [DEBUG] Agent: 🔄 Starting main execution loop with max 100 steps...
+[2025-08-22 22:58:18] [DEBUG] Agent: 🚶 Starting step 1/100...
+[2025-08-22 22:58:18] [DEBUG] Agent: 🌐 Step 1: Getting browser state...
+[2025-08-22 22:58:18] [DEBUG] Agent: 📸 Requesting browser state with include_screenshot=True, cached=True
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: [96m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#3738)]       ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: STARTING browser state request
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page URL: https://www.google.com/
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: 📍 Current page URL: https://www.google.com/, target_id: C2D76656B3BEF9A415808ADA497B9C49, session_id: 4805DCFF5B2DE854E8302BDD47D81627
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ⏳ Waiting for page stability...
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: ⏳ Minimum wait: 0.25s
+[2025-08-22 22:58:18] [DEBUG] BrowserSession: ⏳ Network idle wait: 0.5s
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: ✅ Page stability wait completed in 0.75s
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ Page stability complete
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting tabs info...
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got 1 tabs
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Tabs info: [TabInfo(url='https://www.google.com/', title='Google', target_id='C2D76656B3BEF9A415808ADA497B9C49', parent_target_id=None)]
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 🌳 Building DOM tree...
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Starting _build_dom_tree...
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: STARTING DOM tree build
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Removing existing highlights...
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: Successfully removed 0 highlight elements
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Calling DomService.get_serialized_dom_tree...
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DEBUG: Capturing DOM snapshot for target C2D76656B3BEF9A415808ADA497B9C49
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DEBUG: Snapshot contains 1 documents with 17 total nodes
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DEBUG: HTML frame scroll - scrollY=0, scrollX=0, frameId=C2D76656B3BEF9A415808ADA497B9C49, nodeId=3
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ DomService.get_serialized_dom_tree completed
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: Time taken to get DOM tree: 0.09882950782775879 seconds
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: Timing breakdown: {'clickable_detection_time': 0.001039743423461914, 'create_simplified_tree': 0.0015187263488769531, 'optimize_tree': 4.3392181396484375e-05, 'bbox_filtering': 0.0002601146697998047, 'assign_interactive_indices': 2.0265579223632812e-05, 'serialize_accessible_elements_total': 0.001844644546508789, 'serialize_dom_tree_total': 0.0018563270568847656}
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Updating selector maps...
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Selector maps updated, 24 elements
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Injecting highlighting script...
+[2025-08-22 22:58:19] [DEBUG] dom: 📍 Creating CSP-safe highlighting for 24 elements
+[2025-08-22 22:58:19] [DEBUG] dom: 🧹 Removing browser-use highlighting elements
+[2025-08-22 22:58:19] [DEBUG] dom: Enhanced CSP-safe highlighting injected for 24 elements
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Injected highlighting for 24 elements
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ COMPLETED DOM tree build
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ _build_dom_tree completed
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 DOM watchdog requesting screenshot, include_screenshot=True
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 📸 ScreenshotEvent handlers registered: 1 - ['ScreenshotWatchdog.on_ScreenshotEvent']
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 📸 Dispatched ScreenshotEvent, waiting for event to complete...
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: [96m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#1e09)]         ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStateRequestEvent#3738[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: [ScreenshotWatchdog] Handler START - on_ScreenshotEvent called
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: [ScreenshotWatchdog] Taking screenshot with params: {'format': 'png', 'captureBeyondViewport': False}
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: [ScreenshotWatchdog] Screenshot captured successfully
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: Successfully removed 49 highlight elements
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: [92m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#1e09)]         ✅ Succeeded (0.14s)[0m ➡️ [95m<str>[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStateRequestEvent#3738[0m
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page title...
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got title: Google
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page info from CDP...
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page info from CDP: viewport_width=1705 viewport_height=1333 page_width=1705 page_height=1333 scroll_x=0 scroll_y=0 pixels_above=0 pixels_below=0 pixels_left=0 pixels_right=0
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 Creating BrowserStateSummary with screenshot, length: 59864
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ COMPLETED - Returning browser state
+[2025-08-22 22:58:19] [DEBUG] BrowserSession: [92m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#3738)]       ✅ Succeeded (1.12s)[0m ➡️ [95m<BrowserStateSummary>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:58:19] [DEBUG] Agent: 📸 Got browser state WITH screenshot, length: 59864
+[2025-08-22 22:58:19] [INFO] Agent: 
+
+[2025-08-22 22:58:19] [INFO] Agent: 📍 Step 1:
+[2025-08-22 22:58:19] [DEBUG] Agent: Evaluating page with 24 interactive elements on: https://www.google.com/
+[2025-08-22 22:58:19] [DEBUG] Agent: 📝 Step 1: Updating action models...
+[2025-08-22 22:58:19] [DEBUG] Agent: 💬 Step 1: Creating state messages for context...
+[2025-08-22 22:58:19] [DEBUG] service: Added long_term_memory to action_results: Navigated to https://google.com
+[2025-08-22 22:58:19] [DEBUG] service: 
+[2025-08-22 22:58:19] [DEBUG] Agent: 🤖 Step 1: Calling LLM with 2 messages (model: gpt-4.1-mini)...
+[2025-08-22 22:58:27] [DEBUG] service: Token cost service: model='gpt-4.1-mini' timestamp=datetime.datetime(2025, 8, 22, 22, 58, 27, 80094) usage=ChatInvokeUsage(prompt_tokens=8174, prompt_cached_tokens=5120, prompt_cache_creation_tokens=None, prompt_image_tokens=None, completion_tokens=159, total_tokens=8333)
+[2025-08-22 22:58:27] [DEBUG] Agent: 💡 Thinking:
+The user wants to search for a book on Amazon, add it to the cart, and confirm the addition. The current page is Google. The first step is to navigate directly to Amazon's website to perform the book search and subsequent actions efficiently. This avoids unnecessary steps through Google search results.
+[2025-08-22 22:58:27] [INFO] Agent:   [32m👍 Eval: Initial state is Google homepage, ready for navigation. Success.[0m
+[2025-08-22 22:58:27] [DEBUG] Agent: 🧠 Memory: Starting from Google homepage, no actions taken yet towards Amazon or book search.
+[2025-08-22 22:58:27] [INFO] Agent:   [34m🎯 Next goal: Navigate to Amazon homepage to start searching for the book.[0m
+[2025-08-22 22:58:27] [INFO] Agent: ☝️ Decided next action: go_to_url(url="https://www.amazon.com", new_tab=False)
+[2025-08-22 22:58:27] [DEBUG] Agent: ⏳ get_next_action() took 7.44s
+[2025-08-22 22:58:27] [DEBUG] Agent: ✅ Step 1: Got LLM response with 1 actions
+[2025-08-22 22:58:27] [DEBUG] Agent: ⚡ Step 1: Executing 1 actions...
+[2025-08-22 22:58:27] [INFO] Agent:   🦾 [34m[ACTION 1/1][0m go_to_url: url: https://www.amazon.com, new_tab: False
+[2025-08-22 22:58:27] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_NavigateToUrlEvent(#47b1)]          ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:58:27] [DEBUG] BrowserSession: [on_NavigateToUrlEvent] Received NavigateToUrlEvent: url=https://www.amazon.com, new_tab=False
+[2025-08-22 22:58:27] [DEBUG] BrowserSession: [on_NavigateToUrlEvent] Processing new_tab=False
+[2025-08-22 22:58:27] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_SwitchTabEvent(#21ff)]              ⏳ Starting...      [0m [93m↲  triggered by [96mon_NavigateToUrlEvent#47b1[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:27] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_AgentFocusChangedEvent(#2ea5)]      ⏳ Starting...      [0m [93m↲  triggered by [96mon_SwitchTabEvent#21ff[0m [93m↲  under [96mNavigateToUrlEvent#47b1[0m
+[2025-08-22 22:58:27] [DEBUG] BrowserSession: 🔄 AgentFocusChangedEvent received: target_id=...9C49 url=chrome://newtab/
+[2025-08-22 22:58:27] [DEBUG] BrowserSession: 🔄 Cached browser state cleared
+[2025-08-22 22:58:27] [DEBUG] BrowserSession: 🔄 Updated agent focus to tab target_id=...9C49
+[2025-08-22 22:58:27] [DEBUG] BrowserSession: 🔄 Testing tab responsiveness...
+[2025-08-22 22:58:27] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_AgentFocusChangedEvent(#2ea5)]      ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_SwitchTabEvent#21ff[0m
+[2025-08-22 22:58:27] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_SwitchTabEvent(#21ff)]              ✅ Succeeded (0.01s)[0m ➡️ [95m<str>[0m [93m⤴  [92mreturned to  [96m[96mon_NavigateToUrlEvent#47b1[0m
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: Dispatching NavigationCompleteEvent for https://www.amazon.com (tab #9C49)
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: [96m🚌 [DownloadsWatchdog.on_NavigationCompleteEvent(#2038)]  ⏳ Starting...      [0m [93m↲  triggered by [96mon_NavigateToUrlEvent#47b1[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: [DownloadsWatchdog] NavigationCompleteEvent received for https://www.amazon.com, tab #9C49
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: [DownloadsWatchdog] Got target_id=C2D76656B3BEF9A415808ADA497B9C49 for tab #9C49
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: [DownloadsWatchdog] Checking if target C2D76656B3BEF9A415808ADA497B9C49 is PDF viewer...
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: [92m🚌 [DownloadsWatchdog.on_NavigationCompleteEvent(#2038)]  ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_NavigateToUrlEvent#47b1[0m
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: [96m🚌 [SecurityWatchdog.on_NavigationCompleteEvent(#2038)]   ⏳ Starting...      [0m [93m↲  triggered by [96mon_NavigateToUrlEvent#47b1[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: [92m🚌 [SecurityWatchdog.on_NavigationCompleteEvent(#2038)]   ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_NavigateToUrlEvent#47b1[0m
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_AgentFocusChangedEvent(#5a90)]      ⏳ Starting...      [0m [93m↲  triggered by [96mon_NavigateToUrlEvent#47b1[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: 🔄 AgentFocusChangedEvent received: target_id=...9C49 url=https://www.amazon.com
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: 🔄 Cached browser state cleared
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: 🔄 Updated agent focus to tab target_id=...9C49
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: 🔄 Testing tab responsiveness...
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_AgentFocusChangedEvent(#5a90)]      ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_NavigateToUrlEvent#47b1[0m
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_NavigateToUrlEvent(#47b1)]          ✅ Succeeded (0.96s)[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: [96m🚌 [SecurityWatchdog.on_NavigateToUrlEvent(#47b1)]        ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: [92m🚌 [SecurityWatchdog.on_NavigateToUrlEvent(#47b1)]        ✅ Succeeded (0.00s)[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:58:28] [INFO] controller: 🔗 Navigated to https://www.amazon.com
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: ⏳ execute_action() took 0.96s
+[2025-08-22 22:58:28] [DEBUG] Agent: ☑️ Executed action 1/1: [92mgo_to_url: url: https://www.amazon.com, new_tab: False[0m in 0.96s
+[2025-08-22 22:58:28] [DEBUG] Agent: ⏳ multi_act() took 0.96s
+[2025-08-22 22:58:28] [DEBUG] Agent: ✅ Step 1: Actions completed
+[2025-08-22 22:58:28] [DEBUG] Agent: 🔄 Step 1: Consecutive failures reset to: 0
+[2025-08-22 22:58:28] [DEBUG] Agent: 📸 Storing screenshot for step 1, screenshot length: 59864
+[2025-08-22 22:58:28] [DEBUG] Agent: 📸 Screenshot stored at: /tmp/browser_use_agent_068a93c5-54b3-76c3-8000-86ad803be599_1755921493/screenshots/step_1.png
+[2025-08-22 22:58:28] [DEBUG] Agent: 📍 Step 1: Ran 1 action in 9.55s: ✅ 1
+[2025-08-22 22:58:28] [DEBUG] cloud_events: 📸 Including screenshot in CreateAgentStepEvent, length: 59864
+[2025-08-22 22:58:28] [DEBUG] Agent: ⏳ step() took 9.55s
+[2025-08-22 22:58:28] [DEBUG] Agent: ✅ Completed step 1/100
+[2025-08-22 22:58:28] [DEBUG] Agent: 🚶 Starting step 2/100...
+[2025-08-22 22:58:28] [DEBUG] Agent: 🌐 Step 2: Getting browser state...
+[2025-08-22 22:58:28] [DEBUG] Agent: 📸 Requesting browser state with include_screenshot=True, cached=False
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: [96m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#6e9e)]       ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: STARTING browser state request
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page URL: https://www.amazon.com/
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: 📍 Current page URL: https://www.amazon.com/, target_id: C2D76656B3BEF9A415808ADA497B9C49, session_id: 4805DCFF5B2DE854E8302BDD47D81627
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ⏳ Waiting for page stability...
+[2025-08-22 22:58:28] [DEBUG] BrowserSession: ⏳ Minimum wait: 0.25s
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: ⏳ Network idle wait: 0.5s
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: ✅ Page stability wait completed in 0.75s
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ Page stability complete
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting tabs info...
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got 1 tabs
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Tabs info: [TabInfo(url='https://www.amazon.com/', title='Amazon.com', target_id='C2D76656B3BEF9A415808ADA497B9C49', parent_target_id=None)]
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 🌳 Building DOM tree...
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Starting _build_dom_tree...
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: STARTING DOM tree build
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Removing existing highlights...
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: Successfully removed 0 highlight elements
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Calling DomService.get_serialized_dom_tree...
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DEBUG: Capturing DOM snapshot for target C2D76656B3BEF9A415808ADA497B9C49
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DEBUG: Snapshot contains 1 documents with 17 total nodes
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DEBUG: HTML frame scroll - scrollY=0, scrollX=0, frameId=C2D76656B3BEF9A415808ADA497B9C49, nodeId=7
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ DomService.get_serialized_dom_tree completed
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: Time taken to get DOM tree: 0.0099334716796875 seconds
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: Timing breakdown: {'clickable_detection_time': 0.000125885009765625, 'create_simplified_tree': 0.0001938343048095703, 'optimize_tree': 1.430511474609375e-05, 'bbox_filtering': 0.00011134147644042969, 'assign_interactive_indices': 6.9141387939453125e-06, 'serialize_accessible_elements_total': 0.0003275871276855469, 'serialize_dom_tree_total': 0.0003383159637451172}
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Updating selector maps...
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Selector maps updated, 6 elements
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Injecting highlighting script...
+[2025-08-22 22:58:29] [DEBUG] dom: 📍 Creating CSP-safe highlighting for 6 elements
+[2025-08-22 22:58:29] [DEBUG] dom: 🧹 Removing browser-use highlighting elements
+[2025-08-22 22:58:29] [DEBUG] dom: Enhanced CSP-safe highlighting injected for 6 elements
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Injected highlighting for 6 elements
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ COMPLETED DOM tree build
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ _build_dom_tree completed
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 DOM watchdog requesting screenshot, include_screenshot=True
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 📸 ScreenshotEvent handlers registered: 1 - ['ScreenshotWatchdog.on_ScreenshotEvent']
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 📸 Dispatched ScreenshotEvent, waiting for event to complete...
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: [96m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#63ad)]         ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStateRequestEvent#6e9e[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: [ScreenshotWatchdog] Handler START - on_ScreenshotEvent called
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: [ScreenshotWatchdog] Taking screenshot with params: {'format': 'png', 'captureBeyondViewport': False}
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: [ScreenshotWatchdog] Screenshot captured successfully
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: Successfully removed 13 highlight elements
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: [92m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#63ad)]         ✅ Succeeded (0.10s)[0m ➡️ [95m<str>[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStateRequestEvent#6e9e[0m
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page title...
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got title: Amazon.com
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page info from CDP...
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page info from CDP: viewport_width=1705 viewport_height=1333 page_width=1705 page_height=1333 scroll_x=0 scroll_y=0 pixels_above=0 pixels_below=0 pixels_left=0 pixels_right=0
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 Creating BrowserStateSummary with screenshot, length: 47292
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ COMPLETED - Returning browser state
+[2025-08-22 22:58:29] [DEBUG] BrowserSession: [92m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#6e9e)]       ✅ Succeeded (0.94s)[0m ➡️ [95m<BrowserStateSummary>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:58:29] [DEBUG] Agent: 📸 Got browser state WITH screenshot, length: 47292
+[2025-08-22 22:58:29] [INFO] Agent: 
+
+[2025-08-22 22:58:29] [INFO] Agent: 📍 Step 2:
+[2025-08-22 22:58:29] [DEBUG] Agent: Evaluating page with 6 interactive elements on: https://www.amazon.com/
+[2025-08-22 22:58:29] [DEBUG] Agent: 📝 Step 2: Updating action models...
+[2025-08-22 22:58:29] [DEBUG] Agent: 💬 Step 2: Creating state messages for context...
+[2025-08-22 22:58:29] [DEBUG] service: Added long_term_memory to action_results: Navigated to https://www.amazon.com
+[2025-08-22 22:58:29] [DEBUG] service: 
+[2025-08-22 22:58:29] [DEBUG] Agent: 🤖 Step 2: Calling LLM with 2 messages (model: gpt-4.1-mini)...
+[2025-08-22 22:58:35] [DEBUG] service: Token cost service: model='gpt-4.1-mini' timestamp=datetime.datetime(2025, 8, 22, 22, 58, 35, 453760) usage=ChatInvokeUsage(prompt_tokens=8053, prompt_cached_tokens=0, prompt_cache_creation_tokens=None, prompt_image_tokens=None, completion_tokens=192, total_tokens=8245)
+[2025-08-22 22:58:35] [DEBUG] Agent: 💡 Thinking:
+The current Amazon page shows a prompt with a 'Continue shopping' button, likely blocking further interaction until clicked. To proceed with searching for a book, I need to click this 'Continue shopping' button first. After that, I will locate the search input field to enter the book's name and perform the search.
+[2025-08-22 22:58:35] [INFO] Agent:   [32m👍 Eval: Successfully navigated to Amazon homepage but encountered a prompt requiring interaction before proceeding. Verdict: Success with a minor obstacle.[0m
+[2025-08-22 22:58:35] [DEBUG] Agent: 🧠 Memory: On Amazon homepage, encountered a 'Continue shopping' prompt that must be dismissed before searching for a book.
+[2025-08-22 22:58:35] [INFO] Agent:   [34m🎯 Next goal: Click the 'Continue shopping' button to dismiss the prompt and then locate the search bar to input the book name.[0m
+[2025-08-22 22:58:35] [INFO] Agent: ☝️ Decided next action: click_element_by_index(#4, while_holding_ctrl=False)
+[2025-08-22 22:58:35] [DEBUG] Agent: ⏳ get_next_action() took 5.65s
+[2025-08-22 22:58:35] [DEBUG] Agent: ✅ Step 2: Got LLM response with 1 actions
+[2025-08-22 22:58:35] [DEBUG] Agent: ⚡ Step 2: Executing 1 actions...
+[2025-08-22 22:58:35] [INFO] Agent:   🦾 [34m[ACTION 1/1][0m click_element_by_index: index: 4, while_holding_ctrl: False
+[2025-08-22 22:58:35] [DEBUG] BrowserSession: [96m🚌 [DefaultActionWatchdog.on_ClickElementEvent(#bfc1)]    ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:58:35] [DEBUG] BrowserSession: Got 1 quads from DOM.getContentQuads
+[2025-08-22 22:58:35] [DEBUG] BrowserSession: 👆 Dragging mouse over element before clicking x: 852.5px y: 216.15625px ...
+[2025-08-22 22:58:35] [DEBUG] BrowserSession: 👆🏾 Clicking x: 852.5px y: 216.15625px with modifiers: 0 ...
+[2025-08-22 22:58:35] [DEBUG] BrowserSession: 🖱️ Clicked successfully using x,y coordinates
+[2025-08-22 22:58:36] [DEBUG] BrowserSession: 🖱️ Clicked button with index 4: 
+[2025-08-22 22:58:36] [DEBUG] BrowserSession: Element xpath: button
+[2025-08-22 22:58:36] [DEBUG] BrowserSession: [92m🚌 [DefaultActionWatchdog.on_ClickElementEvent(#bfc1)]    ✅ Succeeded (1.16s)[0m ➡️ [95m<dict>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:58:36] [INFO] controller: 🖱️ Clicked element with index 4
+[2025-08-22 22:58:36] [DEBUG] BrowserSession: ⏳ execute_action() took 1.16s
+[2025-08-22 22:58:36] [DEBUG] Agent: ☑️ Executed action 1/1: [92mclick_element_by_index: index: 4, while_holding_ctrl: False[0m in 1.17s
+[2025-08-22 22:58:36] [DEBUG] Agent: ⏳ multi_act() took 1.17s
+[2025-08-22 22:58:36] [DEBUG] Agent: ✅ Step 2: Actions completed
+[2025-08-22 22:58:36] [DEBUG] Agent: 🔄 Step 2: Consecutive failures reset to: 0
+[2025-08-22 22:58:36] [DEBUG] Agent: 📸 Storing screenshot for step 2, screenshot length: 47292
+[2025-08-22 22:58:36] [DEBUG] Agent: 📸 Screenshot stored at: /tmp/browser_use_agent_068a93c5-54b3-76c3-8000-86ad803be599_1755921493/screenshots/step_2.png
+[2025-08-22 22:58:36] [DEBUG] Agent: 📍 Step 2: Ran 1 action in 8.57s: ✅ 1
+[2025-08-22 22:58:36] [DEBUG] cloud_events: 📸 Including screenshot in CreateAgentStepEvent, length: 47292
+[2025-08-22 22:58:36] [DEBUG] Agent: ⏳ step() took 8.57s
+[2025-08-22 22:58:36] [DEBUG] Agent: ✅ Completed step 2/100
+[2025-08-22 22:58:36] [DEBUG] Agent: 🚶 Starting step 3/100...
+[2025-08-22 22:58:36] [DEBUG] Agent: 🌐 Step 3: Getting browser state...
+[2025-08-22 22:58:36] [DEBUG] Agent: 📸 Requesting browser state with include_screenshot=True, cached=False
+[2025-08-22 22:58:37] [INFO] auth: ──────────────────────────────────────────────────────────────────────────
+[2025-08-22 22:58:37] [INFO] auth: 🌐  View the details of this run in Browser Use Cloud:
+[2025-08-22 22:58:37] [INFO] auth:     👉  https://cloud.browser-use.com/hotlink?user_code=ZZ9Y4KU8X8RYXF3Z
+[2025-08-22 22:58:37] [INFO] auth: ──────────────────────────────────────────────────────────────────────────
+
+[2025-08-22 22:58:37] [DEBUG] BrowserSession: [96m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#d0e5)]       ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:58:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: STARTING browser state request
+[2025-08-22 22:58:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page URL: https://www.amazon.com/
+[2025-08-22 22:58:37] [DEBUG] BrowserSession: 📍 Current page URL: https://www.amazon.com/, target_id: C2D76656B3BEF9A415808ADA497B9C49, session_id: 4805DCFF5B2DE854E8302BDD47D81627
+[2025-08-22 22:58:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ⏳ Waiting for page stability...
+[2025-08-22 22:58:37] [DEBUG] BrowserSession: ⏳ Minimum wait: 0.25s
+[2025-08-22 22:58:37] [DEBUG] BrowserSession: ⏳ Network idle wait: 0.5s
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: ✅ Page stability wait completed in 0.75s
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ Page stability complete
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting tabs info...
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got 1 tabs
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Tabs info: [TabInfo(url='https://www.amazon.com/', title='Amazon.com. Spend less. Smile more.', target_id='C2D76656B3BEF9A415808ADA497B9C49', parent_target_id=None)]
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 🌳 Building DOM tree...
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Starting _build_dom_tree...
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: STARTING DOM tree build
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Removing existing highlights...
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: Successfully removed 0 highlight elements
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Calling DomService.get_serialized_dom_tree...
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DEBUG: Capturing DOM snapshot for target C2D76656B3BEF9A415808ADA497B9C49
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DEBUG: Snapshot contains 2 documents with 34 total nodes
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DEBUG: Document 1 has 17 nodes
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DEBUG: HTML frame scroll - scrollY=0, scrollX=0, frameId=C2D76656B3BEF9A415808ADA497B9C49, nodeId=82
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ DomService.get_serialized_dom_tree completed
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: Time taken to get DOM tree: 0.4767453670501709 seconds
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: Timing breakdown: {'clickable_detection_time': 0.00977325439453125, 'create_simplified_tree': 0.013644933700561523, 'optimize_tree': 0.00028443336486816406, 'bbox_filtering': 0.0014908313751220703, 'assign_interactive_indices': 0.00013017654418945312, 'serialize_accessible_elements_total': 0.015552759170532227, 'serialize_dom_tree_total': 0.015577316284179688}
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Updating selector maps...
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Selector maps updated, 144 elements
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Injecting highlighting script...
+[2025-08-22 22:58:38] [DEBUG] dom: 📍 Creating CSP-safe highlighting for 142 elements
+[2025-08-22 22:58:38] [DEBUG] dom: 🧹 Removing browser-use highlighting elements
+[2025-08-22 22:58:38] [DEBUG] dom: Enhanced CSP-safe highlighting injected for 142 elements
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Injected highlighting for 144 elements
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ COMPLETED DOM tree build
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ _build_dom_tree completed
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 DOM watchdog requesting screenshot, include_screenshot=True
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 📸 ScreenshotEvent handlers registered: 1 - ['ScreenshotWatchdog.on_ScreenshotEvent']
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: 📸 Dispatched ScreenshotEvent, waiting for event to complete...
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: [96m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#9c8d)]         ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStateRequestEvent#d0e5[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: [ScreenshotWatchdog] Handler START - on_ScreenshotEvent called
+[2025-08-22 22:58:38] [DEBUG] BrowserSession: [ScreenshotWatchdog] Taking screenshot with params: {'format': 'png', 'captureBeyondViewport': False}
+[2025-08-22 22:58:39] [DEBUG] BrowserSession: [ScreenshotWatchdog] Screenshot captured successfully
+[2025-08-22 22:58:39] [DEBUG] BrowserSession: Successfully removed 285 highlight elements
+[2025-08-22 22:58:39] [DEBUG] BrowserSession: [92m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#9c8d)]         ✅ Succeeded (0.33s)[0m ➡️ [95m<str>[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStateRequestEvent#d0e5[0m
+[2025-08-22 22:58:39] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page title...
+[2025-08-22 22:58:39] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got title: Amazon.com. Spend less. Smile more.
+[2025-08-22 22:58:39] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page info from CDP...
+[2025-08-22 22:58:39] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page info from CDP: viewport_width=1690 viewport_height=1333 page_width=1690 page_height=5700 scroll_x=0 scroll_y=0 pixels_above=0 pixels_below=4367 pixels_left=0 pixels_right=0
+[2025-08-22 22:58:39] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 Creating BrowserStateSummary with screenshot, length: 1542924
+[2025-08-22 22:58:39] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ COMPLETED - Returning browser state
+[2025-08-22 22:58:39] [DEBUG] BrowserSession: [92m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#d0e5)]       ✅ Succeeded (1.73s)[0m ➡️ [95m<BrowserStateSummary>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:58:39] [DEBUG] Agent: 📸 Got browser state WITH screenshot, length: 1542924
+[2025-08-22 22:58:39] [INFO] Agent: 
+
+[2025-08-22 22:58:39] [INFO] Agent: 📍 Step 3:
+[2025-08-22 22:58:39] [DEBUG] Agent: Evaluating page with 144 interactive elements on: https://www.amazon.com/
+[2025-08-22 22:58:39] [DEBUG] Agent: 📝 Step 3: Updating action models...
+[2025-08-22 22:58:39] [DEBUG] Agent: 💬 Step 3: Creating state messages for context...
+[2025-08-22 22:58:39] [DEBUG] service: Added long_term_memory to action_results: Clicked element with index 4
+[2025-08-22 22:58:39] [DEBUG] service: 
+[2025-08-22 22:58:39] [DEBUG] Agent: 🤖 Step 3: Calling LLM with 2 messages (model: gpt-4.1-mini)...
+[2025-08-22 22:58:46] [DEBUG] service: Token cost service: model='gpt-4.1-mini' timestamp=datetime.datetime(2025, 8, 22, 22, 58, 46, 919137) usage=ChatInvokeUsage(prompt_tokens=9857, prompt_cached_tokens=0, prompt_cache_creation_tokens=None, prompt_image_tokens=None, completion_tokens=258, total_tokens=10115)
+[2025-08-22 22:58:46] [DEBUG] Agent: 💡 Thinking:
+I am currently on the Amazon homepage with the search bar visible and ready for input. The user wants to search for a book, add it to the cart, and confirm the addition. The next logical step is to input a book name into the search bar and submit the search. Since the user did not specify a particular book, I will use a common popular book title for demonstration, such as 'The Great Gatsby'. After searching, I will proceed to select the first relevant book from the results and add it to the cart.
+[2025-08-22 22:58:46] [INFO] Agent:   [32m👍 Eval: Successfully dismissed the prompt and located the search bar on Amazon homepage. Verdict: Success[0m
+[2025-08-22 22:58:46] [DEBUG] Agent: 🧠 Memory: On Amazon homepage with search bar ready for input after dismissing initial prompt. Preparing to search for a book.
+[2025-08-22 22:58:46] [INFO] Agent:   [34m🎯 Next goal: Input 'The Great Gatsby' into the Amazon search bar and submit the search.[0m
+[2025-08-22 22:58:46] [INFO] Agent: ✌️ Decided next 2 multi-actions:
+          1. input_text(#11, text="The Great Gatsby", clear_existing=True)
+          2. click_element_by_index(#15, while_holding_ctrl=False)
+[2025-08-22 22:58:46] [DEBUG] Agent: ⏳ get_next_action() took 7.73s
+[2025-08-22 22:58:46] [DEBUG] Agent: ✅ Step 3: Got LLM response with 2 actions
+[2025-08-22 22:58:46] [DEBUG] Agent: ⚡ Step 3: Executing 2 actions...
+[2025-08-22 22:58:46] [INFO] Agent:   🦾 [34m[ACTION 1/2][0m input_text: index: 11, text: The Great Gatsby, clear_existing: True
+[2025-08-22 22:58:46] [DEBUG] BrowserSession: [96m🚌 [DefaultActionWatchdog.on_TypeTextEvent(#2c51)]        ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:58:47] [DEBUG] BrowserSession: Element focusability check: {'visible': True, 'focusable': True, 'interactive': True, 'disabled': False, 'bounds': {'x': 319.171875, 'y': 11, 'width': 863.84375, 'height': 38}, 'tagName': 'input', 'type': 'text'}
+[2025-08-22 22:58:47] [DEBUG] BrowserSession: 📍 Input coordinates: x=751.1, y=30.0
+[2025-08-22 22:58:47] [DEBUG] BrowserSession: ✅ Element focused using CDP DOM.focus
+[2025-08-22 22:58:47] [INFO] BrowserSession: ⌨️ Typed "The Great Gatsby" into element with index 11
+[2025-08-22 22:58:47] [DEBUG] BrowserSession: Element xpath: input
+[2025-08-22 22:58:47] [DEBUG] BrowserSession: [92m🚌 [DefaultActionWatchdog.on_TypeTextEvent(#2c51)]        ✅ Succeeded (0.40s)[0m ➡️ [95m<dict>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:58:47] [INFO] controller: Input 'The Great Gatsby' into element 11.
+[2025-08-22 22:58:47] [DEBUG] BrowserSession: ⏳ execute_action() took 0.40s
+[2025-08-22 22:58:47] [DEBUG] Agent: ☑️ Executed action 1/2: [92minput_text: index: 11, text: The Great Gatsby, clear_existing: True[0m in 0.41s
+[2025-08-22 22:58:47] [DEBUG] BrowserSession: [96m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#9347)]       ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:58:47] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: STARTING browser state request
+[2025-08-22 22:58:47] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page URL: https://www.amazon.com/
+[2025-08-22 22:58:47] [DEBUG] BrowserSession: 📍 Current page URL: https://www.amazon.com/, target_id: C2D76656B3BEF9A415808ADA497B9C49, session_id: 4805DCFF5B2DE854E8302BDD47D81627
+[2025-08-22 22:58:47] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ⏳ Waiting for page stability...
+[2025-08-22 22:58:47] [DEBUG] BrowserSession: ⏳ Minimum wait: 0.25s
+[2025-08-22 22:58:47] [DEBUG] BrowserSession: ⏳ Network idle wait: 0.5s
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: ✅ Page stability wait completed in 0.75s
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ Page stability complete
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting tabs info...
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got 1 tabs
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Tabs info: [TabInfo(url='https://www.amazon.com/', title='Amazon.com. Spend less. Smile more.', target_id='C2D76656B3BEF9A415808ADA497B9C49', parent_target_id=None)]
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 🌳 Building DOM tree...
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Starting _build_dom_tree...
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: STARTING DOM tree build
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Removing existing highlights...
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: Successfully removed 0 highlight elements
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Calling DomService.get_serialized_dom_tree...
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DEBUG: Capturing DOM snapshot for target C2D76656B3BEF9A415808ADA497B9C49
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DEBUG: Snapshot contains 2 documents with 34 total nodes
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DEBUG: Document 1 has 17 nodes
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DEBUG: HTML frame scroll - scrollY=0, scrollX=0, frameId=C2D76656B3BEF9A415808ADA497B9C49, nodeId=3817
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ DomService.get_serialized_dom_tree completed
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: Time taken to get DOM tree: 0.4822077751159668 seconds
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: Timing breakdown: {'clickable_detection_time': 0.00940704345703125, 'create_simplified_tree': 0.013146638870239258, 'optimize_tree': 0.0003437995910644531, 'bbox_filtering': 0.0018150806427001953, 'assign_interactive_indices': 0.0007183551788330078, 'serialize_accessible_elements_total': 0.016026020050048828, 'serialize_dom_tree_total': 0.01605081558227539}
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Updating selector maps...
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Selector maps updated, 197 elements
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Injecting highlighting script...
+[2025-08-22 22:58:48] [DEBUG] dom: 📍 Creating CSP-safe highlighting for 185 elements
+[2025-08-22 22:58:48] [DEBUG] dom: 🧹 Removing browser-use highlighting elements
+[2025-08-22 22:58:48] [DEBUG] dom: Enhanced CSP-safe highlighting injected for 185 elements
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Injected highlighting for 197 elements
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ COMPLETED DOM tree build
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ _build_dom_tree completed
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 📸 Skipping screenshot, include_screenshot=False
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page title...
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got title: Amazon.com. Spend less. Smile more.
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page info from CDP...
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page info from CDP: viewport_width=1690 viewport_height=1333 page_width=1690 page_height=5700 scroll_x=0 scroll_y=0 pixels_above=0 pixels_below=4367 pixels_left=0 pixels_right=0
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 Creating BrowserStateSummary WITHOUT screenshot
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ COMPLETED - Returning browser state
+[2025-08-22 22:58:48] [DEBUG] BrowserSession: [92m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#9347)]       ✅ Succeeded (1.43s)[0m ➡️ [95m<BrowserStateSummary>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:58:48] [INFO] service: Something new appeared after action 1 / 2: actions click_element_by_index were not executed
+[2025-08-22 22:58:48] [DEBUG] Agent: ⏳ multi_act() took 1.85s
+[2025-08-22 22:58:48] [DEBUG] Agent: ✅ Step 3: Actions completed
+[2025-08-22 22:58:48] [DEBUG] Agent: 🔄 Step 3: Consecutive failures reset to: 0
+[2025-08-22 22:58:48] [DEBUG] Agent: 📸 Storing screenshot for step 3, screenshot length: 1542924
+[2025-08-22 22:58:48] [DEBUG] Agent: 📸 Screenshot stored at: /tmp/browser_use_agent_068a93c5-54b3-76c3-8000-86ad803be599_1755921493/screenshots/step_3.png
+[2025-08-22 22:58:48] [DEBUG] Agent: 📍 Step 3: Ran 2 actions in 12.15s: ✅ 2
+[2025-08-22 22:58:48] [DEBUG] cloud_events: 📸 Including screenshot in CreateAgentStepEvent, length: 1542924
+[2025-08-22 22:58:48] [DEBUG] Agent: ⏳ step() took 12.15s
+[2025-08-22 22:58:48] [DEBUG] Agent: ✅ Completed step 3/100
+[2025-08-22 22:58:48] [DEBUG] Agent: 🚶 Starting step 4/100...
+[2025-08-22 22:58:48] [DEBUG] Agent: 🌐 Step 4: Getting browser state...
+[2025-08-22 22:58:48] [DEBUG] Agent: 📸 Requesting browser state with include_screenshot=True, cached=False
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: [96m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#a87f)]       ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: STARTING browser state request
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page URL: https://www.amazon.com/
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: 📍 Current page URL: https://www.amazon.com/, target_id: C2D76656B3BEF9A415808ADA497B9C49, session_id: 4805DCFF5B2DE854E8302BDD47D81627
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ⏳ Waiting for page stability...
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: ⏳ Minimum wait: 0.25s
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: ⏳ Network idle wait: 0.5s
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: ✅ Page stability wait completed in 0.75s
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ Page stability complete
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting tabs info...
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got 1 tabs
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Tabs info: [TabInfo(url='https://www.amazon.com/', title='Amazon.com. Spend less. Smile more.', target_id='C2D76656B3BEF9A415808ADA497B9C49', parent_target_id=None)]
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 🌳 Building DOM tree...
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Starting _build_dom_tree...
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: STARTING DOM tree build
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Removing existing highlights...
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: Successfully removed 371 highlight elements
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Calling DomService.get_serialized_dom_tree...
+[2025-08-22 22:58:50] [DEBUG] BrowserSession: 🔍 DEBUG: Capturing DOM snapshot for target C2D76656B3BEF9A415808ADA497B9C49
+[2025-08-22 22:58:51] [DEBUG] BrowserSession: 🔍 DEBUG: Snapshot contains 2 documents with 34 total nodes
+[2025-08-22 22:58:51] [DEBUG] BrowserSession: 🔍 DEBUG: Document 1 has 17 nodes
+[2025-08-22 22:58:51] [DEBUG] BrowserSession: 🔍 DEBUG: HTML frame scroll - scrollY=0, scrollX=0, frameId=C2D76656B3BEF9A415808ADA497B9C49, nodeId=7471
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ DomService.get_serialized_dom_tree completed
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: Time taken to get DOM tree: 1.0170643329620361 seconds
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: Timing breakdown: {'clickable_detection_time': 0.010880231857299805, 'create_simplified_tree': 0.014970779418945312, 'optimize_tree': 0.00044536590576171875, 'bbox_filtering': 0.0020971298217773438, 'assign_interactive_indices': 0.0009407997131347656, 'serialize_accessible_elements_total': 0.018457651138305664, 'serialize_dom_tree_total': 0.018494606018066406}
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Updating selector maps...
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Selector maps updated, 197 elements
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Injecting highlighting script...
+[2025-08-22 22:58:52] [DEBUG] dom: 📍 Creating CSP-safe highlighting for 185 elements
+[2025-08-22 22:58:52] [DEBUG] dom: 🧹 Removing browser-use highlighting elements
+[2025-08-22 22:58:52] [DEBUG] dom: Enhanced CSP-safe highlighting injected for 185 elements
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Injected highlighting for 197 elements
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ COMPLETED DOM tree build
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ _build_dom_tree completed
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 DOM watchdog requesting screenshot, include_screenshot=True
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: 📸 ScreenshotEvent handlers registered: 1 - ['ScreenshotWatchdog.on_ScreenshotEvent']
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: 📸 Dispatched ScreenshotEvent, waiting for event to complete...
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: [96m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#5116)]         ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStateRequestEvent#a87f[0m [95m👈 by Agent[0m
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: [ScreenshotWatchdog] Handler START - on_ScreenshotEvent called
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: [ScreenshotWatchdog] Taking screenshot with params: {'format': 'png', 'captureBeyondViewport': False}
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: [ScreenshotWatchdog] Screenshot captured successfully
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: Successfully removed 371 highlight elements
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: [92m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#5116)]         ✅ Succeeded (0.76s)[0m ➡️ [95m<str>[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStateRequestEvent#a87f[0m
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page title...
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got title: Amazon.com. Spend less. Smile more.
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page info from CDP...
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page info from CDP: viewport_width=1690 viewport_height=1333 page_width=1690 page_height=5700 scroll_x=0 scroll_y=0 pixels_above=0 pixels_below=4367 pixels_left=0 pixels_right=0
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 Creating BrowserStateSummary with screenshot, length: 1316376
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ COMPLETED - Returning browser state
+[2025-08-22 22:58:52] [DEBUG] BrowserSession: [92m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#a87f)]       ✅ Succeeded (2.66s)[0m ➡️ [95m<BrowserStateSummary>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:58:52] [DEBUG] Agent: 📸 Got browser state WITH screenshot, length: 1316376
+[2025-08-22 22:58:52] [INFO] Agent: 
+
+[2025-08-22 22:58:52] [INFO] Agent: 📍 Step 4:
+[2025-08-22 22:58:52] [DEBUG] Agent: Evaluating page with 197 interactive elements on: https://www.amazon.com/
+[2025-08-22 22:58:52] [DEBUG] Agent: 📝 Step 4: Updating action models...
+[2025-08-22 22:58:52] [DEBUG] Agent: 💬 Step 4: Creating state messages for context...
+[2025-08-22 22:58:52] [DEBUG] service: Added long_term_memory to action_results: Input 'The Great Gatsby' into element 11.
+[2025-08-22 22:58:52] [DEBUG] service: Added long_term_memory to action_results: Something new appeared after action 1 / 2: actions click_element_by_index were not executed
+[2025-08-22 22:58:52] [DEBUG] service: 
+[2025-08-22 22:58:52] [DEBUG] Agent: 🤖 Step 4: Calling LLM with 2 messages (model: gpt-4.1-mini)...
+[2025-08-22 22:58:59] [DEBUG] service: Token cost service: model='gpt-4.1-mini' timestamp=datetime.datetime(2025, 8, 22, 22, 58, 59, 161964) usage=ChatInvokeUsage(prompt_tokens=10638, prompt_cached_tokens=5248, prompt_cache_creation_tokens=None, prompt_image_tokens=None, completion_tokens=263, total_tokens=10901)
+[2025-08-22 22:58:59] [DEBUG] Agent: 💡 Thinking:
+The previous step successfully input the search term 'The Great Gatsby' into the Amazon search bar but did not execute the search submission click. The next logical step is to click the search button to perform the search. After that, I will need to identify the correct book listing from the results and proceed to add it to the cart. Finally, I will confirm that the book was added to the cart successfully.
+[2025-08-22 22:58:59] [INFO] Agent:   [32m👍 Eval: Successfully input 'The Great Gatsby' into the search bar but did not submit the search yet. Verdict: Partial success.[0m
+[2025-08-22 22:58:59] [DEBUG] Agent: 🧠 Memory: Currently on Amazon homepage with 'The Great Gatsby' typed in the search bar, waiting to submit the search query.
+[2025-08-22 22:58:59] [INFO] Agent:   [34m🎯 Next goal: Click on the search button to submit the query and then locate and select the correct book from results.[0m
+[2025-08-22 22:58:59] [INFO] Agent: ☝️ Decided next action: click_element_by_index(#15, while_holding_ctrl=False)
+[2025-08-22 22:58:59] [DEBUG] Agent: ⏳ get_next_action() took 6.25s
+[2025-08-22 22:58:59] [DEBUG] Agent: ✅ Step 4: Got LLM response with 1 actions
+[2025-08-22 22:58:59] [DEBUG] Agent: ⚡ Step 4: Executing 1 actions...
+[2025-08-22 22:58:59] [INFO] Agent:   🦾 [34m[ACTION 1/1][0m click_element_by_index: index: 15, while_holding_ctrl: False
+[2025-08-22 22:58:59] [DEBUG] BrowserSession: [96m🚌 [DefaultActionWatchdog.on_ClickElementEvent(#a45b)]    ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:58:59] [DEBUG] BrowserSession: Got 1 quads from DOM.getContentQuads
+[2025-08-22 22:58:59] [DEBUG] BrowserSession: 👆 Dragging mouse over element before clicking x: 1205.515625px y: 30.0px ...
+[2025-08-22 22:58:59] [DEBUG] BrowserSession: 👆🏾 Clicking x: 1205.515625px y: 30.0px with modifiers: 0 ...
+[2025-08-22 22:58:59] [DEBUG] BrowserSession: 🖱️ Clicked successfully using x,y coordinates
+[2025-08-22 22:58:59] [DEBUG] BrowserSession: 🖱️ Clicked button with index 15: 
+[2025-08-22 22:58:59] [DEBUG] BrowserSession: Element xpath: input
+[2025-08-22 22:59:00] [DEBUG] BrowserSession: [92m🚌 [DefaultActionWatchdog.on_ClickElementEvent(#a45b)]    ✅ Succeeded (1.21s)[0m ➡️ [95m<dict>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:59:00] [INFO] controller: 🖱️ Clicked element with index 15
+[2025-08-22 22:59:00] [DEBUG] BrowserSession: ⏳ execute_action() took 1.21s
+[2025-08-22 22:59:00] [DEBUG] Agent: ☑️ Executed action 1/1: [92mclick_element_by_index: index: 15, while_holding_ctrl: False[0m in 1.21s
+[2025-08-22 22:59:00] [DEBUG] Agent: ⏳ multi_act() took 1.21s
+[2025-08-22 22:59:00] [DEBUG] Agent: ✅ Step 4: Actions completed
+[2025-08-22 22:59:00] [DEBUG] Agent: 🔄 Step 4: Consecutive failures reset to: 0
+[2025-08-22 22:59:00] [DEBUG] Agent: 📸 Storing screenshot for step 4, screenshot length: 1316376
+[2025-08-22 22:59:00] [DEBUG] Agent: 📸 Screenshot stored at: /tmp/browser_use_agent_068a93c5-54b3-76c3-8000-86ad803be599_1755921493/screenshots/step_4.png
+[2025-08-22 22:59:00] [DEBUG] Agent: 📍 Step 4: Ran 1 action in 11.62s: ✅ 1
+[2025-08-22 22:59:00] [DEBUG] cloud_events: 📸 Including screenshot in CreateAgentStepEvent, length: 1316376
+[2025-08-22 22:59:00] [DEBUG] Agent: ⏳ step() took 11.62s
+[2025-08-22 22:59:00] [DEBUG] Agent: ✅ Completed step 4/100
+[2025-08-22 22:59:00] [DEBUG] Agent: 🚶 Starting step 5/100...
+[2025-08-22 22:59:00] [DEBUG] Agent: 🌐 Step 5: Getting browser state...
+[2025-08-22 22:59:00] [DEBUG] Agent: 📸 Requesting browser state with include_screenshot=True, cached=False
+[2025-08-22 22:59:01] [DEBUG] BrowserSession: [96m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#d685)]       ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:59:01] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: STARTING browser state request
+[2025-08-22 22:59:01] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page URL: https://www.amazon.com/s?k=The+Great+Gatsby
+[2025-08-22 22:59:01] [DEBUG] BrowserSession: 📍 Current page URL: https://www.amazon.com/s?k=The+Great+Gatsby, target_id: C2D76656B3BEF9A415808ADA497B9C49, session_id: 4805DCFF5B2DE854E8302BDD47D81627
+[2025-08-22 22:59:01] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ⏳ Waiting for page stability...
+[2025-08-22 22:59:01] [DEBUG] BrowserSession: ⏳ Minimum wait: 0.25s
+[2025-08-22 22:59:01] [DEBUG] BrowserSession: ⏳ Network idle wait: 0.5s
+[2025-08-22 22:59:02] [DEBUG] BrowserSession: ✅ Page stability wait completed in 0.75s
+[2025-08-22 22:59:02] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ Page stability complete
+[2025-08-22 22:59:02] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting tabs info...
+[2025-08-22 22:59:02] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got 1 tabs
+[2025-08-22 22:59:02] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Tabs info: [TabInfo(url='https://www.amazon.com/s?k=The+Great+Gatsby', title='Amazon.com : The Great Gatsby', target_id='C2D76656B3BEF9A415808ADA497B9C49', parent_target_id=None)]
+[2025-08-22 22:59:02] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 🌳 Building DOM tree...
+[2025-08-22 22:59:02] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Starting _build_dom_tree...
+[2025-08-22 22:59:02] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: STARTING DOM tree build
+[2025-08-22 22:59:02] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Removing existing highlights...
+[2025-08-22 22:59:02] [DEBUG] BrowserSession: Successfully removed 0 highlight elements
+[2025-08-22 22:59:02] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Calling DomService.get_serialized_dom_tree...
+[2025-08-22 22:59:02] [DEBUG] BrowserSession: 🔍 DEBUG: Capturing DOM snapshot for target C2D76656B3BEF9A415808ADA497B9C49
+[2025-08-22 22:59:02] [DEBUG] BrowserSession: 🔍 DEBUG: Iframe 0 actual scroll position - scrollTop=0, scrollLeft=0
+[2025-08-22 22:59:02] [DEBUG] BrowserSession: 🔍 DEBUG: Snapshot contains 3 documents with 51 total nodes
+[2025-08-22 22:59:02] [DEBUG] BrowserSession: 🔍 DEBUG: Document 1 has 17 nodes
+[2025-08-22 22:59:02] [DEBUG] BrowserSession: 🔍 DEBUG: Document 2 has 17 nodes
+[2025-08-22 22:59:03] [DEBUG] BrowserSession: 🔍 DEBUG: HTML frame scroll - scrollY=0, scrollX=0, frameId=C2D76656B3BEF9A415808ADA497B9C49, nodeId=11127
+[2025-08-22 22:59:03] [DEBUG] BrowserSession: 🔍 DEBUG: HTML frame scroll - scrollY=0, scrollX=0, frameId=FA42C20AF17D7EAC1873386DC358D049, nodeId=16514
+[2025-08-22 22:59:03] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ DomService.get_serialized_dom_tree completed
+[2025-08-22 22:59:03] [DEBUG] BrowserSession: Time taken to get DOM tree: 1.2655982971191406 seconds
+[2025-08-22 22:59:03] [DEBUG] BrowserSession: Timing breakdown: {'clickable_detection_time': 0.015187263488769531, 'create_simplified_tree': 0.021529197692871094, 'optimize_tree': 0.0009002685546875, 'bbox_filtering': 0.0028352737426757812, 'assign_interactive_indices': 0.0012142658233642578, 'serialize_accessible_elements_total': 0.026482343673706055, 'serialize_dom_tree_total': 0.02652740478515625}
+[2025-08-22 22:59:03] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Updating selector maps...
+[2025-08-22 22:59:03] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Selector maps updated, 266 elements
+[2025-08-22 22:59:03] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Injecting highlighting script...
+[2025-08-22 22:59:03] [DEBUG] dom: 📍 Creating CSP-safe highlighting for 249 elements
+[2025-08-22 22:59:03] [DEBUG] dom: 🧹 Removing browser-use highlighting elements
+[2025-08-22 22:59:03] [DEBUG] dom: Enhanced CSP-safe highlighting injected for 249 elements
+[2025-08-22 22:59:03] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Injected highlighting for 266 elements
+[2025-08-22 22:59:03] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ COMPLETED DOM tree build
+[2025-08-22 22:59:03] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ _build_dom_tree completed
+[2025-08-22 22:59:03] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 DOM watchdog requesting screenshot, include_screenshot=True
+[2025-08-22 22:59:03] [DEBUG] BrowserSession: 📸 ScreenshotEvent handlers registered: 1 - ['ScreenshotWatchdog.on_ScreenshotEvent']
+[2025-08-22 22:59:03] [DEBUG] BrowserSession: 📸 Dispatched ScreenshotEvent, waiting for event to complete...
+[2025-08-22 22:59:03] [DEBUG] BrowserSession: [96m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#be1c)]         ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStateRequestEvent#d685[0m [95m👈 by Agent[0m
+[2025-08-22 22:59:03] [DEBUG] BrowserSession: [ScreenshotWatchdog] Handler START - on_ScreenshotEvent called
+[2025-08-22 22:59:03] [DEBUG] BrowserSession: [ScreenshotWatchdog] Taking screenshot with params: {'format': 'png', 'captureBeyondViewport': False}
+[2025-08-22 22:59:04] [DEBUG] BrowserSession: [ScreenshotWatchdog] Screenshot captured successfully
+[2025-08-22 22:59:04] [DEBUG] BrowserSession: Successfully removed 499 highlight elements
+[2025-08-22 22:59:04] [DEBUG] BrowserSession: [92m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#be1c)]         ✅ Succeeded (0.26s)[0m ➡️ [95m<str>[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStateRequestEvent#d685[0m
+[2025-08-22 22:59:04] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page title...
+[2025-08-22 22:59:04] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got title: Amazon.com : The Great Gatsby
+[2025-08-22 22:59:04] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page info from CDP...
+[2025-08-22 22:59:04] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page info from CDP: viewport_width=1690 viewport_height=1333 page_width=1690 page_height=6782 scroll_x=0 scroll_y=0 pixels_above=0 pixels_below=5449 pixels_left=0 pixels_right=0
+[2025-08-22 22:59:04] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 Creating BrowserStateSummary with screenshot, length: 627484
+[2025-08-22 22:59:04] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ COMPLETED - Returning browser state
+[2025-08-22 22:59:04] [DEBUG] BrowserSession: [92m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#d685)]       ✅ Succeeded (2.53s)[0m ➡️ [95m<BrowserStateSummary>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:59:04] [DEBUG] Agent: 📸 Got browser state WITH screenshot, length: 627484
+[2025-08-22 22:59:04] [INFO] Agent: 
+
+[2025-08-22 22:59:04] [INFO] Agent: 📍 Step 5:
+[2025-08-22 22:59:04] [DEBUG] Agent: Evaluating page with 266 interactive elements on: https://www.amazon.com/s?k=The+Great+Gatsby
+[2025-08-22 22:59:04] [DEBUG] Agent: 📝 Step 5: Updating action models...
+[2025-08-22 22:59:04] [DEBUG] Agent: 💬 Step 5: Creating state messages for context...
+[2025-08-22 22:59:04] [DEBUG] service: Added long_term_memory to action_results: Clicked element with index 15
+[2025-08-22 22:59:04] [DEBUG] service: 
+[2025-08-22 22:59:04] [DEBUG] Agent: 🤖 Step 5: Calling LLM with 2 messages (model: gpt-4.1-mini)...
+[2025-08-22 22:59:12] [DEBUG] service: Token cost service: model='gpt-4.1-mini' timestamp=datetime.datetime(2025, 8, 22, 22, 59, 12, 558150) usage=ChatInvokeUsage(prompt_tokens=11495, prompt_cached_tokens=0, prompt_cache_creation_tokens=None, prompt_image_tokens=None, completion_tokens=247, total_tokens=11742)
+[2025-08-22 22:59:12] [DEBUG] Agent: 💡 Thinking:
+The search results page for 'The Great Gatsby' on Amazon is loaded. The first three book listings are visible, each with a clickable title link. The user wants to add the book to the cart and confirm the addition. The best approach is to click on the first relevant book title link to go to its product page, then add it to the cart and confirm. The first book listing's title link is at index 61. After navigating to the product page, I will look for the 'Add to Cart' button and click it, then confirm the addition.
+[2025-08-22 22:59:12] [INFO] Agent:   [32m👍 Eval: Successfully loaded search results for 'The Great Gatsby' and identified clickable book titles. Verdict: Success[0m
+[2025-08-22 22:59:12] [DEBUG] Agent: 🧠 Memory: On Amazon search results page for 'The Great Gatsby', ready to select the first book listing and proceed to add it to cart.
+[2025-08-22 22:59:12] [INFO] Agent:   [34m🎯 Next goal: Click on the first book title link (index 61) to open its product page and then add it to the cart.[0m
+[2025-08-22 22:59:12] [INFO] Agent: ☝️ Decided next action: click_element_by_index(#61, while_holding_ctrl=False)
+[2025-08-22 22:59:12] [DEBUG] Agent: ⏳ get_next_action() took 8.34s
+[2025-08-22 22:59:12] [DEBUG] Agent: ✅ Step 5: Got LLM response with 1 actions
+[2025-08-22 22:59:12] [DEBUG] Agent: ⚡ Step 5: Executing 1 actions...
+[2025-08-22 22:59:12] [INFO] Agent:   🦾 [34m[ACTION 1/1][0m click_element_by_index: index: 61, while_holding_ctrl: False
+[2025-08-22 22:59:12] [DEBUG] BrowserSession: [96m🚌 [DefaultActionWatchdog.on_ClickElementEvent(#4613)]    ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:59:12] [DEBUG] BrowserSession: Got 1 quads from DOM.getContentQuads
+[2025-08-22 22:59:12] [DEBUG] BrowserSession: 👆 Dragging mouse over element before clicking x: 985.765625px y: 236.0px ...
+[2025-08-22 22:59:12] [DEBUG] BrowserSession: 👆🏾 Clicking x: 985.765625px y: 236.0px with modifiers: 0 ...
+[2025-08-22 22:59:12] [DEBUG] BrowserSession: 🖱️ Clicked successfully using x,y coordinates
+[2025-08-22 22:59:13] [DEBUG] BrowserSession: 🖱️ Clicked button with index 61: 
+[2025-08-22 22:59:13] [DEBUG] BrowserSession: Element xpath: h2
+[2025-08-22 22:59:13] [DEBUG] BrowserSession: [92m🚌 [DefaultActionWatchdog.on_ClickElementEvent(#4613)]    ✅ Succeeded (1.19s)[0m ➡️ [95m<dict>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:59:13] [INFO] controller: 🖱️ Clicked element with index 61
+[2025-08-22 22:59:13] [DEBUG] BrowserSession: ⏳ execute_action() took 1.19s
+[2025-08-22 22:59:13] [DEBUG] Agent: ☑️ Executed action 1/1: [92mclick_element_by_index: index: 61, while_holding_ctrl: False[0m in 1.19s
+[2025-08-22 22:59:13] [DEBUG] Agent: ⏳ multi_act() took 1.19s
+[2025-08-22 22:59:13] [DEBUG] Agent: ✅ Step 5: Actions completed
+[2025-08-22 22:59:13] [DEBUG] Agent: 🔄 Step 5: Consecutive failures reset to: 0
+[2025-08-22 22:59:13] [DEBUG] Agent: 📸 Storing screenshot for step 5, screenshot length: 627484
+[2025-08-22 22:59:13] [DEBUG] Agent: 📸 Screenshot stored at: /tmp/browser_use_agent_068a93c5-54b3-76c3-8000-86ad803be599_1755921493/screenshots/step_5.png
+[2025-08-22 22:59:13] [DEBUG] Agent: 📍 Step 5: Ran 1 action in 13.36s: ✅ 1
+[2025-08-22 22:59:13] [DEBUG] cloud_events: 📸 Including screenshot in CreateAgentStepEvent, length: 627484
+[2025-08-22 22:59:13] [DEBUG] Agent: ⏳ step() took 13.36s
+[2025-08-22 22:59:13] [DEBUG] Agent: ✅ Completed step 5/100
+[2025-08-22 22:59:13] [DEBUG] Agent: 🚶 Starting step 6/100...
+[2025-08-22 22:59:13] [DEBUG] Agent: 🌐 Step 6: Getting browser state...
+[2025-08-22 22:59:13] [DEBUG] Agent: 📸 Requesting browser state with include_screenshot=True, cached=False
+[2025-08-22 22:59:14] [DEBUG] BrowserSession: [96m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#1086)]       ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:59:14] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: STARTING browser state request
+[2025-08-22 22:59:14] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page URL: https://www.amazon.com/Great-Gatsby-Readers-Library-Classic/dp/1954839243
+[2025-08-22 22:59:14] [DEBUG] BrowserSession: 📍 Current page URL: https://www.amazon.com/Great-Gatsby-Readers-Library-Classic/dp/1954839243, target_id: C2D76656B3BEF9A415808ADA497B9C49, session_id: 4805DCFF5B2DE854E8302BDD47D81627
+[2025-08-22 22:59:14] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ⏳ Waiting for page stability...
+[2025-08-22 22:59:14] [DEBUG] BrowserSession: ⏳ Minimum wait: 0.25s
+[2025-08-22 22:59:15] [DEBUG] BrowserSession: ⏳ Network idle wait: 0.5s
+[2025-08-22 22:59:15] [DEBUG] BrowserSession: ✅ Page stability wait completed in 0.75s
+[2025-08-22 22:59:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ Page stability complete
+[2025-08-22 22:59:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting tabs info...
+[2025-08-22 22:59:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got 1 tabs
+[2025-08-22 22:59:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Tabs info: [TabInfo(url='https://www.amazon.com/Great-Gatsby-Readers-Library-Classic/dp/1954839243', title="Amazon.com: The Great Gatsby - Reader's Library Classic: 9781954839243: Fitzgerald, F. Scott: Books", target_id='C2D76656B3BEF9A415808ADA497B9C49', parent_target_id=None)]
+[2025-08-22 22:59:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 🌳 Building DOM tree...
+[2025-08-22 22:59:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Starting _build_dom_tree...
+[2025-08-22 22:59:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: STARTING DOM tree build
+[2025-08-22 22:59:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Removing existing highlights...
+[2025-08-22 22:59:15] [DEBUG] BrowserSession: Successfully removed 0 highlight elements
+[2025-08-22 22:59:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Calling DomService.get_serialized_dom_tree...
+[2025-08-22 22:59:15] [DEBUG] BrowserSession: 🔍 DEBUG: Capturing DOM snapshot for target C2D76656B3BEF9A415808ADA497B9C49
+[2025-08-22 22:59:15] [DEBUG] BrowserSession: 🔍 DEBUG: Iframe 2 actual scroll position - scrollTop=0, scrollLeft=0
+[2025-08-22 22:59:16] [DEBUG] BrowserSession: 🔍 DEBUG: Snapshot contains 2 documents with 34 total nodes
+[2025-08-22 22:59:16] [DEBUG] BrowserSession: 🔍 DEBUG: Document 1 has 17 nodes
+[2025-08-22 22:59:17] [DEBUG] BrowserSession: 🔍 DEBUG: HTML frame scroll - scrollY=0, scrollX=0, frameId=C2D76656B3BEF9A415808ADA497B9C49, nodeId=17084
+[2025-08-22 22:59:17] [DEBUG] BrowserSession: 🔍 DEBUG: Form element label id='captions-foreground-opacity-vse-vw-dp-_dnNlL_heroPlayerWrapper_3NfkM-element_component_264' name='' - visible=False, bounds=None
+[2025-08-22 22:59:17] [DEBUG] BrowserSession: 🔍 DEBUG: Form element label id='captions-background-opacity-vse-vw-dp-_dnNlL_heroPlayerWrapper_3NfkM-element_component_264' name='' - visible=False, bounds=None
+[2025-08-22 22:59:17] [DEBUG] BrowserSession: 🔍 DEBUG: Form element label id='captions-window-opacity-vse-vw-dp-_dnNlL_heroPlayerWrapper_3NfkM-element_component_264' name='' - visible=False, bounds=None
+[2025-08-22 22:59:17] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ DomService.get_serialized_dom_tree completed
+[2025-08-22 22:59:17] [DEBUG] BrowserSession: Time taken to get DOM tree: 2.0883333683013916 seconds
+[2025-08-22 22:59:17] [DEBUG] BrowserSession: Timing breakdown: {'clickable_detection_time': 0.02281641960144043, 'create_simplified_tree': 0.03168630599975586, 'optimize_tree': 0.0010368824005126953, 'bbox_filtering': 0.003178119659423828, 'assign_interactive_indices': 0.0018062591552734375, 'serialize_accessible_elements_total': 0.03771233558654785, 'serialize_dom_tree_total': 0.03779149055480957}
+[2025-08-22 22:59:17] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Updating selector maps...
+[2025-08-22 22:59:17] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Selector maps updated, 213 elements
+[2025-08-22 22:59:17] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Injecting highlighting script...
+[2025-08-22 22:59:17] [DEBUG] dom: 📍 Creating CSP-safe highlighting for 204 elements
+[2025-08-22 22:59:17] [DEBUG] dom: 🧹 Removing browser-use highlighting elements
+[2025-08-22 22:59:17] [DEBUG] dom: Enhanced CSP-safe highlighting injected for 204 elements
+[2025-08-22 22:59:17] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Injected highlighting for 213 elements
+[2025-08-22 22:59:17] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ COMPLETED DOM tree build
+[2025-08-22 22:59:17] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ _build_dom_tree completed
+[2025-08-22 22:59:18] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 DOM watchdog requesting screenshot, include_screenshot=True
+[2025-08-22 22:59:18] [DEBUG] BrowserSession: 📸 ScreenshotEvent handlers registered: 1 - ['ScreenshotWatchdog.on_ScreenshotEvent']
+[2025-08-22 22:59:18] [DEBUG] BrowserSession: 📸 Dispatched ScreenshotEvent, waiting for event to complete...
+[2025-08-22 22:59:18] [DEBUG] BrowserSession: [96m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#702f)]         ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStateRequestEvent#1086[0m [95m👈 by Agent[0m
+[2025-08-22 22:59:18] [DEBUG] BrowserSession: [ScreenshotWatchdog] Handler START - on_ScreenshotEvent called
+[2025-08-22 22:59:18] [DEBUG] BrowserSession: [ScreenshotWatchdog] Taking screenshot with params: {'format': 'png', 'captureBeyondViewport': False}
+[2025-08-22 22:59:18] [DEBUG] BrowserSession: [ScreenshotWatchdog] Screenshot captured successfully
+[2025-08-22 22:59:18] [DEBUG] BrowserSession: Successfully removed 409 highlight elements
+[2025-08-22 22:59:18] [DEBUG] BrowserSession: [92m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#702f)]         ✅ Succeeded (0.40s)[0m ➡️ [95m<str>[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStateRequestEvent#1086[0m
+[2025-08-22 22:59:18] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page title...
+[2025-08-22 22:59:18] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got title: Amazon.com: The Great Gatsby - Reader's Library Classic: 9781954839243: Fitzgerald, F. Scott: Books
+[2025-08-22 22:59:18] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page info from CDP...
+[2025-08-22 22:59:18] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page info from CDP: viewport_width=1690 viewport_height=1333 page_width=1690 page_height=8752 scroll_x=0 scroll_y=0 pixels_above=0 pixels_below=7419 pixels_left=0 pixels_right=0
+[2025-08-22 22:59:18] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 Creating BrowserStateSummary with screenshot, length: 889220
+[2025-08-22 22:59:18] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ COMPLETED - Returning browser state
+[2025-08-22 22:59:18] [DEBUG] BrowserSession: [92m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#1086)]       ✅ Succeeded (3.50s)[0m ➡️ [95m<BrowserStateSummary>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:59:18] [DEBUG] Agent: 📸 Got browser state WITH screenshot, length: 889220
+[2025-08-22 22:59:18] [INFO] Agent: 
+
+[2025-08-22 22:59:18] [INFO] Agent: 📍 Step 6:
+[2025-08-22 22:59:18] [DEBUG] Agent: Evaluating page with 213 interactive elements on: https://www.amazon.com/Great-Gatsby-Readers-Librar...
+[2025-08-22 22:59:18] [DEBUG] Agent: 📝 Step 6: Updating action models...
+[2025-08-22 22:59:18] [DEBUG] Agent: 💬 Step 6: Creating state messages for context...
+[2025-08-22 22:59:18] [DEBUG] service: Added long_term_memory to action_results: Clicked element with index 61
+[2025-08-22 22:59:18] [DEBUG] service: 
+[2025-08-22 22:59:18] [DEBUG] Agent: 🤖 Step 6: Calling LLM with 2 messages (model: gpt-4.1-mini)...
+[2025-08-22 22:59:52] [DEBUG] service: Token cost service: model='gpt-4.1-mini' timestamp=datetime.datetime(2025, 8, 22, 22, 59, 52, 735654) usage=ChatInvokeUsage(prompt_tokens=11020, prompt_cached_tokens=0, prompt_cache_creation_tokens=None, prompt_image_tokens=None, completion_tokens=2164, total_tokens=13184)
+[2025-08-22 22:59:52] [DEBUG] Agent: 💡 Thinking:
+I am currently on the product page for 'The Great Gatsby' on Amazon. The next step is to add this book to the shopping cart by clicking the 'Add to Cart' button. After that, I will confirm that the book has been successfully added to the cart by checking for any confirmation message or cart update.
+[2025-08-22 22:59:52] [INFO] Agent:   [32m👍 Eval: Successfully navigated to the product page of 'The Great Gatsby'. Verdict: Success[0m
+[2025-08-22 22:59:52] [DEBUG] Agent: 🧠 Memory: On the product page of 'The Great Gatsby' after selecting it from search results, ready to add it to the cart.
+[2025-08-22 22:59:52] [INFO] Agent:   [34m🎯 Next goal: Click the 'Add to Cart' button and then confirm the addition by checking for confirmation or cart update.[0m
+[2025-08-22 22:59:52] [INFO] Agent: ☝️ Decided next action: click_element_by_index(#94, while_holding_ctrl=False)
+[2025-08-22 22:59:52] [DEBUG] Agent: ⏳ get_next_action() took 34.26s
+[2025-08-22 22:59:52] [DEBUG] Agent: ✅ Step 6: Got LLM response with 1 actions
+[2025-08-22 22:59:52] [DEBUG] Agent: ⚡ Step 6: Executing 1 actions...
+[2025-08-22 22:59:52] [INFO] Agent:   🦾 [34m[ACTION 1/1][0m click_element_by_index: index: 94, while_holding_ctrl: False
+[2025-08-22 22:59:52] [DEBUG] BrowserSession: [96m🚌 [DefaultActionWatchdog.on_ClickElementEvent(#2fc5)]    ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:59:52] [DEBUG] BrowserSession: Got 1 quads from DOM.getContentQuads
+[2025-08-22 22:59:52] [DEBUG] BrowserSession: 👆 Dragging mouse over element before clicking x: 1419.5px y: 658.0px ...
+[2025-08-22 22:59:52] [DEBUG] BrowserSession: 👆🏾 Clicking x: 1419.5px y: 658.0px with modifiers: 0 ...
+[2025-08-22 22:59:53] [DEBUG] BrowserSession: 🖱️ Clicked successfully using x,y coordinates
+[2025-08-22 22:59:54] [DEBUG] BrowserSession: 🖱️ Clicked button with index 94: 
+[2025-08-22 22:59:54] [DEBUG] BrowserSession: Element xpath: input
+[2025-08-22 22:59:54] [DEBUG] BrowserSession: [92m🚌 [DefaultActionWatchdog.on_ClickElementEvent(#2fc5)]    ✅ Succeeded (2.23s)[0m ➡️ [95m<dict>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:59:54] [INFO] controller: 🖱️ Clicked element with index 94
+[2025-08-22 22:59:54] [DEBUG] BrowserSession: ⏳ execute_action() took 2.23s
+[2025-08-22 22:59:54] [DEBUG] Agent: ☑️ Executed action 1/1: [92mclick_element_by_index: index: 94, while_holding_ctrl: False[0m in 2.23s
+[2025-08-22 22:59:54] [DEBUG] Agent: ⏳ multi_act() took 2.23s
+[2025-08-22 22:59:54] [DEBUG] Agent: ✅ Step 6: Actions completed
+[2025-08-22 22:59:54] [DEBUG] Agent: 🔄 Step 6: Consecutive failures reset to: 0
+[2025-08-22 22:59:54] [DEBUG] Agent: 📸 Storing screenshot for step 6, screenshot length: 889220
+[2025-08-22 22:59:54] [DEBUG] Agent: 📸 Screenshot stored at: /tmp/browser_use_agent_068a93c5-54b3-76c3-8000-86ad803be599_1755921493/screenshots/step_6.png
+[2025-08-22 22:59:54] [DEBUG] Agent: 📍 Step 6: Ran 1 action in 41.22s: ✅ 1
+[2025-08-22 22:59:54] [DEBUG] cloud_events: 📸 Including screenshot in CreateAgentStepEvent, length: 889220
+[2025-08-22 22:59:54] [DEBUG] Agent: ⏳ step() took 41.23s
+[2025-08-22 22:59:54] [DEBUG] Agent: ✅ Completed step 6/100
+[2025-08-22 22:59:54] [DEBUG] Agent: 🚶 Starting step 7/100...
+[2025-08-22 22:59:54] [DEBUG] Agent: 🌐 Step 7: Getting browser state...
+[2025-08-22 22:59:54] [DEBUG] Agent: 📸 Requesting browser state with include_screenshot=True, cached=False
+[2025-08-22 22:59:56] [DEBUG] BrowserSession: [96m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#887d)]       ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 22:59:56] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: STARTING browser state request
+[2025-08-22 22:59:56] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page URL: https://www.amazon.com/cart/smart-wagon?newItems=13a7d633-c805-4791-a11c-0d587da978fc%2C1
+[2025-08-22 22:59:56] [DEBUG] BrowserSession: 📍 Current page URL: https://www.amazon.com/cart/smart-wagon?newItems=13a7d633-c805-4791-a11c-0d587da978fc%2C1, target_id: C2D76656B3BEF9A415808ADA497B9C49, session_id: 4805DCFF5B2DE854E8302BDD47D81627
+[2025-08-22 22:59:56] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ⏳ Waiting for page stability...
+[2025-08-22 22:59:56] [DEBUG] BrowserSession: ⏳ Minimum wait: 0.25s
+[2025-08-22 22:59:56] [DEBUG] BrowserSession: ⏳ Network idle wait: 0.5s
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: ✅ Page stability wait completed in 0.75s
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ Page stability complete
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting tabs info...
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got 1 tabs
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Tabs info: [TabInfo(url='https://www.amazon.com/cart/smart-wagon?newItems=13a7d633-c805-4791-a11c-0d587da978fc%2C1', title='Amazon.com Shopping Cart', target_id='C2D76656B3BEF9A415808ADA497B9C49', parent_target_id=None)]
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 🌳 Building DOM tree...
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Starting _build_dom_tree...
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: STARTING DOM tree build
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Removing existing highlights...
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: Successfully removed 0 highlight elements
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Calling DomService.get_serialized_dom_tree...
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DEBUG: Capturing DOM snapshot for target C2D76656B3BEF9A415808ADA497B9C49
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DEBUG: Snapshot contains 2 documents with 34 total nodes
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DEBUG: Document 1 has 17 nodes
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DEBUG: HTML frame scroll - scrollY=0, scrollX=0, frameId=C2D76656B3BEF9A415808ADA497B9C49, nodeId=25789
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ DomService.get_serialized_dom_tree completed
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: Time taken to get DOM tree: 0.5790064334869385 seconds
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: Timing breakdown: {'clickable_detection_time': 0.01378488540649414, 'create_simplified_tree': 0.019625425338745117, 'optimize_tree': 0.0007889270782470703, 'bbox_filtering': 0.002171039581298828, 'assign_interactive_indices': 0.0012056827545166016, 'serialize_accessible_elements_total': 0.023793935775756836, 'serialize_dom_tree_total': 0.023846149444580078}
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Updating selector maps...
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Selector maps updated, 232 elements
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Injecting highlighting script...
+[2025-08-22 22:59:57] [DEBUG] dom: 📍 Creating CSP-safe highlighting for 230 elements
+[2025-08-22 22:59:57] [DEBUG] dom: 🧹 Removing browser-use highlighting elements
+[2025-08-22 22:59:57] [DEBUG] dom: Enhanced CSP-safe highlighting injected for 230 elements
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Injected highlighting for 232 elements
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ COMPLETED DOM tree build
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ _build_dom_tree completed
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 DOM watchdog requesting screenshot, include_screenshot=True
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 📸 ScreenshotEvent handlers registered: 1 - ['ScreenshotWatchdog.on_ScreenshotEvent']
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: 📸 Dispatched ScreenshotEvent, waiting for event to complete...
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: [96m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#d821)]         ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStateRequestEvent#887d[0m [95m👈 by Agent[0m
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: [ScreenshotWatchdog] Handler START - on_ScreenshotEvent called
+[2025-08-22 22:59:57] [DEBUG] BrowserSession: [ScreenshotWatchdog] Taking screenshot with params: {'format': 'png', 'captureBeyondViewport': False}
+[2025-08-22 22:59:58] [DEBUG] BrowserSession: [ScreenshotWatchdog] Screenshot captured successfully
+[2025-08-22 22:59:58] [DEBUG] BrowserSession: Successfully removed 461 highlight elements
+[2025-08-22 22:59:58] [DEBUG] BrowserSession: [92m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#d821)]         ✅ Succeeded (0.33s)[0m ➡️ [95m<str>[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStateRequestEvent#887d[0m
+[2025-08-22 22:59:58] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page title...
+[2025-08-22 22:59:58] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got title: Amazon.com Shopping Cart
+[2025-08-22 22:59:58] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page info from CDP...
+[2025-08-22 22:59:58] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page info from CDP: viewport_width=1690 viewport_height=1333 page_width=1690 page_height=3256 scroll_x=0 scroll_y=0 pixels_above=0 pixels_below=1923 pixels_left=0 pixels_right=0
+[2025-08-22 22:59:58] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 Creating BrowserStateSummary with screenshot, length: 1087036
+[2025-08-22 22:59:58] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ COMPLETED - Returning browser state
+[2025-08-22 22:59:58] [DEBUG] BrowserSession: [92m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#887d)]       ✅ Succeeded (1.89s)[0m ➡️ [95m<BrowserStateSummary>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 22:59:58] [DEBUG] Agent: 📸 Got browser state WITH screenshot, length: 1087036
+[2025-08-22 22:59:58] [INFO] Agent: 
+
+[2025-08-22 22:59:58] [INFO] Agent: 📍 Step 7:
+[2025-08-22 22:59:58] [DEBUG] Agent: Evaluating page with 232 interactive elements on: https://www.amazon.com/cart/smart-wagon?newItems=1...
+[2025-08-22 22:59:58] [DEBUG] Agent: 📝 Step 7: Updating action models...
+[2025-08-22 22:59:58] [DEBUG] Agent: 💬 Step 7: Creating state messages for context...
+[2025-08-22 22:59:58] [DEBUG] service: Added long_term_memory to action_results: Clicked element with index 94
+[2025-08-22 22:59:58] [DEBUG] service: 
+[2025-08-22 22:59:58] [DEBUG] Agent: 🤖 Step 7: Calling LLM with 2 messages (model: gpt-4.1-mini)...
+[2025-08-22 23:00:06] [DEBUG] service: Token cost service: model='gpt-4.1-mini' timestamp=datetime.datetime(2025, 8, 22, 23, 0, 6, 180255) usage=ChatInvokeUsage(prompt_tokens=11123, prompt_cached_tokens=5632, prompt_cache_creation_tokens=None, prompt_image_tokens=None, completion_tokens=273, total_tokens=11396)
+[2025-08-22 23:00:06] [DEBUG] Agent: 💡 Thinking:
+I have successfully added 'The Great Gatsby' to the Amazon cart and am now on the cart page. The page shows a subtotal of $7.99 and an 'Added to cart' confirmation message. To fully confirm the addition, I will check for any visible confirmation text or indicators on this cart page. Since the subtotal and item count are visible, this confirms the book is in the cart. I will extract structured data from this cart page to capture the confirmation details such as item name, quantity, and subtotal for final verification.
+[2025-08-22 23:00:06] [INFO] Agent:   [32m👍 Eval: Successfully clicked 'Add to Cart' and navigated to the cart page showing the added book with subtotal and quantity. Verdict: Success.[0m
+[2025-08-22 23:00:06] [DEBUG] Agent: 🧠 Memory: The Great Gatsby has been added to the Amazon cart with a subtotal of $7.99. Currently viewing the Amazon cart page with visible confirmation of the item in the cart.
+[2025-08-22 23:00:06] [INFO] Agent:   [34m🎯 Next goal: Extract structured data from the Amazon cart page to confirm that 'The Great Gatsby' is in the cart with correct quantity and price.[0m
+[2025-08-22 23:00:06] [INFO] Agent: ☝️ Decided next action: extract_structured_data(query=Extract details of items in Am..., extract_links=False)
+[2025-08-22 23:00:06] [DEBUG] Agent: ⏳ get_next_action() took 7.97s
+[2025-08-22 23:00:06] [DEBUG] Agent: ✅ Step 7: Got LLM response with 1 actions
+[2025-08-22 23:00:06] [DEBUG] Agent: ⚡ Step 7: Executing 1 actions...
+[2025-08-22 23:00:06] [INFO] Agent:   🦾 [34m[ACTION 1/1][0m extract_structured_data: query: Extract details of items in Amazon shopping cart including product name, quantity, price, ...
+[2025-08-22 23:00:13] [DEBUG] service: Token cost service: model='gpt-4.1-mini' timestamp=datetime.datetime(2025, 8, 22, 23, 0, 13, 129825) usage=ChatInvokeUsage(prompt_tokens=4580, prompt_cached_tokens=0, prompt_cache_creation_tokens=None, prompt_image_tokens=None, completion_tokens=280, total_tokens=4860)
+[2025-08-22 23:00:13] [INFO] controller: 📄 Extracted content from https://www.amazon.com/cart/smart-wagon?newItems=13a7d633-c805-4791-a11c-0d587da978fc%2C1 for query: Extract details of items in Amazon shopping cart including product name, quantity, price, and confirmation messages
+Content saved to file system: Extracted content saved to file extracted_content_0.md successfully.
+[2025-08-22 23:00:13] [DEBUG] BrowserSession: ⏳ execute_action() took 6.95s
+[2025-08-22 23:00:13] [DEBUG] Agent: ☑️ Executed action 1/1: [92mextract_structured_data: query: Extract details of items in Amazon shopping cart including product name, quantity, price, ...[0m in 6.95s
+[2025-08-22 23:00:13] [DEBUG] Agent: ⏳ multi_act() took 6.95s
+[2025-08-22 23:00:13] [DEBUG] Agent: ✅ Step 7: Actions completed
+[2025-08-22 23:00:13] [DEBUG] Agent: 🔄 Step 7: Consecutive failures reset to: 0
+[2025-08-22 23:00:13] [DEBUG] Agent: 📸 Storing screenshot for step 7, screenshot length: 1087036
+[2025-08-22 23:00:13] [DEBUG] Agent: 📸 Screenshot stored at: /tmp/browser_use_agent_068a93c5-54b3-76c3-8000-86ad803be599_1755921493/screenshots/step_7.png
+[2025-08-22 23:00:13] [DEBUG] Agent: 📍 Step 7: Ran 1 action in 18.15s: ✅ 1
+[2025-08-22 23:00:13] [DEBUG] cloud_events: 📸 Including screenshot in CreateAgentStepEvent, length: 1087036
+[2025-08-22 23:00:13] [DEBUG] Agent: ⏳ step() took 18.16s
+[2025-08-22 23:00:13] [DEBUG] Agent: ✅ Completed step 7/100
+[2025-08-22 23:00:13] [DEBUG] Agent: 🚶 Starting step 8/100...
+[2025-08-22 23:00:13] [DEBUG] Agent: 🌐 Step 8: Getting browser state...
+[2025-08-22 23:00:13] [DEBUG] Agent: 📸 Requesting browser state with include_screenshot=True, cached=False
+[2025-08-22 23:00:14] [DEBUG] BrowserSession: [96m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#2654)]       ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 23:00:14] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: STARTING browser state request
+[2025-08-22 23:00:14] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page URL: https://www.amazon.com/cart/smart-wagon?newItems=13a7d633-c805-4791-a11c-0d587da978fc%2C1
+[2025-08-22 23:00:14] [DEBUG] BrowserSession: 📍 Current page URL: https://www.amazon.com/cart/smart-wagon?newItems=13a7d633-c805-4791-a11c-0d587da978fc%2C1, target_id: C2D76656B3BEF9A415808ADA497B9C49, session_id: 4805DCFF5B2DE854E8302BDD47D81627
+[2025-08-22 23:00:14] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ⏳ Waiting for page stability...
+[2025-08-22 23:00:14] [DEBUG] BrowserSession: ⏳ Minimum wait: 0.25s
+[2025-08-22 23:00:14] [DEBUG] BrowserSession: ⏳ Network idle wait: 0.5s
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: ✅ Page stability wait completed in 0.75s
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ Page stability complete
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting tabs info...
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got 1 tabs
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Tabs info: [TabInfo(url='https://www.amazon.com/cart/smart-wagon?newItems=13a7d633-c805-4791-a11c-0d587da978fc%2C1', title='Amazon.com Shopping Cart', target_id='C2D76656B3BEF9A415808ADA497B9C49', parent_target_id=None)]
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 🌳 Building DOM tree...
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Starting _build_dom_tree...
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: STARTING DOM tree build
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Removing existing highlights...
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: Successfully removed 0 highlight elements
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Calling DomService.get_serialized_dom_tree...
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DEBUG: Capturing DOM snapshot for target C2D76656B3BEF9A415808ADA497B9C49
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DEBUG: Snapshot contains 2 documents with 34 total nodes
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DEBUG: Document 1 has 17 nodes
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DEBUG: HTML frame scroll - scrollY=0, scrollX=0, frameId=C2D76656B3BEF9A415808ADA497B9C49, nodeId=30775
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ DomService.get_serialized_dom_tree completed
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: Time taken to get DOM tree: 0.5559465885162354 seconds
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: Timing breakdown: {'clickable_detection_time': 0.012426614761352539, 'create_simplified_tree': 0.01768183708190918, 'optimize_tree': 0.0004906654357910156, 'bbox_filtering': 0.002095460891723633, 'assign_interactive_indices': 0.0012927055358886719, 'serialize_accessible_elements_total': 0.02156209945678711, 'serialize_dom_tree_total': 0.021589040756225586}
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Updating selector maps...
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Selector maps updated, 232 elements
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Injecting highlighting script...
+[2025-08-22 23:00:15] [DEBUG] dom: 📍 Creating CSP-safe highlighting for 230 elements
+[2025-08-22 23:00:15] [DEBUG] dom: 🧹 Removing browser-use highlighting elements
+[2025-08-22 23:00:15] [DEBUG] dom: Enhanced CSP-safe highlighting injected for 230 elements
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Injected highlighting for 232 elements
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ COMPLETED DOM tree build
+[2025-08-22 23:00:15] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ _build_dom_tree completed
+[2025-08-22 23:00:16] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 DOM watchdog requesting screenshot, include_screenshot=True
+[2025-08-22 23:00:16] [DEBUG] BrowserSession: 📸 ScreenshotEvent handlers registered: 1 - ['ScreenshotWatchdog.on_ScreenshotEvent']
+[2025-08-22 23:00:16] [DEBUG] BrowserSession: 📸 Dispatched ScreenshotEvent, waiting for event to complete...
+[2025-08-22 23:00:16] [DEBUG] BrowserSession: [96m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#6cdb)]         ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStateRequestEvent#2654[0m [95m👈 by Agent[0m
+[2025-08-22 23:00:16] [DEBUG] BrowserSession: [ScreenshotWatchdog] Handler START - on_ScreenshotEvent called
+[2025-08-22 23:00:16] [DEBUG] BrowserSession: [ScreenshotWatchdog] Taking screenshot with params: {'format': 'png', 'captureBeyondViewport': False}
+[2025-08-22 23:00:16] [DEBUG] BrowserSession: [ScreenshotWatchdog] Screenshot captured successfully
+[2025-08-22 23:00:16] [DEBUG] BrowserSession: Successfully removed 461 highlight elements
+[2025-08-22 23:00:16] [DEBUG] BrowserSession: [92m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#6cdb)]         ✅ Succeeded (0.34s)[0m ➡️ [95m<str>[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStateRequestEvent#2654[0m
+[2025-08-22 23:00:16] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page title...
+[2025-08-22 23:00:16] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got title: Amazon.com Shopping Cart
+[2025-08-22 23:00:16] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page info from CDP...
+[2025-08-22 23:00:16] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page info from CDP: viewport_width=1690 viewport_height=1333 page_width=1690 page_height=3256 scroll_x=0 scroll_y=0 pixels_above=0 pixels_below=1923 pixels_left=0 pixels_right=0
+[2025-08-22 23:00:16] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 Creating BrowserStateSummary with screenshot, length: 1087036
+[2025-08-22 23:00:16] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ COMPLETED - Returning browser state
+[2025-08-22 23:00:16] [DEBUG] BrowserSession: [92m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#2654)]       ✅ Succeeded (1.90s)[0m ➡️ [95m<BrowserStateSummary>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 23:00:16] [DEBUG] Agent: 📸 Got browser state WITH screenshot, length: 1087036
+[2025-08-22 23:00:16] [INFO] Agent: 
+
+[2025-08-22 23:00:16] [INFO] Agent: 📍 Step 8:
+[2025-08-22 23:00:16] [DEBUG] Agent: Evaluating page with 232 interactive elements on: https://www.amazon.com/cart/smart-wagon?newItems=1...
+[2025-08-22 23:00:16] [DEBUG] Agent: 📝 Step 8: Updating action models...
+[2025-08-22 23:00:16] [DEBUG] Agent: 💬 Step 8: Creating state messages for context...
+[2025-08-22 23:00:16] [DEBUG] service: Added extracted_content to read_state_description: Query: Extract details of items in Amazon shopping cart including product name, quantity, price, and confirmation messages
+ Result:
+Extracted Amazon Shopping Cart Details:
+
+---
+**Items in Cart:**
+
+1. **Product Name:** The Great Gatsby - Reader's Library Classic  
+   **Quantity:** 1  
+   **Price:** $7.99  
+   **Confirmation Messages:**  
+   - "The Great Gatsby - Reader's Library Classic was removed from Shopping Cart."  
+   - "The Great Gatsby - Reader's Library Classic was already removed from Shopping Cart."  
+   - "Moved to Saved For Later" (attempted)  
+   - "Delete Failed. Try again" (attempted)  
+   - "Update failed. Try again" (attempted)  
+   - "We couldn’t save this item for later, try again" (attempted)  
+   - "Quantity is 1"  
+   - "Updating quantity1"  
+
+---
+**Cart Summary:**
+
+- Number of items: 1  
+- Subtotal: $7.99  
+
+---
+**Additional Notes:**
+
+- The cart shows only one item, "The Great Gatsby - Reader's Library Classic," with quantity 1 and price $7.99.
+- Multiple confirmation/error messages indicate attempts to remove or save the item for later failed or were already done.
+- The subtotal matches the price of the single item in the cart.
+
+---
+
+This is the complete extracted information about items currently in the Amazon shopping cart from the provided content.
+[2025-08-22 23:00:16] [DEBUG] service: Added long_term_memory to action_results: Extracted content from https://www.amazon.com/cart/smart-wagon?newItems=13a7d633-c805-4791-a11c-0d587da978fc%2C1 for query: Extract details of items in Amazon shopping cart including product name, quantity, price, and confirmation messages
+Content saved to file system: Extracted content saved to file extracted_content_0.md successfully.
+[2025-08-22 23:00:16] [DEBUG] service: 
+[2025-08-22 23:00:16] [DEBUG] Agent: 🤖 Step 8: Calling LLM with 2 messages (model: gpt-4.1-mini)...
+[2025-08-22 23:00:24] [DEBUG] service: Token cost service: model='gpt-4.1-mini' timestamp=datetime.datetime(2025, 8, 22, 23, 0, 24, 755287) usage=ChatInvokeUsage(prompt_tokens=11749, prompt_cached_tokens=5248, prompt_cache_creation_tokens=None, prompt_image_tokens=None, completion_tokens=302, total_tokens=12051)
+[2025-08-22 23:00:24] [DEBUG] Agent: 💡 Thinking:
+I have successfully added 'The Great Gatsby' to the Amazon cart and extracted detailed information from the cart page. The extracted data confirms that the book is in the cart with quantity 1 and price $7.99, matching the subtotal. There are some messages related to attempts to remove or save the item for later, but these do not affect the confirmation of the addition. The user request to search for a book, add it to the cart, and confirm the addition is fully satisfied based on this data.
+[2025-08-22 23:00:24] [INFO] Agent:   [32m👍 Eval: Successfully extracted and confirmed that 'The Great Gatsby' is in the Amazon cart with correct quantity and price.[0m
+[2025-08-22 23:00:24] [DEBUG] Agent: 🧠 Memory: The Great Gatsby is confirmed in the Amazon shopping cart with quantity 1 and price $7.99. The subtotal matches this price, confirming successful addition.
+[2025-08-22 23:00:24] [INFO] Agent:   [34m🎯 Next goal: Complete the task by reporting confirmation of successful addition of 'The Great Gatsby' to the Amazon cart.[0m
+[2025-08-22 23:00:24] [INFO] Agent: ☝️ Decided next action: done(text="The requested task has been co...", success=True)
+[2025-08-22 23:00:24] [DEBUG] Agent: ⏳ get_next_action() took 8.33s
+[2025-08-22 23:00:24] [DEBUG] Agent: ✅ Step 8: Got LLM response with 1 actions
+[2025-08-22 23:00:24] [DEBUG] Agent: ⚡ Step 8: Executing 1 actions...
+[2025-08-22 23:00:24] [INFO] Agent:   🦾 [34m[ACTION 1/1][0m done: text: The requested task has been completed successfully. I searched for The Great Gatsby on Amazon, added it to the...
+[2025-08-22 23:00:24] [DEBUG] Agent: ☑️ Executed action 1/1: [92mdone: text: The requested task has been completed successfully. I searched for The Great Gatsby on Amazon, added it to the...[0m in 0.00s
+[2025-08-22 23:00:24] [DEBUG] Agent: ✅ Step 8: Actions completed
+[2025-08-22 23:00:24] [DEBUG] Agent: 🔄 Step 8: Consecutive failures reset to: 0
+[2025-08-22 23:00:24] [INFO] Agent: 📄 [32m Result:[0m 
+The requested task has been completed successfully. I searched for 'The Great Gatsby' on Amazon, added it to the shopping cart, and confirmed its presence with quantity 1 and price $7.99 in the cart subtotal. If you need any further assistance or additional tasks, please let me know.
+
+Attachments:
+
+extracted_content_0.md:
+Query: Extract details of items in Amazon shopping cart including product name, quantity, price, and confirmation messages
+ Result:
+Extracted Amazon Shopping Cart Details:
+
+---
+**Items in Cart:**
+
+1. **Product Name:** The Great Gatsby - Reader's Library Classic  
+   **Quantity:** 1  
+   **Price:** $7.99  
+   **Confirmation Messages:**  
+   - "The Great Gatsby - Reader's Library Classic was removed from Shopping Cart."  
+   - "The Great Gatsby - Reader's Library Classic was already removed from Shopping Cart."  
+   - "Moved to Saved For Later" (attempted)  
+   - "Delete Failed. Try again" (attempted)  
+   - "Update failed. Try again" (attempted)  
+   - "We couldn’t save this item for later, try again" (attempted)  
+   - "Quantity is 1"  
+   - "Updating quantity1"  
+
+---
+**Cart Summary:**
+
+- Number of items: 1  
+- Subtotal: $7.99  
+
+---
+**Additional Notes:**
+
+- The cart shows only one item, "The Great Gatsby - Reader's Library Classic," with quantity 1 and price $7.99.
+- Multiple confirmation/error messages indicate attempts to remove or save the item for later failed or were already done.
+- The subtotal matches the price of the single item in the cart.
+
+---
+
+This is the complete extracted information about items currently in the Amazon shopping cart from the provided content.
+
+
+[2025-08-22 23:00:24] [INFO] Agent: 👉 Attachment : /tmp/browser_use_agent_068a93c5-54b3-76c3-8000-86ad803be599_1755921493/browseruse_agent_data/extracted_content_0.md
+[2025-08-22 23:00:24] [DEBUG] Agent: 📸 Storing screenshot for step 8, screenshot length: 1087036
+[2025-08-22 23:00:24] [DEBUG] Agent: 📸 Screenshot stored at: /tmp/browser_use_agent_068a93c5-54b3-76c3-8000-86ad803be599_1755921493/screenshots/step_8.png
+[2025-08-22 23:00:24] [DEBUG] Agent: 📍 Step 8: Ran 1 action in 11.62s: ✅ 1
+[2025-08-22 23:00:24] [DEBUG] cloud_events: 📸 Including screenshot in CreateAgentStepEvent, length: 1087036
+[2025-08-22 23:00:24] [DEBUG] Agent: ⏳ step() took 11.63s
+[2025-08-22 23:00:24] [DEBUG] Agent: ✅ Completed step 8/100
+[2025-08-22 23:00:24] [DEBUG] Agent: 🎯 Task completed after 8 steps!
+[2025-08-22 23:00:24] [INFO] Agent: ✅ Task completed successfully in 131.37s
+[2025-08-22 23:00:24] [DEBUG] Agent: 📊 Collecting usage summary...
+[2025-08-22 23:00:24] [DEBUG] Agent: 🏁 Agent.run() completed successfully
+[2025-08-22 23:00:26] [DEBUG] service: Cloud authentication started - continuing in background
+[2025-08-22 23:00:27] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_BrowserStopEvent(#26d0)]            ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 23:00:27] [DEBUG] BrowserSession: [96m🚌 [DownloadsWatchdog.on_BrowserStoppedEvent(#4cd0)]      ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStopEvent#26d0[0m [95m👈 by Agent[0m
+[2025-08-22 23:00:27] [DEBUG] BrowserSession: [92m🚌 [DownloadsWatchdog.on_BrowserStoppedEvent(#4cd0)]      ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStopEvent#26d0[0m
+[2025-08-22 23:00:27] [DEBUG] BrowserSession: [96m🚌 [AboutBlankWatchdog.on_BrowserStoppedEvent(#4cd0)]     ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStopEvent#26d0[0m [95m👈 by Agent[0m
+[2025-08-22 23:00:27] [DEBUG] BrowserSession: [92m🚌 [AboutBlankWatchdog.on_BrowserStoppedEvent(#4cd0)]     ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStopEvent#26d0[0m
+[2025-08-22 23:00:27] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_BrowserStopEvent(#26d0)]            ✅ Succeeded (0.00s)[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 23:00:27] [DEBUG] BrowserSession: [96m🚌 [LocalBrowserWatchdog.on_BrowserStopEvent(#26d0)]      ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 23:00:27] [DEBUG] BrowserSession: [LocalBrowserWatchdog] BrowserStopEvent received, dispatching BrowserKillEvent
+[2025-08-22 23:00:27] [DEBUG] BrowserSession: [92m🚌 [LocalBrowserWatchdog.on_BrowserStopEvent(#26d0)]      ✅ Succeeded (0.00s)[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 23:00:27] [DEBUG] BrowserSession: [96m🚌 [AboutBlankWatchdog.on_BrowserStopEvent(#26d0)]        ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 23:00:27] [DEBUG] BrowserSession: [92m🚌 [AboutBlankWatchdog.on_BrowserStopEvent(#26d0)]        ✅ Succeeded (0.00s)[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 23:00:27] [DEBUG] BrowserSession: [96m🚌 [LocalBrowserWatchdog.on_BrowserKillEvent(#db44)]      ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStopEvent#26d0[0m [95m👈 by Agent[0m
+[2025-08-22 23:00:27] [DEBUG] BrowserSession: [LocalBrowserWatchdog] Killing local browser process
+[2025-08-22 23:00:27] [DEBUG] BrowserSession: [LocalBrowserWatchdog] Browser cleanup completed
+[2025-08-22 23:00:27] [DEBUG] BrowserSession: [92m🚌 [LocalBrowserWatchdog.on_BrowserKillEvent(#db44)]      ✅ Succeeded (0.10s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStopEvent#26d0[0m
+[2025-08-22 23:00:28] [DEBUG] Agent: 🧵 Remaining threads (5): ['MainThread', 'Thread-1', 'asyncio_0', 'AnyIO worker thread', 'asyncio_1']
+[2025-08-22 23:00:28] [DEBUG] Agent: ⚡ No remaining asyncio tasks
+[2025-08-22 23:00:28] [DEBUG] Agent: ⏳ run() took 134.66s
+[2025-08-22 23:00:28] [INFO] browser_use: Tarea completada. Resultado guardado en el archivo de salida.

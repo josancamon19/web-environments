@@ -1,0 +1,283 @@
+[2025-08-22 23:04:22] [INFO] service: Using anonymized telemetry, see https://docs.browser-use.com/development/telemetry.
+[2025-08-22 23:04:22] [DEBUG] service: LLM instance 140074822559888 (openai_gpt-4.1-mini) is already registered
+[2025-08-22 23:04:22] [DEBUG] service: 💾 File system path: /tmp/browser_use_agent_068a93dc-6462-755f-8000-bfad0cd00712_1755921862
+[2025-08-22 23:04:22] [DEBUG] service: 📸 Screenshot service initialized in: /tmp/browser_use_agent_068a93dc-6462-755f-8000-bfad0cd00712_1755921862/screenshots
+[2025-08-22 23:04:22] [INFO] Agent: 🧠 Starting a browser-use version 0.6.1 with model=gpt-4.1-mini
+[2025-08-22 23:04:22] [DEBUG] service:  +vision extraction_model=gpt-4.1-mini +file_system
+[2025-08-22 23:04:22] [DEBUG] Agent: 📁 Initialized download tracking for agent
+[2025-08-22 23:04:22] [INFO] browser_use: Iniciando la tarea del agente.
+[2025-08-22 23:04:22] [INFO] Agent: [34m🚀 Task: Search for a book on Amazon, add it to the cart, and confirm the addition.[0m
+[2025-08-22 23:04:22] [DEBUG] Agent: 🤖 Browser-Use Library Version 0.6.1 (pip)
+[2025-08-22 23:04:22] [DEBUG] Agent: 🔧 Agent setup: Task ID 0712, Session ID 952d, Browser Session ID 0712
+[2025-08-22 23:04:22] [DEBUG] Agent: 📡 Dispatching CreateAgentSessionEvent...
+[2025-08-22 23:04:22] [DEBUG] Agent: 📡 Dispatching CreateAgentTaskEvent...
+[2025-08-22 23:04:22] [DEBUG] Agent: 🌐 Starting browser session...
+[2025-08-22 23:04:23] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_BrowserStartEvent(#be62)]           ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 23:04:23] [DEBUG] BrowserSession: 📄 PDF auto-download enabled for this session
+[2025-08-22 23:04:23] [DEBUG] BrowserSession: 🚀 PopupsWatchdog initialized with browser_session=BrowserSession🆂 0712:no-cdp #72, ID=140074847235328
+[2025-08-22 23:04:23] [DEBUG] BrowserSession: [96m🚌 [DownloadsWatchdog.on_BrowserLaunchEvent(#7653)]       ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#be62[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:23] [DEBUG] BrowserSession: [DownloadsWatchdog] Received BrowserLaunchEvent, EventBus ID: 140074895718160
+[2025-08-22 23:04:23] [DEBUG] BrowserSession: [DownloadsWatchdog] Ensured downloads directory exists: /tmp/browser-use-downloads-8wbfgn06
+[2025-08-22 23:04:23] [DEBUG] BrowserSession: [92m🚌 [DownloadsWatchdog.on_BrowserLaunchEvent(#7653)]       ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#be62[0m
+[2025-08-22 23:04:23] [DEBUG] BrowserSession: [96m🚌 [LocalBrowserWatchdog.on_BrowserLaunchEvent(#7653)]    ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#be62[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:23] [DEBUG] BrowserSession: [LocalBrowserWatchdog] Received BrowserLaunchEvent, EventBus ID: 140074895718160, launching local browser
+[2025-08-22 23:04:23] [DEBUG] BrowserSession: [LocalBrowserWatchdog] Calling _launch_browser...
+[2025-08-22 23:04:23] [DEBUG] utils: [BrowserProfile] 🧩 Extensions loaded (3): [uBlock Origin, I still don't care about cookies, ClearURLs]
+[2025-08-22 23:04:23] [DEBUG] BrowserSession: [LocalBrowserWatchdog] 📦 Found local browser installed at executable_path= /home/darcdev/.cache/ms-playwright/chromium-1181/chrome-linux/chrome
+[2025-08-22 23:04:23] [DEBUG] BrowserSession: [LocalBrowserWatchdog] 🚀 Launching browser subprocess with 65 args...
+[2025-08-22 23:04:23] [DEBUG] BrowserSession: [LocalBrowserWatchdog] 🎭 Browser subprocess launched with browser_pid= 53502
+[2025-08-22 23:04:23] [DEBUG] BrowserSession: [LocalBrowserWatchdog] _launch_browser returned: process=psutil.Process(pid=53502, name='chrome', status='running', started='23:04:22'), cdp_url=http://localhost:41377/
+[2025-08-22 23:04:23] [DEBUG] BrowserSession: [LocalBrowserWatchdog] Browser launched successfully at http://localhost:41377/, PID: 53502
+[2025-08-22 23:04:23] [DEBUG] BrowserSession: [92m🚌 [LocalBrowserWatchdog.on_BrowserLaunchEvent(#7653)]    ✅ Succeeded (0.48s)[0m ➡️ [95m<BrowserLaunchResult>[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#be62[0m
+[2025-08-22 23:04:23] [DEBUG] BrowserSession: 🌎 Connecting to existing chromium-based browser via CDP: ws://localhost:41377/devtools/browser/4e781c9e-d5af-482a-9f05-ebe60a6187a4 -> (local browser)
+[2025-08-22 23:04:24] [DEBUG] BrowserSession: CDP client connected successfully
+[2025-08-22 23:04:24] [DEBUG] BrowserSession: 🔄 Redirecting chrome://newtab/ to about:blank for target 83FAECED0CE9D313343D0BFE17878EAF
+[2025-08-22 23:04:24] [DEBUG] BrowserSession: Redirected 1 chrome://newtab pages to about:blank
+[2025-08-22 23:04:24] [DEBUG] BrowserSession: 📄 Using existing page with target ID: 83FAECED0CE9D313343D0BFE17878EAF
+[2025-08-22 23:04:24] [DEBUG] BrowserSession: Reusing redirect session for target 83FAECED0CE9D313343D0BFE17878EAF
+[2025-08-22 23:04:24] [DEBUG] BrowserSession: Proxy credentials not provided; skipping proxy auth setup
+[2025-08-22 23:04:24] [DEBUG] BrowserSession: Dispatching TabCreatedEvent for initial tab 0: about:blank
+[2025-08-22 23:04:24] [DEBUG] BrowserSession: Initial agent focus set to tab 0: about:blank
+[2025-08-22 23:04:24] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_BrowserStartEvent(#be62)]           ✅ Succeeded (1.50s)[0m ➡️ [95m<dict>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [96m🚌 [DownloadsWatchdog.on_TabCreatedEvent(#7087)]          ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#be62[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [DownloadsWatchdog] Set up CDP download listeners
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [92m🚌 [DownloadsWatchdog.on_TabCreatedEvent(#7087)]          ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#be62[0m
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [96m🚌 [SecurityWatchdog.on_TabCreatedEvent(#7087)]           ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#be62[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [92m🚌 [SecurityWatchdog.on_TabCreatedEvent(#7087)]           ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#be62[0m
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [96m🚌 [AboutBlankWatchdog.on_TabCreatedEvent(#7087)]         ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#be62[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [92m🚌 [AboutBlankWatchdog.on_TabCreatedEvent(#7087)]         ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#be62[0m
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [96m🚌 [PopupsWatchdog.on_TabCreatedEvent(#7087)]             ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#be62[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: 🎯 PopupsWatchdog received TabCreatedEvent for target 83FAECED0CE9D313343D0BFE17878EAF
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: 📌 Starting dialog handler setup for target 83FAECED0CE9D313343D0BFE17878EAF
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: Successfully registered Page.javascriptDialogOpening handler for session C0EDD663FB30709D367C50AC891EFE71
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: Set up JavaScript dialog handling for tab 83FAECED0CE9D313343D0BFE17878EAF
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [92m🚌 [PopupsWatchdog.on_TabCreatedEvent(#7087)]             ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#be62[0m
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [96m🚌 [DOMWatchdog.on_TabCreatedEvent(#7087)]                ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#be62[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: 💉 Injecting DOM Service init script to track event listeners added to DOM elements by JS...
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [92m🚌 [DOMWatchdog.on_TabCreatedEvent(#7087)]                ✅ Succeeded (0.01s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#be62[0m
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_AgentFocusChangedEvent(#12c2)]      ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#be62[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: 🔄 AgentFocusChangedEvent received: target_id=...8EAF url=about:blank
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: 🔄 Cached browser state cleared
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: 🔄 Updated agent focus to tab target_id=...8EAF
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: 🔄 Testing tab responsiveness...
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_AgentFocusChangedEvent(#12c2)]      ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#be62[0m
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [96m🚌 [PermissionsWatchdog.on_BrowserConnectedEvent(#294f)]  ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStartEvent#be62[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: 🔓 Granting browser permissions: ['clipboardReadWrite', 'notifications']
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: ✅ Successfully granted permissions: ['clipboardReadWrite', 'notifications']
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [92m🚌 [PermissionsWatchdog.on_BrowserConnectedEvent(#294f)]  ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStartEvent#be62[0m
+[2025-08-22 23:04:25] [DEBUG] Agent: 🔧 Browser session started with watchdogs attached
+[2025-08-22 23:04:25] [DEBUG] Agent: 📍 Task mentions "google" or "search", defaulting to https://google.com
+[2025-08-22 23:04:25] [INFO] Agent: 🔗 Found URL in task: https://google.com, adding as initial action...
+[2025-08-22 23:04:25] [DEBUG] Agent: ✅ Added navigation to https://google.com as initial action
+[2025-08-22 23:04:25] [DEBUG] Agent: ⚡ Executing 1 initial actions...
+[2025-08-22 23:04:25] [INFO] Agent:   🦾 [34m[ACTION 1/1][0m go_to_url: url: https://google.com, new_tab: False
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_NavigateToUrlEvent(#7db9)]          ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [on_NavigateToUrlEvent] Received NavigateToUrlEvent: url=https://google.com, new_tab=False
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [on_NavigateToUrlEvent] Processing new_tab=False
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_SwitchTabEvent(#6f68)]              ⏳ Starting...      [0m [93m↲  triggered by [96mon_NavigateToUrlEvent#7db9[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_AgentFocusChangedEvent(#43ec)]      ⏳ Starting...      [0m [93m↲  triggered by [96mon_SwitchTabEvent#6f68[0m [93m↲  under [96mNavigateToUrlEvent#7db9[0m
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: 🔄 AgentFocusChangedEvent received: target_id=...8EAF url=chrome://newtab/
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: 🔄 Cached browser state cleared
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: 🔄 Updated agent focus to tab target_id=...8EAF
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: 🔄 Testing tab responsiveness...
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_AgentFocusChangedEvent(#43ec)]      ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_SwitchTabEvent#6f68[0m
+[2025-08-22 23:04:25] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_SwitchTabEvent(#6f68)]              ✅ Succeeded (0.01s)[0m ➡️ [95m<str>[0m [93m⤴  [92mreturned to  [96m[96mon_NavigateToUrlEvent#7db9[0m
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: Dispatching NavigationCompleteEvent for https://google.com (tab #8EAF)
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: [96m🚌 [DownloadsWatchdog.on_NavigationCompleteEvent(#2b5b)]  ⏳ Starting...      [0m [93m↲  triggered by [96mon_NavigateToUrlEvent#7db9[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: [DownloadsWatchdog] NavigationCompleteEvent received for https://google.com, tab #8EAF
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: [DownloadsWatchdog] Got target_id=83FAECED0CE9D313343D0BFE17878EAF for tab #8EAF
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: [DownloadsWatchdog] Checking if target 83FAECED0CE9D313343D0BFE17878EAF is PDF viewer...
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: [92m🚌 [DownloadsWatchdog.on_NavigationCompleteEvent(#2b5b)]  ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_NavigateToUrlEvent#7db9[0m
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: [96m🚌 [SecurityWatchdog.on_NavigationCompleteEvent(#2b5b)]   ⏳ Starting...      [0m [93m↲  triggered by [96mon_NavigateToUrlEvent#7db9[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: [92m🚌 [SecurityWatchdog.on_NavigationCompleteEvent(#2b5b)]   ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_NavigateToUrlEvent#7db9[0m
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_AgentFocusChangedEvent(#2590)]      ⏳ Starting...      [0m [93m↲  triggered by [96mon_NavigateToUrlEvent#7db9[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 🔄 AgentFocusChangedEvent received: target_id=...8EAF url=https://google.com
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 🔄 Cached browser state cleared
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 🔄 Updated agent focus to tab target_id=...8EAF
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 🔄 Testing tab responsiveness...
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_AgentFocusChangedEvent(#2590)]      ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_NavigateToUrlEvent#7db9[0m
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_NavigateToUrlEvent(#7db9)]          ✅ Succeeded (0.94s)[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: [96m🚌 [SecurityWatchdog.on_NavigateToUrlEvent(#7db9)]        ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: [92m🚌 [SecurityWatchdog.on_NavigateToUrlEvent(#7db9)]        ✅ Succeeded (0.00s)[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 23:04:26] [INFO] controller: 🔗 Navigated to https://google.com
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: ⏳ execute_action() took 0.95s
+[2025-08-22 23:04:26] [DEBUG] Agent: ☑️ Executed action 1/1: [92mgo_to_url: url: https://google.com, new_tab: False[0m in 0.95s
+[2025-08-22 23:04:26] [DEBUG] Agent: ⏳ multi_act() took 0.95s
+[2025-08-22 23:04:26] [DEBUG] Agent: ✅ Initial actions completed
+[2025-08-22 23:04:26] [DEBUG] Agent: 🔄 Starting main execution loop with max 100 steps...
+[2025-08-22 23:04:26] [DEBUG] Agent: 🚶 Starting step 1/100...
+[2025-08-22 23:04:26] [DEBUG] Agent: 🌐 Step 1: Getting browser state...
+[2025-08-22 23:04:26] [DEBUG] Agent: 📸 Requesting browser state with include_screenshot=True, cached=True
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: [96m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#31f2)]       ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: STARTING browser state request
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page URL: https://www.google.com/
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 📍 Current page URL: https://www.google.com/, target_id: 83FAECED0CE9D313343D0BFE17878EAF, session_id: C0EDD663FB30709D367C50AC891EFE71
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ⏳ Waiting for page stability...
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: ⏳ Minimum wait: 0.25s
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: ⏳ Network idle wait: 0.5s
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: ✅ Page stability wait completed in 0.75s
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ Page stability complete
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting tabs info...
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got 1 tabs
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Tabs info: [TabInfo(url='https://www.google.com/', title='Google', target_id='83FAECED0CE9D313343D0BFE17878EAF', parent_target_id=None)]
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 🌳 Building DOM tree...
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Starting _build_dom_tree...
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: STARTING DOM tree build
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Removing existing highlights...
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: Successfully removed 0 highlight elements
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Calling DomService.get_serialized_dom_tree...
+[2025-08-22 23:04:26] [DEBUG] BrowserSession: 🔍 DEBUG: Capturing DOM snapshot for target 83FAECED0CE9D313343D0BFE17878EAF
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 🔍 DEBUG: Snapshot contains 1 documents with 17 total nodes
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 🔍 DEBUG: HTML frame scroll - scrollY=0, scrollX=0, frameId=83FAECED0CE9D313343D0BFE17878EAF, nodeId=3
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ DomService.get_serialized_dom_tree completed
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: Time taken to get DOM tree: 0.14821910858154297 seconds
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: Timing breakdown: {'clickable_detection_time': 0.0011110305786132812, 'create_simplified_tree': 0.0016472339630126953, 'optimize_tree': 4.553794860839844e-05, 'bbox_filtering': 0.00027298927307128906, 'assign_interactive_indices': 2.384185791015625e-05, 'serialize_accessible_elements_total': 0.001992940902709961, 'serialize_dom_tree_total': 0.0020143985748291016}
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Updating selector maps...
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Selector maps updated, 24 elements
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Injecting highlighting script...
+[2025-08-22 23:04:27] [DEBUG] dom: 📍 Creating CSP-safe highlighting for 24 elements
+[2025-08-22 23:04:27] [DEBUG] dom: 🧹 Removing browser-use highlighting elements
+[2025-08-22 23:04:27] [DEBUG] dom: Enhanced CSP-safe highlighting injected for 24 elements
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Injected highlighting for 24 elements
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ COMPLETED DOM tree build
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ _build_dom_tree completed
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 DOM watchdog requesting screenshot, include_screenshot=True
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 📸 ScreenshotEvent handlers registered: 1 - ['ScreenshotWatchdog.on_ScreenshotEvent']
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 📸 Dispatched ScreenshotEvent, waiting for event to complete...
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: [96m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#0cc4)]         ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStateRequestEvent#31f2[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: [ScreenshotWatchdog] Handler START - on_ScreenshotEvent called
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: [ScreenshotWatchdog] Taking screenshot with params: {'format': 'png', 'captureBeyondViewport': False}
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: [ScreenshotWatchdog] Screenshot captured successfully
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: Successfully removed 49 highlight elements
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: [92m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#0cc4)]         ✅ Succeeded (0.17s)[0m ➡️ [95m<str>[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStateRequestEvent#31f2[0m
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page title...
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got title: Google
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page info from CDP...
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page info from CDP: viewport_width=1705 viewport_height=1333 page_width=1705 page_height=1333 scroll_x=0 scroll_y=0 pixels_above=0 pixels_below=0 pixels_left=0 pixels_right=0
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 Creating BrowserStateSummary with screenshot, length: 59828
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ COMPLETED - Returning browser state
+[2025-08-22 23:04:27] [DEBUG] BrowserSession: [92m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#31f2)]       ✅ Succeeded (1.20s)[0m ➡️ [95m<BrowserStateSummary>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 23:04:27] [DEBUG] Agent: 📸 Got browser state WITH screenshot, length: 59828
+[2025-08-22 23:04:27] [INFO] Agent: 
+
+[2025-08-22 23:04:27] [INFO] Agent: 📍 Step 1:
+[2025-08-22 23:04:27] [DEBUG] Agent: Evaluating page with 24 interactive elements on: https://www.google.com/
+[2025-08-22 23:04:27] [DEBUG] Agent: 📝 Step 1: Updating action models...
+[2025-08-22 23:04:27] [DEBUG] Agent: 💬 Step 1: Creating state messages for context...
+[2025-08-22 23:04:27] [DEBUG] service: Added long_term_memory to action_results: Navigated to https://google.com
+[2025-08-22 23:04:27] [DEBUG] service: 
+[2025-08-22 23:04:27] [DEBUG] Agent: 🤖 Step 1: Calling LLM with 2 messages (model: gpt-4.1-mini)...
+[2025-08-22 23:04:35] [DEBUG] service: Token cost service: model='gpt-4.1-mini' timestamp=datetime.datetime(2025, 8, 22, 23, 4, 35, 93968) usage=ChatInvokeUsage(prompt_tokens=8174, prompt_cached_tokens=5120, prompt_cache_creation_tokens=None, prompt_image_tokens=None, completion_tokens=170, total_tokens=8344)
+[2025-08-22 23:04:35] [DEBUG] Agent: 💡 Thinking:
+The user wants to search for a book on Amazon, add it to the cart, and confirm the addition. Currently, we are on the Google homepage. The next logical step is to navigate directly to Amazon's website to perform the book search and subsequent actions. This will be more efficient than searching for Amazon via Google.
+[2025-08-22 23:04:35] [INFO] Agent:   [32m👍 Eval: Initial state with Google homepage loaded successfully. Verdict: Success[0m
+[2025-08-22 23:04:35] [DEBUG] Agent: 🧠 Memory: Starting from Google homepage, no actions taken yet towards searching or adding a book on Amazon.
+[2025-08-22 23:04:35] [INFO] Agent:   [34m🎯 Next goal: Navigate directly to Amazon's homepage to start searching for the book.[0m
+[2025-08-22 23:04:35] [INFO] Agent: ☝️ Decided next action: go_to_url(url="https://www.amazon.com", new_tab=False)
+[2025-08-22 23:04:35] [DEBUG] Agent: ⏳ get_next_action() took 7.76s
+[2025-08-22 23:04:35] [DEBUG] Agent: ✅ Step 1: Got LLM response with 1 actions
+[2025-08-22 23:04:35] [DEBUG] Agent: ⚡ Step 1: Executing 1 actions...
+[2025-08-22 23:04:35] [INFO] Agent:   🦾 [34m[ACTION 1/1][0m go_to_url: url: https://www.amazon.com, new_tab: False
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_NavigateToUrlEvent(#3725)]          ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [on_NavigateToUrlEvent] Received NavigateToUrlEvent: url=https://www.amazon.com, new_tab=False
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [on_NavigateToUrlEvent] Processing new_tab=False
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_SwitchTabEvent(#0d6c)]              ⏳ Starting...      [0m [93m↲  triggered by [96mon_NavigateToUrlEvent#3725[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_AgentFocusChangedEvent(#4859)]      ⏳ Starting...      [0m [93m↲  triggered by [96mon_SwitchTabEvent#0d6c[0m [93m↲  under [96mNavigateToUrlEvent#3725[0m
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: 🔄 AgentFocusChangedEvent received: target_id=...8EAF url=chrome://newtab/
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: 🔄 Cached browser state cleared
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: 🔄 Updated agent focus to tab target_id=...8EAF
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: 🔄 Testing tab responsiveness...
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_AgentFocusChangedEvent(#4859)]      ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_SwitchTabEvent#0d6c[0m
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_SwitchTabEvent(#0d6c)]              ✅ Succeeded (0.00s)[0m ➡️ [95m<str>[0m [93m⤴  [92mreturned to  [96m[96mon_NavigateToUrlEvent#3725[0m
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: Dispatching NavigationCompleteEvent for https://www.amazon.com (tab #8EAF)
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [96m🚌 [DownloadsWatchdog.on_NavigationCompleteEvent(#0230)]  ⏳ Starting...      [0m [93m↲  triggered by [96mon_NavigateToUrlEvent#3725[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [DownloadsWatchdog] NavigationCompleteEvent received for https://www.amazon.com, tab #8EAF
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [DownloadsWatchdog] Got target_id=83FAECED0CE9D313343D0BFE17878EAF for tab #8EAF
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [DownloadsWatchdog] Checking if target 83FAECED0CE9D313343D0BFE17878EAF is PDF viewer...
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [92m🚌 [DownloadsWatchdog.on_NavigationCompleteEvent(#0230)]  ✅ Succeeded (0.01s)[0m [93m⤴  [92mreturned to  [96m[96mon_NavigateToUrlEvent#3725[0m
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [96m🚌 [SecurityWatchdog.on_NavigationCompleteEvent(#0230)]   ⏳ Starting...      [0m [93m↲  triggered by [96mon_NavigateToUrlEvent#3725[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [92m🚌 [SecurityWatchdog.on_NavigationCompleteEvent(#0230)]   ✅ Succeeded (0.00s)[0m [93m⤴  [92mreturned to  [96m[96mon_NavigateToUrlEvent#3725[0m
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [96m🚌 [BrowserSession.on_AgentFocusChangedEvent(#cd1f)]      ⏳ Starting...      [0m [93m↲  triggered by [96mon_NavigateToUrlEvent#3725[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: 🔄 AgentFocusChangedEvent received: target_id=...8EAF url=https://www.amazon.com
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: 🔄 Cached browser state cleared
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: 🔄 Updated agent focus to tab target_id=...8EAF
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: 🔄 Testing tab responsiveness...
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_AgentFocusChangedEvent(#cd1f)]      ✅ Succeeded (0.01s)[0m [93m⤴  [92mreturned to  [96m[96mon_NavigateToUrlEvent#3725[0m
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [92m🚌 [BrowserSession.on_NavigateToUrlEvent(#3725)]          ✅ Succeeded (0.74s)[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [96m🚌 [SecurityWatchdog.on_NavigateToUrlEvent(#3725)]        ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: [92m🚌 [SecurityWatchdog.on_NavigateToUrlEvent(#3725)]        ✅ Succeeded (0.00s)[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 23:04:35] [INFO] controller: 🔗 Navigated to https://www.amazon.com
+[2025-08-22 23:04:35] [DEBUG] BrowserSession: ⏳ execute_action() took 0.75s
+[2025-08-22 23:04:35] [DEBUG] Agent: ☑️ Executed action 1/1: [92mgo_to_url: url: https://www.amazon.com, new_tab: False[0m in 0.75s
+[2025-08-22 23:04:35] [DEBUG] Agent: ⏳ multi_act() took 0.75s
+[2025-08-22 23:04:35] [DEBUG] Agent: ✅ Step 1: Actions completed
+[2025-08-22 23:04:35] [DEBUG] Agent: 🔄 Step 1: Consecutive failures reset to: 0
+[2025-08-22 23:04:35] [DEBUG] Agent: 📸 Storing screenshot for step 1, screenshot length: 59828
+[2025-08-22 23:04:35] [DEBUG] Agent: 📸 Screenshot stored at: /tmp/browser_use_agent_068a93dc-6462-755f-8000-bfad0cd00712_1755921862/screenshots/step_1.png
+[2025-08-22 23:04:35] [DEBUG] Agent: 📍 Step 1: Ran 1 action in 9.75s: ✅ 1
+[2025-08-22 23:04:35] [DEBUG] cloud_events: 📸 Including screenshot in CreateAgentStepEvent, length: 59828
+[2025-08-22 23:04:35] [DEBUG] Agent: ⏳ step() took 9.75s
+[2025-08-22 23:04:35] [DEBUG] Agent: ✅ Completed step 1/100
+[2025-08-22 23:04:35] [DEBUG] Agent: 🚶 Starting step 2/100...
+[2025-08-22 23:04:35] [DEBUG] Agent: 🌐 Step 2: Getting browser state...
+[2025-08-22 23:04:35] [DEBUG] Agent: 📸 Requesting browser state with include_screenshot=True, cached=False
+[2025-08-22 23:04:36] [DEBUG] BrowserSession: [96m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#b206)]       ⏳ Starting...      [0m [95m👈 by Agent[0m 
+[2025-08-22 23:04:36] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: STARTING browser state request
+[2025-08-22 23:04:36] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page URL: https://www.amazon.com/
+[2025-08-22 23:04:36] [DEBUG] BrowserSession: 📍 Current page URL: https://www.amazon.com/, target_id: 83FAECED0CE9D313343D0BFE17878EAF, session_id: C0EDD663FB30709D367C50AC891EFE71
+[2025-08-22 23:04:36] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ⏳ Waiting for page stability...
+[2025-08-22 23:04:36] [DEBUG] BrowserSession: ⏳ Minimum wait: 0.25s
+[2025-08-22 23:04:36] [DEBUG] BrowserSession: ⏳ Network idle wait: 0.5s
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: ✅ Page stability wait completed in 0.75s
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ Page stability complete
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting tabs info...
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got 1 tabs
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Tabs info: [TabInfo(url='https://www.amazon.com/', title='Amazon.com', target_id='83FAECED0CE9D313343D0BFE17878EAF', parent_target_id=None)]
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 🌳 Building DOM tree...
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Starting _build_dom_tree...
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: STARTING DOM tree build
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Removing existing highlights...
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: Successfully removed 0 highlight elements
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Calling DomService.get_serialized_dom_tree...
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DEBUG: Capturing DOM snapshot for target 83FAECED0CE9D313343D0BFE17878EAF
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DEBUG: Snapshot contains 1 documents with 17 total nodes
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DEBUG: HTML frame scroll - scrollY=0, scrollX=0, frameId=83FAECED0CE9D313343D0BFE17878EAF, nodeId=7
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ DomService.get_serialized_dom_tree completed
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: Time taken to get DOM tree: 0.021347522735595703 seconds
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: Timing breakdown: {'clickable_detection_time': 0.00015163421630859375, 'create_simplified_tree': 0.00027751922607421875, 'optimize_tree': 1.5974044799804688e-05, 'bbox_filtering': 8.940696716308594e-05, 'assign_interactive_indices': 7.3909759521484375e-06, 'serialize_accessible_elements_total': 0.0003921985626220703, 'serialize_dom_tree_total': 0.0004138946533203125}
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Updating selector maps...
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Selector maps updated, 6 elements
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: Injecting highlighting script...
+[2025-08-22 23:04:37] [DEBUG] dom: 📍 Creating CSP-safe highlighting for 6 elements
+[2025-08-22 23:04:37] [DEBUG] dom: 🧹 Removing browser-use highlighting elements
+[2025-08-22 23:04:37] [DEBUG] dom: Enhanced CSP-safe highlighting injected for 6 elements
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ Injected highlighting for 6 elements
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog._build_dom_tree: ✅ COMPLETED DOM tree build
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ _build_dom_tree completed
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 DOM watchdog requesting screenshot, include_screenshot=True
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 📸 ScreenshotEvent handlers registered: 1 - ['ScreenshotWatchdog.on_ScreenshotEvent']
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 📸 Dispatched ScreenshotEvent, waiting for event to complete...
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: [96m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#39ae)]         ⏳ Starting...      [0m [93m↲  triggered by [96mon_BrowserStateRequestEvent#b206[0m [95m👈 by Agent[0m
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: [ScreenshotWatchdog] Handler START - on_ScreenshotEvent called
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: [ScreenshotWatchdog] Taking screenshot with params: {'format': 'png', 'captureBeyondViewport': False}
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: [ScreenshotWatchdog] Screenshot captured successfully
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: Successfully removed 13 highlight elements
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: [92m🚌 [ScreenshotWatchdog.on_ScreenshotEvent(#39ae)]         ✅ Succeeded (0.13s)[0m ➡️ [95m<str>[0m [93m⤴  [92mreturned to  [96m[96mon_BrowserStateRequestEvent#b206[0m
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page title...
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got title: Amazon.com
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Getting page info from CDP...
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: Got page info from CDP: viewport_width=1705 viewport_height=1333 page_width=1705 page_height=1333 scroll_x=0 scroll_y=0 pixels_above=0 pixels_below=0 pixels_left=0 pixels_right=0
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 Creating BrowserStateSummary with screenshot, length: 47292
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: 🔍 DOMWatchdog.on_BrowserStateRequestEvent: ✅ COMPLETED - Returning browser state
+[2025-08-22 23:04:37] [DEBUG] BrowserSession: [92m🚌 [DOMWatchdog.on_BrowserStateRequestEvent(#b206)]       ✅ Succeeded (1.00s)[0m ➡️ [95m<BrowserStateSummary>[0m [95m👉 [92mreturned to  [95mAgent[0m[0m
+[2025-08-22 23:04:37] [DEBUG] Agent: 📸 Got browser state WITH screenshot, length: 47292
+[2025-08-22 23:04:37] [INFO] Agent: 
+
+[2025-08-22 23:04:37] [INFO] Agent: 📍 Step 2:
+[2025-08-22 23:04:37] [DEBUG] Agent: Evaluating page with 6 interactive elements on: https://www.amazon.com/
+[2025-08-22 23:04:37] [DEBUG] Agent: 📝 Step 2: Updating action models...
+[2025-08-22 23:04:37] [DEBUG] Agent: 💬 Step 2: Creating state messages for context...
+[2025-08-22 23:04:37] [DEBUG] service: Added long_term_memory to action_results: Navigated to https://www.amazon.com
+[2025-08-22 23:04:37] [DEBUG] service: 
+[2025-08-22 23:04:37] [DEBUG] Agent: 🤖 Step 2: Calling LLM with 2 messages (model: gpt-4.1-mini)...
+[2025-08-22 23:04:39] [DEBUG] service: PostHog client telemetry queue flushed.
