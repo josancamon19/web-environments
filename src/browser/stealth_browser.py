@@ -82,12 +82,19 @@ class StealthBrowser:
         print("✅ DOM listeners setup complete")
 
     async def page_event_handler(self, event_info):
-        """Log click events"""
-        step_record = StepRecord()
-        await step_record.record_step({
-            'event_info': event_info,
-            "prefix_action" : f"{event_info['event_context']}"
-        })
+        """Handle page events from browser"""
+        try:
+            event_type = event_info.get('event_type', 'unknown')
+            event_context = event_info.get('event_context', 'unknown')
+            logger.debug(f"[PAGE_EVENT] Received: {event_context}:{event_type}")
+            
+            step_record = StepRecord()
+            await step_record.record_step({
+                'event_info': event_info,
+                "prefix_action" : f"{event_context}"
+            })
+        except Exception as e:
+            logger.error(f"[PAGE_EVENT] Error handling event: {e}", exc_info=True)
 
     async def close(self):
         """Close browser"""

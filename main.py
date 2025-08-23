@@ -8,7 +8,12 @@ from src.tasks.task import TaskManager, CreateTaskDto, Task
 from src.utils.get_task_description import get_task_description_from_user
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG,  # Changed to DEBUG to see all logs
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('recorder_debug.log')  # Also save to file for analysis
+    ]
 )
 
 logger = logging.getLogger(__name__)

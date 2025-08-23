@@ -49,11 +49,15 @@ console.log('🎯 Page event listener script loaded');
 
  function sendEventPage(type, context, payload) {
     try {
+      // Only capture DOM snapshot for important events to reduce overhead
+      const importantEvents = ['click', 'load', 'navigate_start', 'navigated', 'domcontentloaded', 'contextmenu', 'loaded'];
+      const shouldCaptureDom = importantEvents.includes(type);
+      
       window.onPageEvent({
         event_type: type,
         event_context: context,
         event_data: payload,
-        dom_snapshot: document.documentElement.outerHTML,
+        dom_snapshot: shouldCaptureDom ? document.documentElement.outerHTML : '',
         metadata: JSON.stringify({
             timestamp: Date.now(),
             page_url: window.location.href,
@@ -167,17 +171,27 @@ function setupPageEventListener() {
         sendEventPage('contextmenu', 'action:user', info);
     }, { capture: true });
 
-    // Input event
+    // Input event with throttling
+    let inputTimeout = null;
     document.addEventListener('input', (e) => {
         try {
             const element = e.target;
-            const info = {
-                tag: element.tagName,
-                id: element.id,
-                className: element.className,
-                value: element.value || ''
-            };
-            sendEventPage('input', 'action:user', info);
+            
+            // Clear previous timeout
+            if (inputTimeout) {
+                clearTimeout(inputTimeout);
+            }
+            
+            // Throttle input events to reduce frequency
+            inputTimeout = setTimeout(() => {
+                const info = {
+                    tag: element.tagName,
+                    id: element.id,
+                    className: element.className,
+                    value: element.value || ''
+                };
+                sendEventPage('input', 'action:user', info);
+            }, 100); // Send after 100ms of no input
         } catch (_) {}
     }, { capture: true });
 
