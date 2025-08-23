@@ -173,6 +173,14 @@ function setupPageEventListener() {
 
     document.addEventListener('mouseover', (e) => {
         const element = e.target;
+
+            const isInteractive = element.tagName.toLowerCase() === 'a' ||
+                          element.tagName.toLowerCase() === 'button' ||
+                          element.getAttribute('role') === 'button' ||
+                          element.getAttribute('role') === 'link';
+
+        if (!isInteractive) return;
+        
         const info = {
             tag: element.tagName,
             id: element.id,
