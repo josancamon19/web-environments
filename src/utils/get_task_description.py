@@ -48,3 +48,26 @@ def get_task_description_from_user() -> str:
     print()
     
     return task_description
+
+
+def get_answer_from_user() -> str:
+    """Get answer for information retrieval task from user"""
+    print("💡 INFORMATION RETRIEVAL ANSWER")
+    print("="*60)
+    print("Please provide the answer/information you found:")
+    print("(Enter the information you retrieved during this task)")
+    print()
+    
+    answer = input("📝 Answer: ").strip()
+    
+    # Validate input
+    if not answer:
+        print("⚠️  No answer provided. Saving as empty.")
+        answer = ""
+    else:
+        print(f"✅ Answer recorded: {answer[:50]}{'...' if len(answer) > 50 else ''}")
+    
+    print("="*60)
+    print()
+    
+    return answer

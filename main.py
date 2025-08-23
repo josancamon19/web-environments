@@ -5,7 +5,7 @@ import logging
 from src.browser.stealth_browser import StealthBrowser
 from src.config.initial_tasks import InitialTasks
 from src.tasks.task import TaskManager, CreateTaskDto, Task
-from src.utils.get_task_description import get_task_description_from_user, get_task_type_from_user
+from src.utils.get_task_description import get_task_description_from_user, get_task_type_from_user, get_answer_from_user
 
 logging.basicConfig(
     level=logging.DEBUG,  # Changed to DEBUG to see all logs
@@ -52,6 +52,12 @@ async def main():
 
         def signal_handler(signum, frame):
             print(f'\n🛑 Task completed: "{task_description}"')
+            
+            # If it's an information retrieval task, ask for the answer
+            if task_type == "information_retrieval":
+                answer = get_answer_from_user()
+                task_manager.save_task_answer(answer)
+            
             print("🔄 Closing browser...")
             task_manager.end_actual_task()
             task_manager.save_task_video(task_manager.get_last_task_path())

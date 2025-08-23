@@ -402,3 +402,5 @@ if __name__ == "__main__":
     # TODO: completion evaluation
     # - info retrieval str match or llm as judge
     # - action based, DOM/final state? llm as judge?
+    # TODO: include a source as well if it's a task from another eval.
+    # TODO: store only result here first

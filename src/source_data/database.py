@@ -153,4 +153,12 @@ class Database:
             "UPDATE tasks SET video_path = ? WHERE id = ?", (video_path, task_id)
         )
         self.conn.commit()
+
+    def save_task_answer(self, task_id: int, answer: str):
+        cur = self.conn.cursor()
+        cur.execute(
+            "UPDATE tasks SET answer = ? WHERE id = ?", (answer, task_id)
+        )
+        self.conn.commit()
+        print(f"Answer saved for task {task_id}")
         

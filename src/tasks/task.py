@@ -74,6 +74,12 @@ class TaskManager:
         else:
             logger.warning("No active task to save video for")
 
+    def save_task_answer(self, answer: str):
+        if self.tasks:
+            self.task_repository.save_task_answer(self.tasks.id, answer)
+        else:
+            logger.warning("No active task to save answer for")
+
 
 class TaskRepository:
     def __init__(self):
@@ -88,3 +94,6 @@ class TaskRepository:
 
     def save_task_video(self, task_id: int, video_path: str):
         self.db.save_task_video(task_id, video_path)
+
+    def save_task_answer(self, task_id: int, answer: str):
+        self.db.save_task_answer(task_id, answer)
