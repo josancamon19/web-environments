@@ -8,13 +8,12 @@ import sys
 import json
 import logging
 from pathlib import Path
+from typing import Dict, Any
+from litellm import completion
 
 # Add src to path
 sys.path.insert(0, ".")
 
-import json
-from typing import Dict, Any
-from litellm import completion
 
 # customized HLE prompt
 prompt = """
@@ -29,13 +28,13 @@ extracted_final_answer: The final exact answer extracted from the [response]. Pu
 [correct_response]: {correct_response}
 
 reasoning: Explain why the extracted_final_answer is correct or incorrect based on [correct_response], focusing only on if there are meaningful differences between [correct_response] and the extracted_final_answer. Do not comment on any background to the problem, do not attempt to solve the problem, do not argue for any answer different than [correct_response], focus only on whether the answers match.
-correct: Answer 'yes' if extracted_final_answer matches the [correct_response] given above, or is within a small margin of error for numerical problems. Answer 'no' otherwise, i.e. if there if there is any inconsistency, ambiguity, non-equivalency, or if the extracted answer is incorrect.
+correct: Answer 'yes' if extracted_final_answer matches the [correct_response] given above, or is within a small margin of error for numerical problems, or includes extra details not found in [correct_response] but not necessarily wrong given [browser_task]. Answer 'no' otherwise, i.e. if there if there is any inconsistency, ambiguity, non-equivalency, or if the extracted answer is incorrect.
 confidence: The extracted confidence score between 0% and 100% from [response]. Put 100 if there is no confidence score available.
 """
 
 
 def verify_task_completion(
-    task: str, response: str, correct_response: str, model: str = "gpt-4o-mini"
+    task: str, response: str, correct_response: str, model: str = "gpt-4.1-2025-04-14"
 ) -> Dict[str, Any]:
     formatted_prompt = prompt.format(
         task=task, response=response, correct_response=correct_response
@@ -59,7 +58,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def evaluate_model_outputs(model: str, judge_model: str = "gpt-4o-mini"):
+def evaluate_model_outputs(model: str, judge_model: str = "gpt-4.1-2025-04-14"):
     output_file = (
         Path("src/eval/results") / f"browseruse-{model.replace('/', '-')}.jsonl"
     )
@@ -184,11 +183,11 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: python evaluate_outputs.py <model_name> [judge_model]")
         print("Example: python evaluate_outputs.py o3-2025-04-16")
-        print("Example: python evaluate_outputs.py o3-2025-04-16 gpt-4o")
+        print("Example: python evaluate_outputs.py o3-2025-04-16 gpt-4.1-2025-04-14")
         sys.exit(1)
 
     model = sys.argv[1]
-    judge_model = sys.argv[2] if len(sys.argv) > 2 else "gpt-4o-mini"
+    judge_model = sys.argv[2] if len(sys.argv) > 2 else "gpt-4.1-2025-04-14"
 
     print(f"Evaluating outputs for model: {model}")
     print(f"Using judge model: {judge_model}")
