@@ -222,3 +222,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # TODO: additional data that can be collected for evaluting info retrieval tasks if not steps
+    # - not_correct answer example
+    # - the dom/selector id of the place where the answer is found, or list
+    # - might be needed to provide an easier way for the collector to set the task instead of having to write in the terminal, maybe md?
