@@ -47,24 +47,42 @@ class StealthBrowser:
 
         await self.page_event.attach_page(self.page)
 
-        self.context.on("page", self.page_event.attach_page)
+        # Track new tab/page creation
+        async def on_page_created(page):
+            await self.step_record.record_step(
+                {
+                    "event_info": {
+                        "event_type": "tab_opened",
+                        "event_context": "state:browser",
+                        "event_data": {
+                            "url": page.url,
+                            "timestamp": page.main_frame.name,
+                        },
+                    },
+                    "prefix_action": "state:browser",
+                },
+                omit_screenshot=True,
+            )
+            await self.page_event.attach_page(page)
+        
+        self.context.on("page", on_page_created)
 
         actual_page = ActualPage()
         actual_page.set_page(self.page)
 
-        await self.step_record.record_step(
-            {
-                "event_info": {
-                    "event_type": "navigate_start",
-                    "event_context": "state:page",
-                    "event_data": {"url": "https://www.google.com", "initial": True},
-                    "dom_snapshot": None,
-                },
-                "prefix_action": "state:page",
-            }
-        )
+        # await self.step_record.record_step(
+        #     {
+        #         "event_info": {
+        #             "event_type": "navigate_start",
+        #             "event_context": "state:page",
+        #             "event_data": {"url": "https://www.google.com", "initial": True},
+        #             "dom_snapshot": None,
+        #         },
+        #         "prefix_action": "state:page",
+        #     }
+        # )
         # Listen to console messages from the browser
-        # self.page.on("console", lambda msg: print(f"🌐 Browser console: {msg.text}"))
+        self.page.on("console", lambda msg: print(f"🌐 Browser console: {msg.text}"))
 
         await self.apply_stealth_techniques()
         await self.setup_dom_listeners()

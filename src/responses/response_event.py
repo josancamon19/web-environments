@@ -7,6 +7,7 @@ from src.source_data.database import Database
 
 logger = logging.getLogger(__name__)
 
+
 class Response_Event:
     _instance = None
     _initialized = False
@@ -16,7 +17,7 @@ class Response_Event:
             cls._instance = super(Response_Event, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self): 
+    def __init__(self):
         if not self._initialized:
             self.taskManager = TaskManager()
             self.request_event = Request_Event()
@@ -58,12 +59,20 @@ class Response_Event:
             status = None
 
         # Don't create a step - just insert into responses table
+        # Get the current task
+        current_task = self.taskManager.get_actual_task()
+        if not current_task:
+            logger.warning(
+                "[RESPONSE] No active task found, skipping response recording"
+            )
+            return
+
         response_id = self.db.insert_response(
-            task_id=self.taskManager.get_actual_task().id,
+            task_id=current_task.id,
             request_id=request_id,
             status=status,
             headers=json.dumps(headers, ensure_ascii=False),
             body=body_bytes,
             timestamp=get_iso_datetime(),
         )
-        # logger.info(f"[RESPONSE] Saved response {response_id} to database")
+        logger.info(f"[RESPONSE] Saved response {response_id} to database")

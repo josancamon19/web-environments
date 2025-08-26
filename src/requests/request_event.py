@@ -3,9 +3,10 @@ from src.tasks.task import TaskManager
 from src.steps.step import StepManager
 import json
 from src.utils.get_iso_datetime import get_iso_datetime
-from src.source_data.database import Database   
+from src.source_data.database import Database
 
 logger = logging.getLogger(__name__)
+
 
 class Request_Event:
     _instance = None
@@ -16,7 +17,7 @@ class Request_Event:
             cls._instance = super(Request_Event, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self): 
+    def __init__(self):
         if not self._initialized:
             self.stepManager = StepManager()
             self.taskManager = TaskManager()
@@ -62,9 +63,19 @@ class Request_Event:
             cookies_json = []
 
         # Don't create a step - just insert into requests table
+        # Get the current step if it exists, otherwise use None
+        current_step = self.stepManager.get_actual_step()
+        step_id = current_step.id if current_step else None
+
+        # Get the current task
+        current_task = self.taskManager.get_actual_task()
+        if not current_task:
+            logger.warning("[REQUEST] No active task found, skipping request recording")
+            return
+
         request_id = self.db.insert_request(
-            task_id=self.taskManager.get_actual_task().id,
-            step_id=self.stepManager.get_actual_step().id,  # Link to the action that triggered this
+            task_id=current_task.id,
+            step_id=step_id,  # Link to the action that triggered this (if any)
             request_uid=request_uid,
             url=url,
             method=request.method,

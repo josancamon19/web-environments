@@ -5,7 +5,7 @@ import logging
 from src.browser.stealth_browser import StealthBrowser
 from src.config.initial_tasks import InitialTasks
 from src.tasks.task import TaskManager, CreateTaskDto, Task
-from src.utils.get_task_description import get_task_description_from_user
+from src.utils.get_task_description import get_task_description_from_user, get_task_type_from_user, get_answer_from_user, get_source_from_user
 
 logging.basicConfig(
     level=logging.DEBUG,  # Changed to DEBUG to see all logs
@@ -26,16 +26,18 @@ async def main():
     initial_tasks.run()
     print("Initial tasks completed")
 
-    # Get task description from user
+    # Get task source, type and description from user
+    source = get_source_from_user()
+    task_type = get_task_type_from_user()
     task_description = get_task_description_from_user()
 
     try:
         # Get TaskManager singleton instance
         task_manager = TaskManager.get_instance()
 
-        new_task = CreateTaskDto(task_description)
+        new_task = CreateTaskDto(task_description, task_type, source)
         task_id = task_manager.save_task(new_task)
-        task_manager.set_actual_task(Task(task_id, task_description))
+        task_manager.set_actual_task(Task(task_id, task_description, task_type, source))
 
         logger.info(f"Task saved: {task_id}")
 
@@ -51,6 +53,12 @@ async def main():
 
         def signal_handler(signum, frame):
             print(f'\n🛑 Task completed: "{task_description}"')
+            
+            # If it's an information retrieval task, ask for the answer
+            if task_type == "information_retrieval":
+                answer = get_answer_from_user()
+                task_manager.save_task_answer(answer)
+            
             print("🔄 Closing browser...")
             task_manager.end_actual_task()
             task_manager.save_task_video(task_manager.get_last_task_path())
@@ -59,10 +67,9 @@ async def main():
 
         signal.signal(signal.SIGINT, signal_handler)
 
-        # Navigate to a page to start
-        await stealth_browser.page.goto("https://www.google.com")
-
-        await stealth_browser.page.wait_for_load_state("domcontentloaded")
+        # Leave it on about:blank
+        # await stealth_browser.page.goto("https://www.google.com")
+        # await stealth_browser.page.wait_for_load_state("domcontentloaded")
 
         await asyncio.Event().wait()
 

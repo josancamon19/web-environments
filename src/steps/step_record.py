@@ -101,6 +101,7 @@ class StepRecord:
             "pointerdown",  # Pointer down
             "pointerup",  # Pointer up
             "pointermove",  # Pointer movement
+            "hover",  # Hover events (too frequent, would cause performance issues)
         }
 
         # Only take screenshots for significant events
@@ -112,6 +113,7 @@ class StepRecord:
             "domcontentloaded",  # DOM ready
             "contextmenu",  # Right-click menu
             "loaded",  # Page fully loaded
+            "back",  # Browser back/forward navigation
         }
 
         # Check if this is an event we should screenshot

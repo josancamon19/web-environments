@@ -107,7 +107,36 @@ def create_selector(event_data: Dict[str, Any]) -> str:
     return tag if tag else "*"
 
 
-def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str, Any]:
+def find_navigation_after_step(steps_list, current_idx, max_lookahead=10):
+    """Find navigation URL after a click or Enter key event."""
+    for i in range(
+        current_idx + 1, min(current_idx + max_lookahead + 1, len(steps_list))
+    ):
+        _, event_type, event_data_str, _ = steps_list[i]
+        if event_type in [
+            "state:browser:navigated",
+            "state:page:navigate_start",
+            "state:page:load",
+            "state:page:loaded",
+        ]:
+            if event_data_str:
+                try:
+                    event_data = json.loads(event_data_str)
+                    url = event_data.get("url", "")
+                    if url and url != "about:blank":
+                        return url
+                except json.JSONDecodeError:
+                    pass
+    return None
+
+
+def process_single_task(
+    cursor,
+    task_id: int,
+    task_description: str,
+    task_type: str = None,
+    answer: str = None,
+) -> Dict[str, Any]:
     """
     Process a single task and convert it to tool calls.
 
@@ -115,6 +144,8 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
         cursor: Database cursor
         task_id: The ID of the task to convert
         task_description: Description of the task
+        task_type: Type of the task (e.g., "information_retrieval", "action")
+        answer: Answer for information retrieval tasks
 
     Returns:
         Dictionary with task data and tool calls
@@ -136,8 +167,14 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
     tool_calls = []
     typing_buffer = None
     click_buffer = None  # Buffer to accumulate related click events
+    first_navigation_handled = False  # Track if we've handled the first navigation
 
-    for step_id, event_type, event_data_str, dom_snapshot in steps:
+    # Convert steps to list for lookahead
+    steps_list = list(steps)
+
+    for idx, (step_id, event_type, event_data_str, dom_snapshot) in enumerate(
+        steps_list
+    ):
         if event_data_str:
             try:
                 event_data = json.loads(event_data_str)
@@ -150,6 +187,19 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
         if event_type == "state:page:navigate_start" and event_data.get("initial"):
             url = event_data.get("url", "")
             if url:
+                first_navigation_handled = True
+                tool_calls.append(
+                    ToolCallData(
+                        type=ToolCall.GO_TO.value,
+                        params={"url": url},
+                        step_ids=[step_id],
+                    )
+                )
+        # Handle the first browser navigation (often the initial page load)
+        elif event_type == "state:browser:navigated" and not first_navigation_handled:
+            url = event_data.get("url", "")
+            if url and url != "about:blank":
+                first_navigation_handled = True
                 tool_calls.append(
                     ToolCallData(
                         type=ToolCall.GO_TO.value,
@@ -158,7 +208,7 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
                     )
                 )
         # Also handle direct navigation to a new domain (not initial)
-        elif event_type == "state:browser:navigated":
+        elif event_type == "state:browser:navigated" and first_navigation_handled:
             url = event_data.get("url", "")
             # Check if this is a significant navigation (new domain)
             if url and tool_calls:
@@ -168,12 +218,12 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
                     if tc.type == ToolCall.GO_TO.value:
                         last_url = tc.params.get("url", "")
                         break
-                
+
                 # Extract domain from URLs
                 if last_url:
                     last_domain = urllib.parse.urlparse(last_url).netloc
                     new_domain = urllib.parse.urlparse(url).netloc
-                    
+
                     # If navigating to a different domain, record it as a GO_TO
                     if last_domain != new_domain and new_domain:
                         # Flush any pending buffers first
@@ -183,7 +233,7 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
                         if typing_buffer:
                             tool_calls.append(typing_buffer)
                             typing_buffer = None
-                            
+
                         tool_calls.append(
                             ToolCallData(
                                 type=ToolCall.GO_TO.value,
@@ -218,11 +268,17 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
         elif event_type == "action:user:click":
             # Save any pending typing before the click
             if typing_buffer:
+                # Typing interrupted by click, so no Enter was pressed
+                if "submit" not in typing_buffer.params:
+                    typing_buffer.params["submit"] = False
                 tool_calls.append(typing_buffer)
                 typing_buffer = None
 
             selector = create_selector(event_data)
             context = extract_element_context(dom_snapshot, event_data)
+
+            # Check for navigation after this click
+            nav_url = find_navigation_after_step(steps_list, idx)
 
             # If we have a click buffer and it's for the same element, add to it
             if click_buffer and click_buffer.params.get("selector") == selector:
@@ -230,12 +286,17 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
                 # Update context if we have better info
                 if context and "selector_details" not in click_buffer.params:
                     click_buffer.params["selector_details"] = context
+                # Add navigation URL if found
+                if nav_url and "navigates_to" not in click_buffer.params:
+                    click_buffer.params["navigates_to"] = nav_url
             elif click_buffer:
                 # Different element, save the old buffer and start new
                 tool_calls.append(click_buffer)
                 params = {"selector": selector}
                 if context:
                     params["selector_details"] = context
+                if nav_url:
+                    params["navigates_to"] = nav_url
                 click_buffer = ToolCallData(
                     type=ToolCall.CLICK.value,
                     params=params,
@@ -252,10 +313,15 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
                     # Update context if we have better info
                     if context and "selector_details" not in tool_calls[-1].params:
                         tool_calls[-1].params["selector_details"] = context
+                    # Add navigation URL if found
+                    if nav_url and "navigates_to" not in tool_calls[-1].params:
+                        tool_calls[-1].params["navigates_to"] = nav_url
                 else:
                     params = {"selector": selector}
                     if context:
                         params["selector_details"] = context
+                    if nav_url:
+                        params["navigates_to"] = nav_url
                     click_buffer = ToolCallData(
                         type=ToolCall.CLICK.value,
                         params=params,
@@ -274,6 +340,12 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
             # Enter key typically submits, so save the buffer first
             if key == "Enter":
                 if typing_buffer:
+                    # Mark that this typing was submitted with Enter
+                    typing_buffer.params["submit"] = True
+                    # Check for navigation after Enter key
+                    nav_url = find_navigation_after_step(steps_list, idx)
+                    if nav_url:
+                        typing_buffer.params["navigates_to"] = nav_url
                     tool_calls.append(typing_buffer)
                     typing_buffer = None
             else:
@@ -329,16 +401,39 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
 
     # Don't forget any pending buffers at the end
     if typing_buffer:
+        # If typing buffer wasn't submitted with Enter, mark submit as False
+        if "submit" not in typing_buffer.params:
+            typing_buffer.params["submit"] = False
         tool_calls.append(typing_buffer)
     if click_buffer:
+        # Check if the last click buffer has a navigation
+        if click_buffer.step_ids:
+            last_step_idx = None
+            for i, (sid, _, _, _) in enumerate(steps_list):
+                if sid == click_buffer.step_ids[-1]:
+                    last_step_idx = i
+                    break
+            if last_step_idx is not None:
+                nav_url = find_navigation_after_step(steps_list, last_step_idx)
+                if nav_url and "navigates_to" not in click_buffer.params:
+                    click_buffer.params["navigates_to"] = nav_url
         tool_calls.append(click_buffer)
 
     # Return output data
-    return {
+    result = {
         "task_id": task_id,
         "task_description": task_description,
+        "task_type": task_type,  # Include task type
         "tool_calls": [tc.to_dict() for tc in tool_calls],
     }
+
+    # Add answer field for information retrieval tasks
+    if task_type == "information_retrieval" and answer:
+        result["answer"] = answer
+    else:
+        result["answer"] = None
+
+    return result
 
 
 def parse(db_path: str = None, output_path: str = None):
@@ -358,8 +453,8 @@ def parse(db_path: str = None, output_path: str = None):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # Get all tasks
-    cursor.execute("SELECT id, description FROM tasks ORDER BY id")
+    # Get all tasks with task_type and answer
+    cursor.execute("SELECT id, description, task_type, answer FROM tasks ORDER BY id")
     tasks = cursor.fetchall()
 
     if not tasks:
@@ -373,12 +468,18 @@ def parse(db_path: str = None, output_path: str = None):
     print(f"Output will be written to: {output_path}")
     print()
 
-    for task_id, task_description in tasks:
+    for task_id, task_description, task_type, answer in tasks:
         try:
             print(f"Processing task {task_id}: {task_description}")
-            result = process_single_task(cursor, task_id, task_description)
+            result = process_single_task(
+                cursor, task_id, task_description, task_type, answer
+            )
             all_results.append(result)
             print(f"  Found {len(result['tool_calls'])} tool calls")
+            if task_type == "information_retrieval":
+                print(
+                    f"  Task type: {task_type}, Answer: {answer[:50] if answer else 'None'}..."
+                )
         except Exception as e:
             print(f"  Error processing task {task_id}: {e}")
             continue

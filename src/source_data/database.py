@@ -8,19 +8,21 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class Database:
     """
     Singleton Database class for managing SQLite connections and operations
     """
-    _instance: Optional['Database'] = None
+
+    _instance: Optional["Database"] = None
     _initialized: bool = False
-    
-    def __new__(cls, db_path: str = None) -> 'Database':
+
+    def __new__(cls, db_path: str = None) -> "Database":
         """Create singleton instance"""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def __init__(self, db_path: str = None):
         """Initialize the singleton (only once)"""
         if not self._initialized:
@@ -32,9 +34,9 @@ class Database:
             self.conn.execute("PRAGMA foreign_keys = ON;")
             self._ensure_schema()
             Database._initialized = True
-    
+
     @classmethod
-    def get_instance(cls, db_path: str = None) -> 'Database':
+    def get_instance(cls, db_path: str = None) -> "Database":
         """Get the singleton instance"""
         if cls._instance is None:
             cls._instance = cls(db_path or DB_PATH)
@@ -48,32 +50,34 @@ class Database:
     def close(self):
         """Close database connection"""
         try:
-            if hasattr(self, 'conn'):
+            if hasattr(self, "conn"):
                 self.conn.close()
         except Exception:
             pass
-    
+
     def get_connection(self):
         """Get the database connection"""
-        return self.conn if hasattr(self, 'conn') else None
-    
+        return self.conn if hasattr(self, "conn") else None
+
     def is_initialized(self) -> bool:
         """Check if database is initialized"""
         return self._initialized
-    
+
     def get_db_path(self) -> str:
         """Get database file path"""
-        return self.db_path if hasattr(self, 'db_path') else ""
+        return self.db_path if hasattr(self, "db_path") else ""
 
-    def start_task(self, description: str) -> int:
+    def start_task(
+        self, description: str, task_type: str = "action", source: str = "none"
+    ) -> int:
         created_at = get_iso_datetime()
         cur = self.conn.cursor()
         cur.execute(
-            "INSERT INTO tasks(description, created_at) VALUES (?, ?)",
-            (description, created_at),
+            "INSERT INTO tasks(description, task_type, source, created_at) VALUES (?, ?, ?, ?)",
+            (description, task_type, source, created_at),
         )
         self.conn.commit()
-        print(f"Task started: {cur.lastrowid}")
+        print(f"Task started: {cur.lastrowid} (Type: {task_type}, Source: {source})")
         return cur.lastrowid
 
     def end_task(self, task_id: int):
@@ -153,4 +157,9 @@ class Database:
             "UPDATE tasks SET video_path = ? WHERE id = ?", (video_path, task_id)
         )
         self.conn.commit()
-        
+
+    def save_task_answer(self, task_id: int, answer: str):
+        cur = self.conn.cursor()
+        cur.execute("UPDATE tasks SET answer = ? WHERE id = ?", (answer, task_id))
+        self.conn.commit()
+        print(f"Answer saved for task {task_id}")

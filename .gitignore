@@ -4,3 +4,4 @@ recorder_debug.log
 .env
 data/dev/*
 data/prod/user-data/
+src/eval/results
