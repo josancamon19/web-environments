@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 from html.parser import HTMLParser
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from src.config.storage_config import DB_PATH, DATA_DIR, get_mode
 
 
 class ToolCall(Enum):
@@ -337,7 +341,7 @@ def process_single_task(cursor, task_id: int, task_description: str) -> Dict[str
     }
 
 
-def parse(db_path: str = "data/tasks.db", output_path: str = "data/tasks.jsonl"):
+def parse(db_path: str = None, output_path: str = None):
     """
     Convert all tasks from the database into tool calls and write to JSONL file.
 
@@ -345,6 +349,12 @@ def parse(db_path: str = "data/tasks.db", output_path: str = "data/tasks.jsonl")
         db_path: Path to the SQLite database
         output_path: Path to the output JSONL file
     """
+    # Use default paths from config if not provided
+    if db_path is None:
+        db_path = DB_PATH
+    if output_path is None:
+        output_path = str(Path(DATA_DIR) / "tasks.jsonl")
+    
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
@@ -357,6 +367,11 @@ def parse(db_path: str = "data/tasks.db", output_path: str = "data/tasks.jsonl")
         return
 
     all_results = []
+    
+    print(f"Running in {get_mode().upper()} mode")
+    print(f"Using database: {db_path}")
+    print(f"Output will be written to: {output_path}")
+    print()
 
     for task_id, task_description in tasks:
         try:

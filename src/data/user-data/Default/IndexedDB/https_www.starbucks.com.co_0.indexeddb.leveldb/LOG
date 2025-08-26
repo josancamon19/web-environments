@@ -1,0 +1,6 @@
+2025/08/22-13:42:45.115 a96 Reusing MANIFEST /mnt/c/Users/diego/Documents/Trabajo/Otro/Santiago Projects/Web-agent/src/data/user-data/Default/IndexedDB/https_www.starbucks.com.co_0.indexeddb.leveldb/MANIFEST-000001
+2025/08/22-13:42:45.135 a96 Recovering log #3
+2025/08/22-13:42:45.199 a96 Reusing old log /mnt/c/Users/diego/Documents/Trabajo/Otro/Santiago Projects/Web-agent/src/data/user-data/Default/IndexedDB/https_www.starbucks.com.co_0.indexeddb.leveldb/000003.log 
+2025/08/22-13:42:47.829 a99 Level-0 table #5: started
+2025/08/22-13:42:48.158 a99 Level-0 table #5: 798806 bytes OK
+2025/08/22-13:42:48.172 a99 Delete type=0 #3
