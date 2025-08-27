@@ -11,6 +11,14 @@ from pathlib import Path
 from typing import Dict, Any
 from litellm import completion
 
+import sys
+import os
+
+if "--prod" in sys.argv:
+    DATA_DIR = os.path.join("data", "prod")
+else:
+    DATA_DIR = os.path.join("data", "dev")
+
 # Add src to path
 sys.path.insert(0, ".")
 
@@ -68,7 +76,7 @@ def evaluate_model_outputs(model: str, judge_model: str = "gpt-4.1-2025-04-14"):
 
     # Load the original tasks to get correct answers
     tasks_by_id = {}
-    with open(Path("data/tasks.jsonl"), "r") as f:
+    with open(Path(f"{DATA_DIR}/tasks.jsonl"), "r") as f:
         for line in f:
             if line.strip():
                 task = json.loads(line)
