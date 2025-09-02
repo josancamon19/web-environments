@@ -6,7 +6,14 @@ from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 from html.parser import HTMLParser
+import sys
+import os
 
+
+if "--prod" in sys.argv:
+    DATA_DIR = os.path.join("data", "prod")
+else:
+    DATA_DIR = os.path.join("data", "dev")
 
 class ToolCall(Enum):
     CLICK = "click"  # params (selector: str)
@@ -432,7 +439,7 @@ def process_single_task(
     return result
 
 
-def parse(db_path: str = "data/tasks.db", output_path: str = "data/tasks.jsonl"):
+def parse(db_path: str = f"{DATA_DIR}/tasks.db", output_path: str = f"{DATA_DIR}/tasks.jsonl"):
     """
     Convert all tasks from the database into tool calls and write to JSONL file.
 

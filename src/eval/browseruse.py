@@ -7,6 +7,14 @@ from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 from browser_use import Agent, ChatOpenAI
 
+import sys
+import os
+
+if "--prod" in sys.argv:
+    DATA_DIR = os.path.join("data", "prod") 
+else:
+    DATA_DIR = os.path.join("data", "dev")
+
 load_dotenv()
 
 # Configure logging
@@ -228,7 +236,7 @@ def load_completed_tasks(output_file: Path) -> set:
 async def process_all_tasks(model: str):
     """Process all tasks and save to JSONL, skipping already completed ones"""
     # Load tasks from input file
-    with open(Path("data/tasks.jsonl"), "r") as f:
+    with open(Path(f"{DATA_DIR}/tasks.jsonl"), "r") as f:
         tasks = [json.loads(line) for line in f if line.strip()]
 
     # Setup output file path
