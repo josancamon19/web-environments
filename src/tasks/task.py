@@ -7,7 +7,9 @@ logger = logging.getLogger(__name__)
 
 
 class Task:
-    def __init__(self, id: int, description: str, task_type: str = "action", source: str = "none"):
+    def __init__(
+        self, id: int, description: str, task_type: str = "action", source: str = "none"
+    ):
         self.id = id
         self.description = description
         self.task_type = task_type
@@ -15,7 +17,9 @@ class Task:
 
 
 class CreateTaskDto:
-    def __init__(self, description: str, task_type: str = "action", source: str = "none"):
+    def __init__(
+        self, description: str, task_type: str = "action", source: str = "none"
+    ):
         self.description = description
         self.task_type = task_type
         self.source = source
