@@ -70,6 +70,7 @@ def evaluate_model_outputs(model: str, judge_model: str = "gpt-4.1-2025-04-14"):
     output_file = (
         Path("src/eval/results") / f"browseruse-{model.replace('/', '-')}.jsonl"
     )
+    print(output_file)
     if not output_file.exists():
         logger.error(f"Output file not found: {output_file}")
         return None

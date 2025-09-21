@@ -1,6 +1,7 @@
 from typing import Optional
 import logging
 from src.source_data.database import Database
+from src.utils.environment_fingerprint import get_environment_fingerprint_json
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +89,13 @@ class TaskRepository:
         self.db = Database.get_instance()
 
     def save(self, task: CreateTaskDto) -> int:
-        task_id = self.db.start_task(task.description, task.task_type, task.source)
+        fingerprint = get_environment_fingerprint_json()
+        task_id = self.db.start_task(
+            task.description,
+            task.task_type,
+            task.source,
+            fingerprint,
+        )
         return task_id
 
     def update_task_ended_at(self, task_id: int):

@@ -171,6 +171,28 @@ def process_single_task(
 
     steps = cursor.fetchall()
 
+    dom_output_root = Path(DATA_DIR) / "doms"
+    dom_output_root.mkdir(parents=True, exist_ok=True)
+
+    def save_dom_snapshot(step_id: int, dom_snapshot: Optional[str]) -> Optional[str]:
+        """Persist DOM snapshot to disk and return relative path."""
+        if not dom_snapshot:
+            return None
+
+        snapshot_text = str(dom_snapshot)
+        if not snapshot_text.strip():
+            return None
+
+        relative_path = Path("doms") / f"task_{task_id}" / f"step_{step_id}.txt"
+        output_path = Path(DATA_DIR) / relative_path
+        try:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, "w", encoding="utf-8") as dom_file:
+                dom_file.write(snapshot_text)
+            return str(relative_path)
+        except OSError:
+            return None
+
     tool_calls = []
     typing_buffer = None
     click_buffer = None  # Buffer to accumulate related click events
@@ -260,9 +282,12 @@ def process_single_task(
             if click_buffer is None:
                 selector = create_selector(event_data)
                 context = extract_element_context(dom_snapshot, event_data)
+                dom_state_path = save_dom_snapshot(step_id, dom_snapshot)
                 params = {"selector": selector}
                 if context:
                     params["selector_details"] = context
+                if dom_state_path:
+                    params["dom_state"] = dom_state_path
                 click_buffer = ToolCallData(
                     type=ToolCall.CLICK.value,
                     params=params,
@@ -270,6 +295,10 @@ def process_single_task(
                 )
             else:
                 click_buffer.step_ids.append(step_id)
+                if "dom_state" not in click_buffer.params:
+                    dom_state_path = save_dom_snapshot(step_id, dom_snapshot)
+                    if dom_state_path:
+                        click_buffer.params["dom_state"] = dom_state_path
 
         # Handle the actual click event
         elif event_type == "action:user:click":
@@ -283,6 +312,7 @@ def process_single_task(
 
             selector = create_selector(event_data)
             context = extract_element_context(dom_snapshot, event_data)
+            dom_state_path = save_dom_snapshot(step_id, dom_snapshot)
 
             # Check for navigation after this click
             nav_url = find_navigation_after_step(steps_list, idx)
@@ -296,6 +326,8 @@ def process_single_task(
                 # Add navigation URL if found
                 if nav_url and "navigates_to" not in click_buffer.params:
                     click_buffer.params["navigates_to"] = nav_url
+                if dom_state_path and "dom_state" not in click_buffer.params:
+                    click_buffer.params["dom_state"] = dom_state_path
             elif click_buffer:
                 # Different element, save the old buffer and start new
                 tool_calls.append(click_buffer)
@@ -304,6 +336,8 @@ def process_single_task(
                     params["selector_details"] = context
                 if nav_url:
                     params["navigates_to"] = nav_url
+                if dom_state_path:
+                    params["dom_state"] = dom_state_path
                 click_buffer = ToolCallData(
                     type=ToolCall.CLICK.value,
                     params=params,
@@ -323,12 +357,16 @@ def process_single_task(
                     # Add navigation URL if found
                     if nav_url and "navigates_to" not in tool_calls[-1].params:
                         tool_calls[-1].params["navigates_to"] = nav_url
+                    if dom_state_path and "dom_state" not in tool_calls[-1].params:
+                        tool_calls[-1].params["dom_state"] = dom_state_path
                 else:
                     params = {"selector": selector}
                     if context:
                         params["selector_details"] = context
                     if nav_url:
                         params["navigates_to"] = nav_url
+                    if dom_state_path:
+                        params["dom_state"] = dom_state_path
                     click_buffer = ToolCallData(
                         type=ToolCall.CLICK.value,
                         params=params,
@@ -393,6 +431,9 @@ def process_single_task(
                     context = extract_element_context(dom_snapshot, event_data)
                     if context:
                         typing_buffer.params["selector_details"] = context
+                    dom_state_path = save_dom_snapshot(step_id, dom_snapshot)
+                    if dom_state_path and "dom_state" not in typing_buffer.params:
+                        typing_buffer.params["dom_state"] = dom_state_path
                     # If still no context, try to get it from the previous click
                     elif tool_calls:
                         for tc in reversed(tool_calls):

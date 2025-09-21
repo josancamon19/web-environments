@@ -10,7 +10,9 @@ CREATE TABLE IF NOT EXISTS tasks (
     answer TEXT,
     video_path TEXT,
     created_at TEXT NOT NULL,
-    ended_at TEXT
+    ended_at TEXT,
+    duration_seconds REAL,
+    environment_fingerprint TEXT
 );
 
 CREATE TABLE IF NOT EXISTS steps (

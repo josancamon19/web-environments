@@ -1,5 +1,6 @@
 import os
 import sqlite3
+from datetime import datetime
 from typing import Optional
 from src.utils.get_iso_datetime import get_iso_datetime
 from src.source_data.schema import SCHEMA_SQL
@@ -68,13 +69,25 @@ class Database:
         return self.db_path if hasattr(self, "db_path") else ""
 
     def start_task(
-        self, description: str, task_type: str = "action", source: str = "none"
+        self,
+        description: str,
+        task_type: str = "action",
+        source: str = "none",
+        environment_fingerprint: Optional[str] = None,
     ) -> int:
         created_at = get_iso_datetime()
         cur = self.conn.cursor()
         cur.execute(
-            "INSERT INTO tasks(description, task_type, source, created_at) VALUES (?, ?, ?, ?)",
-            (description, task_type, source, created_at),
+            """
+            INSERT INTO tasks(
+                description,
+                task_type,
+                source,
+                created_at,
+                environment_fingerprint
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            (description, task_type, source, created_at, environment_fingerprint),
         )
         self.conn.commit()
         print(f"Task started: {cur.lastrowid} (Type: {task_type}, Source: {source})")
@@ -82,8 +95,23 @@ class Database:
 
     def end_task(self, task_id: int):
         ended_at = get_iso_datetime()
+        duration_seconds = None
+
+        try:
+            cur = self.conn.cursor()
+            cur.execute("SELECT created_at FROM tasks WHERE id = ?", (task_id,))
+            row = cur.fetchone()
+            if row and row[0]:
+                start_raw = row[0]
+                end_dt = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
+                start_dt = datetime.fromisoformat(start_raw.replace("Z", "+00:00"))
+                duration_seconds = round((end_dt - start_dt).total_seconds(), 3)
+        except Exception as exc:
+            logger.warning("Failed to compute duration for task %s: %s", task_id, exc)
+
         self.conn.execute(
-            "UPDATE tasks SET ended_at = ? WHERE id = ?", (ended_at, task_id)
+            "UPDATE tasks SET ended_at = ?, duration_seconds = ? WHERE id = ?",
+            (ended_at, duration_seconds, task_id),
         )
         self.conn.commit()
 
