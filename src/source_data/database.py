@@ -94,12 +94,21 @@ class Database:
         event_type: str,
         event_data: str,
         dom_snapshot: str,
+        dom_snapshot_metadata: str,
         screenshot_path: str,
     ) -> int:
         cur = self.conn.cursor()
         cur.execute(
-            "INSERT INTO steps(task_id, timestamp, event_type, event_data, dom_snapshot, screenshot_path) VALUES (?, ?, ?, ?, ?, ?)",
-            (task_id, timestamp, event_type, event_data, dom_snapshot, screenshot_path),
+            "INSERT INTO steps(task_id, timestamp, event_type, event_data, dom_snapshot, dom_snapshot_metadata, screenshot_path) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                task_id,
+                timestamp,
+                event_type,
+                event_data,
+                dom_snapshot,
+                dom_snapshot_metadata,
+                screenshot_path,
+            ),
         )
         self.conn.commit()
         return cur.lastrowid

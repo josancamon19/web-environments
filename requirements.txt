@@ -9,8 +9,8 @@ attrs==25.3.0
 Authlib==1.6.1
 backoff==2.2.1
 beautifulsoup4==4.13.4
-browser-use==0.6.1
-bubus==1.5.5
+browser-use==0.7.7
+bubus==1.5.6
 cachetools==5.5.2
 cdp-use==1.4.0
 certifi==2025.8.3
@@ -34,6 +34,7 @@ greenlet==3.2.4
 groq==0.31.0
 h11==0.16.0
 hf-xet==1.1.8
+html2text==2025.4.15
 httpcore==1.0.9
 httplib2==0.22.0
 httpx==0.28.1
@@ -55,8 +56,9 @@ mdurl==0.1.2
 multidict==6.6.4
 oauthlib==3.3.1
 ollama==0.5.3
-openai==1.101.0
+openai==1.107.3
 packaging==25.0
+pillow==11.3.0
 playwright==1.54.0
 portalocker==2.10.1
 posthog==6.6.1
@@ -74,6 +76,7 @@ pyee==13.0.0
 PyMuPDF==1.25.3
 pyobjc-core==11.1
 pyobjc-framework-Cocoa==11.1
+pyotp==2.9.0
 pyparsing==3.2.3
 pypdf==6.0.0
 python-dateutil==2.9.0.post0
@@ -82,6 +85,7 @@ python-multipart==0.0.20
 PyYAML==6.0.2
 referencing==0.36.2
 regex==2025.7.34
+reportlab==4.4.3
 requests==2.32.5
 requests-oauthlib==2.0.0
 rpds-py==0.27.0

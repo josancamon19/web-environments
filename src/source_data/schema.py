@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS steps (
     event_type TEXT NOT NULL,
     event_data TEXT,
     dom_snapshot TEXT,
+    dom_snapshot_metadata TEXT,
     screenshot_path TEXT
 );
 

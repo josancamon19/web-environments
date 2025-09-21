@@ -2,22 +2,43 @@ from src.source_data.database import Database
 
 
 class Step:
-    def __init__(self, id: int, task_id: int, timestamp: str, event_type: str, event_data: str, dom_snapshot: str, screenshot_path: str):
+    def __init__(
+        self,
+        id: int,
+        task_id: int,
+        timestamp: str,
+        event_type: str,
+        event_data: str,
+        dom_snapshot: str,
+        dom_snapshot_metadata: str,
+        screenshot_path: str,
+    ):
         self.id = id
         self.task_id = task_id
         self.timestamp = timestamp
         self.event_type = event_type
         self.event_data = event_data
         self.dom_snapshot = dom_snapshot
+        self.dom_snapshot_metadata = dom_snapshot_metadata
         self.screenshot_path = screenshot_path
 
 class CreateStepDto:
-    def __init__(self, task_id: int, timestamp: str, event_type: str, event_data: str, dom_snapshot: str, screenshot_path: str):
+    def __init__(
+        self,
+        task_id: int,
+        timestamp: str,
+        event_type: str,
+        event_data: str,
+        dom_snapshot: str,
+        dom_snapshot_metadata: str,
+        screenshot_path: str,
+    ):
         self.task_id = task_id
         self.timestamp = timestamp
         self.event_type = event_type
         self.event_data = event_data
         self.dom_snapshot = dom_snapshot
+        self.dom_snapshot_metadata = dom_snapshot_metadata
         self.screenshot_path = screenshot_path
 
 class StepManager:
@@ -64,10 +85,12 @@ class StepRepository:
 
     def save(self, step: CreateStepDto):
         step_id = self.db.insert_step(
-            step.task_id,         
+            step.task_id,
             step.timestamp,
             step.event_type,
             step.event_data,
             step.dom_snapshot,
-            step.screenshot_path)
+            step.dom_snapshot_metadata,
+            step.screenshot_path,
+        )
         return step_id

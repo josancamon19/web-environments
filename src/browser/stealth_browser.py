@@ -26,6 +26,8 @@ class StealthBrowser:
         self.response_event = Response_Event()
         self.step_record = StepRecord()
         self.page_event = NewPageEvent()
+        self._binding_registered = False
+        self._page_script_registered = False
 
     async def launch(self):
         """Launch stealth browser"""
@@ -60,11 +62,13 @@ class StealthBrowser:
                         },
                     },
                     "prefix_action": "state:browser",
+                    "source_page": page,
                 },
                 omit_screenshot=True,
             )
             await self.page_event.attach_page(page)
-        
+            await self._initialize_page_event_script(page)
+
         self.context.on("page", on_page_created)
 
         actual_page = ActualPage()
@@ -86,6 +90,7 @@ class StealthBrowser:
 
         await self.apply_stealth_techniques()
         await self.setup_dom_listeners()
+        await self._initialize_page_event_script(self.page)
 
         return self.page
 
@@ -96,11 +101,30 @@ class StealthBrowser:
     async def setup_dom_listeners(self):
         """Setup DOM event listeners"""
         print("🔧 Setting up DOM listeners...")
-        await self.page.expose_function("onPageEvent", self.page_event_handler)
-        await self.page.add_init_script(PAGE_EVENT_LISTENER_SCRIPT)
+
+        if not self._binding_registered:
+            async def _on_page_event(source, event_info):
+                page = getattr(source, "page", None)
+                await self.page_event_handler(event_info, page)
+
+            await self.context.expose_binding("onPageEvent", _on_page_event)
+            self._binding_registered = True
+
+        if not self._page_script_registered:
+            await self.context.add_init_script(PAGE_EVENT_LISTENER_SCRIPT)
+            self._page_script_registered = True
+
         print("✅ DOM listeners setup complete")
 
-    async def page_event_handler(self, event_info):
+    async def _initialize_page_event_script(self, page):
+        if not page:
+            return
+        try:
+            await page.evaluate(PAGE_EVENT_LISTENER_SCRIPT)
+        except Exception as exc:
+            logger.error("[PAGE_EVENT] Failed to initialize listener script: %s", exc)
+
+    async def page_event_handler(self, event_info, page=None):
         """Handle page events from browser"""
         try:
             event_type = event_info.get("event_type", "unknown")
@@ -109,7 +133,11 @@ class StealthBrowser:
 
             step_record = StepRecord()
             await step_record.record_step(
-                {"event_info": event_info, "prefix_action": f"{event_context}"}
+                {
+                    "event_info": event_info,
+                    "prefix_action": f"{event_context}",
+                    "source_page": page,
+                }
             )
         except Exception as e:
             logger.error(f"[PAGE_EVENT] Error handling event: {e}", exc_info=True)

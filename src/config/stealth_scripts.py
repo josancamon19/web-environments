@@ -45,24 +45,23 @@ STEALTH_SCRIPT = """
 """
 
 PAGE_EVENT_LISTENER_SCRIPT = """
-console.log('🎯 Page event listener script loaded');
+if (!window.__RECORDER_EVENT_LISTENER_LOADED__) {
+  window.__RECORDER_EVENT_LISTENER_LOADED__ = true;
 
- function sendEventPage(type, context, payload) {
+  console.log('🎯 Page event listener script loaded');
+
+  function sendEventPage(type, context, payload) {
     try {
-      // Only capture DOM snapshot for important events to reduce overhead
-      const importantEvents = ['click', 'load', 'navigate_start', 'navigated', 'domcontentloaded', 'contextmenu', 'loaded', 'back', 'hover'];
-      const shouldCaptureDom = importantEvents.includes(type);
-      
       window.onPageEvent({
         event_type: type,
         event_context: context,
         event_data: payload,
-        dom_snapshot: shouldCaptureDom ? document.documentElement.outerHTML : '',
-        metadata: JSON.stringify({
+        dom_snapshot: '',
+        metadata: {
             timestamp: Date.now(),
             page_url: window.location.href,
             page_title: document.title,
-        })
+        }
       });
     } catch (e) {
       console.error('[RECORDER] Failed to send event:', e);
@@ -70,7 +69,7 @@ console.log('🎯 Page event listener script loaded');
   }
 
 
-function setupPageEventListener() {
+  function setupPageEventListener() {
 
     let scrollArmed = true;
     window.addEventListener('scroll', (event) => {
@@ -240,6 +239,19 @@ function setupPageEventListener() {
     }, { capture: true });
 
 
+    document.addEventListener('submit', (e) => {
+        const form = e.target;
+        const info = {
+            tag: form.tagName,
+            id: form.id,
+            className: form.className,
+            action: form.action,
+            method: form.method
+        };
+        sendEventPage('submit', 'action:user', info);
+    }, { capture: true });
+
+
     document.addEventListener('DOMContentLoaded', (event) => {
         const info = {
             message: 'DOM fully loaded and parsed',
@@ -300,12 +312,13 @@ function setupPageEventListener() {
             sendEventPage('back', 'action:user', info);
         }
     }
-}
+  }
 
-// Setup immediately if DOM is already loaded
-if (document.readyState === 'loading') {
+  // Setup immediately if DOM is already loaded
+  if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', setupPageEventListener);
-} else {
+  } else {
     setupPageEventListener();
+  }
 }
 """

@@ -31,6 +31,7 @@ class NewPageEvent:
                             "event_data": {"url": p.url},
                         },
                         "prefix_action": f"state:page",
+                        "source_page": p,
                     }
                 )
 
@@ -47,6 +48,7 @@ class NewPageEvent:
                             "event_data": {"url": p.url},
                         },
                         "prefix_action": f"state:page",
+                        "source_page": p,
                     }
                 )
 
@@ -62,10 +64,11 @@ class NewPageEvent:
                                 "event_data": {"url": frame.url},
                             },
                             "prefix_action": f"state:browser",
+                            "source_page": p,
                         },
                         omit_screenshot=True,
                     )
-            
+
             async def on_close(p=page):
                 # logger.info(f"[PAGE_EVENT] Tab/page closed: {p.url}")
                 await self.step_record.record_step(
@@ -76,6 +79,7 @@ class NewPageEvent:
                             "event_data": {"url": p.url, "final_url": p.url},
                         },
                         "prefix_action": f"state:browser",
+                        "source_page": p,
                     },
                     omit_screenshot=True,
                 )
