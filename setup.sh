@@ -11,6 +11,8 @@ RESET="\033[0m"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_NAME="$(basename "$SCRIPT_DIR")"
 VENV_DIR="$SCRIPT_DIR/venv"
+MIN_PYTHON_VERSION="3.11"
+PYTHON_BIN=""
 
 info() {
   printf "%b[INFO]%b %s\n" "$GREEN" "$RESET" "$1"
@@ -31,20 +33,76 @@ ensure_macos() {
   fi
 }
 
-ensure_python() {
-  if command -v python3 >/dev/null 2>&1; then
-    PYTHON_BIN=$(command -v python3)
-    info "Found Python at $PYTHON_BIN"
+version_ge() {
+  # Returns true if version $1 >= version $2
+  local IFS=.
+  local i
+  local -a ver1=($1) ver2=($2)
+  local len=$(( ${#ver1[@]} > ${#ver2[@]} ? ${#ver1[@]} : ${#ver2[@]} ))
+
+  for ((i = 0; i < len; i++)); do
+    local v1=${ver1[i]:-0}
+    local v2=${ver2[i]:-0}
+    if ((10#$v1 > 10#$v2)); then
+      return 0
+    elif ((10#$v1 < 10#$v2)); then
+      return 1
+    fi
+  done
+
+  return 0
+}
+
+install_python311() {
+  if command -v brew >/dev/null 2>&1; then
+    info "Attempting to install Python ${MIN_PYTHON_VERSION} via Homebrew..."
+    brew install python@3.11
+    local brew_prefix
+    brew_prefix=$(brew --prefix python@3.11 2>/dev/null || true)
+    if [[ -n "$brew_prefix" && -x "$brew_prefix/bin/python3.11" ]]; then
+      PYTHON_BIN="$brew_prefix/bin/python3.11"
+      info "Installed Python ${MIN_PYTHON_VERSION} at $PYTHON_BIN"
+      return
+    fi
+    error "Python ${MIN_PYTHON_VERSION} installation succeeded but expected binary not found."
   else
-    error "Python 3 is not installed."
-    cat <<'EOF'
-Please install Python 3 first:
-  1. Open https://www.python.org/downloads/macos/
-  2. Download the latest macOS installer (universal2).
-  3. Run the installer and re-run this script.
-EOF
-    exit 1
+    error "Homebrew is required to install Python ${MIN_PYTHON_VERSION} automatically."
   fi
+
+  cat <<'EOF'
+Please install Python 3.11 manually:
+  1. Install Homebrew from https://brew.sh/ (if not available).
+  2. Run 'brew install python@3.11'.
+  3. Re-run this script.
+EOF
+  exit 1
+}
+
+ensure_python() {
+  local detected_version=""
+
+  if command -v python3 >/dev/null 2>&1; then
+    local candidate
+    candidate=$(command -v python3)
+    detected_version=$("$candidate" -c 'import sys; print(".".join(map(str, sys.version_info[:3])))' 2>/dev/null || true)
+    if [[ -n "$detected_version" ]] && version_ge "$detected_version" "$MIN_PYTHON_VERSION"; then
+      PYTHON_BIN="$candidate"
+      info "Found Python $detected_version at $PYTHON_BIN"
+      return
+    fi
+    warn "Detected python3 version $detected_version, but >= ${MIN_PYTHON_VERSION} is required."
+  else
+    warn "python3 command not found in PATH."
+  fi
+
+  if command -v python3.11 >/dev/null 2>&1; then
+    PYTHON_BIN=$(command -v python3.11)
+    detected_version=$("$PYTHON_BIN" -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')
+    info "Using Python $detected_version at $PYTHON_BIN"
+    return
+  fi
+
+  install_python311
 }
 
 create_venv() {
@@ -52,7 +110,7 @@ create_venv() {
     warn "Virtual environment already exists at $VENV_DIR"
   else
     info "Creating virtual environment..."
-    python3 -m venv "$VENV_DIR"
+    "$PYTHON_BIN" -m venv "$VENV_DIR"
   fi
   # shellcheck source=/dev/null
   source "$VENV_DIR/bin/activate"
