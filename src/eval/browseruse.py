@@ -193,8 +193,47 @@ async def run_task_with_agent(
 ) -> Dict[str, Any]:
     """Run a single task with the Browser-Use agent and capture all data"""
     start_time = datetime.now()
-    llm = ChatOpenAI(model=model, temperature=0.0)
-    agent = Agent(task=task["task_description"], llm=llm, verbose=True, max_steps=20)
+
+    # Directory for saving accessibility trees
+    doms_output_dir = Path("src/eval/results/doms")
+    task_dom_dir = doms_output_dir / f"task_{task['task_id']}"
+    task_dom_dir.mkdir(parents=True, exist_ok=True)
+
+    # Storage for accessibility tree file paths mapped by step
+    step_dom_mapping = {}
+
+    def capture_accessibility_tree(browser_state, agent_output, step_number):
+        """Callback to capture accessibility tree at each step"""
+        try:
+            # The callback receives BrowserStateSummary which should contain DOM state
+            if browser_state and hasattr(browser_state, 'dom_state') and browser_state.dom_state:
+                # Get the accessibility tree content
+                accessibility_content = browser_state.dom_state.llm_representation()
+
+                # Save to file
+                dom_file_path = task_dom_dir / f"step_{step_number}.txt"
+                with open(dom_file_path, "w", encoding="utf-8") as f:
+                    f.write(accessibility_content)
+
+                # Store relative path for reference
+                relative_path = f"doms/task_{task['task_id']}/step_{step_number}.txt"
+                step_dom_mapping[step_number] = relative_path
+
+        except Exception as e:
+            logger.warning(f"Failed to capture accessibility tree at step {step_number}: {e}")
+
+    # Use a supported model for browser-use (o3 models are not supported by OpenAI API)
+    actual_model = "gpt-4o-mini" if "o3" in model else model
+    
+    llm = ChatOpenAI(model=actual_model, temperature=0.0)
+    agent = Agent(
+        task=task["task_description"],
+        llm=llm,
+        verbose=True,
+        max_steps=20,
+        register_new_step_callback=capture_accessibility_tree
+    )
+
     history = await agent.run()
     duration = (datetime.now() - start_time).total_seconds()
 
@@ -205,6 +244,19 @@ async def run_task_with_agent(
     print("task", task)
     answer = extract_final_answer(history_dump, task_type)
 
+    # Get token usage
+    usage_summary = {}
+    if hasattr(agent, 'token_cost_service'):
+        try:
+            # Get usage summary which is async
+            usage_summary = await agent.token_cost_service.get_usage_summary()
+            usage_summary = usage_summary.model_dump()
+            logger.info(f"Token usage summary: {usage_summary}")
+            
+        except Exception as e:
+            logger.warning(f"Failed to get token usage: {e}")
+            usage_summary = {}
+
     return {
         "task_id": task["task_id"],
         "task_description": task["task_description"],
@@ -214,6 +266,8 @@ async def run_task_with_agent(
         "action_count": len(history.model_actions()),
         "tool_calls": tool_calls,
         "answer": answer,
+        "usage_summary": usage_summary,
+        "step_dom_mapping": step_dom_mapping,
         "dump": history_dump,
     }
 
@@ -288,6 +342,8 @@ async def process_all_tasks(model: str):
                 "error": str(e),
                 "tool_calls": [],
                 "answer": None,
+                "usage_summary": {},
+                "step_dom_mapping": {},
             }
             with open(output_file, "a") as f:
                 f.write(json.dumps(error_result, default=str) + "\n")

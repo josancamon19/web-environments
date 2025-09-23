@@ -41,6 +41,45 @@ confidence: The extracted confidence score between 0% and 100% from [response]. 
 """
 
 
+# You will receive both the text content and a screenshot of the
+# webpage for examination. Your task is to provide a binary judgment (i.e., supported or not supported)
+# along with clear and detailed reasoning for your decision.
+
+m2web2_prompt = """
+You are responsible for verifying whether a given answer or claim is fully supported by the actual content of a specified webpage
+(an accesibility tree representing it's contents). For context, we are examining the correctness of an answer to a web information-gathering task.
+Typically, the claim or "fact" is extracted directly from the answer, and the webpage provided is the URL source referenced in the answer 
+as well as the accesibility tree representing it's contents. This verification step helps us determine whether the claim or "fact" 
+in the answer is accurate or hallucinated, a common issue in LLM-based systems.
+
+GENERAL RULES:
+1. The provided webpage content may be lengthy. Carefully examine the relevant sections of both the webpage texts. 
+Determine clearly whether the claim or "fact" exactly matches or is explicitly supported by the webpage content.
+2. You will also receive the original task description, original trajectory, and the complete answer as context. 
+Understand them clearly, as they provide essential background for evaluating the claim. 
+You may apply commonsense reasoning (e.g., fuzzy matching for names differing only in letter casing or minor spelling variations) to assist your judgment, 
+but your final decision must primarily rely on explicit evidence from the webpage content provided.
+3. If the provided webpage (the URL source mentioned in the answer) is entirely irrelevant, invalid, or
+inaccessible, you must conclude that the claim or "fact" is not supported.
+4. Occasionally, additional instructions might be provided to aid your judgment. Carefully follow those
+instructions when available.
+
+Original Task Description:
+{task_description}
+Complete Answer to the Task:
+{answer}
+Claim or Fact to Verify:
+{claim}
+Additional Instructions (if any):
+{additional_instruction}
+Webpage URL:
+{url}
+Extracted Webpage Text (truncated if too long):
+{web_text}
+Rendered Screenshots (to provide non-textual context):
+{screenshots}
+"""
+
 def verify_task_completion(
     task: str, response: str, correct_response: str, model: str = "gpt-4.1-2025-04-14"
 ) -> Dict[str, Any]:
