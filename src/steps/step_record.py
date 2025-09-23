@@ -184,6 +184,7 @@ class StepRecord:
 
             # For now, use the regular screenshot method for stability
             # We can optimize later once we identify the crash cause
+            page.waitForTimeout(500)
             await page.screenshot(path=screenshot_path, full_page=False)
             logger.debug(f"[SCREENSHOT] Screenshot captured successfully")
 

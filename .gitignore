@@ -5,3 +5,6 @@ recorder_debug.log
 data/dev/*
 data/prod/user-data/
 src/eval/results
+build/
+dist/
+TaskCollector.spec
