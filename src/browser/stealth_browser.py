@@ -1,6 +1,7 @@
 import logging
 from playwright.async_api import async_playwright
 from src.config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
+from src.config.firefox_config import FIREFOX_ARGS, FIREFOX_CONTEXT_CONFIG
 from src.config.stealth_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
 from src.steps.step_record import StepRecord
 from src.page.actual_page import ActualPage
@@ -14,7 +15,6 @@ import os
 from src.config.storage_config import DATA_DIR
 
 logger = logging.getLogger(__name__)
-
 
 class StealthBrowser:
     def __init__(self):
@@ -42,14 +42,19 @@ class StealthBrowser:
 
         self.context = await self.open_browser_context(VIDEO_TASK_PATH)
 
+
         self.context.on("request", self.request_event.listen_for_request)
         self.context.on("response", self.response_event.listen_for_response)
 
         self.page = await self.context.new_page()
 
+        await self.page.goto('https://www.google.com')
+
+  
         await self.page_event.attach_page(self.page)
 
-        # Track new tab/page creation
+
+        # Track new tab/page creations
         async def on_page_created(page):
             await self.step_record.record_step(
                 {
@@ -161,13 +166,31 @@ class StealthBrowser:
         user_data_dir = os.environ.get("RECORDER_USER_DATA_DIR") or os.path.join(
             DATA_DIR, "user-data"
         )
-        # args = ["--disable-blink-features=AutomationControlled"]
+        
+        # Try Firefox first if specified
+        if preferred_channel and preferred_channel.lower() == "firefox":
+            try:
+                logger.info("[LAUNCH_BROWSER] Attempting to launch Firefox...")
+                self.context = await self.playwright.firefox.launch_persistent_context(
+                    headless=False,
+                    user_data_dir=user_data_dir,
+                    args=FIREFOX_ARGS,
+                    record_video_dir=video_task_path,
+                    record_video_size={"width": 1280, "height": 720},
+                )
+                logger.info("[LAUNCH_BROWSER] Firefox launched successfully")
+                return self.context
+            except Exception as e:
+                logger.error(f"[LAUNCH_BROWSER] Error launching Firefox: {e}")
+                logger.info("[LAUNCH_BROWSER] Falling back to Chrome...")
+        
+        # Chrome/Chromium launch logic (existing code)
         ignore_default_args = [
             "--enable-automation",
             "--use-mock-keychain",
             "--password-store=basic",
         ]
-        if preferred_channel:
+        if preferred_channel and preferred_channel.lower() != "firefox":
             try:
                 self.context = await self.playwright.chromium.launch_persistent_context(
                     user_data_dir=user_data_dir,
@@ -206,6 +229,8 @@ class StealthBrowser:
             self.context = await self.browser.new_context(
                 **CONTEXT_CONFIG,
                 record_video_dir=video_task_path,
+                viewport={"width": 1280, "height": 720},
+                device_scale_factor=1,
                 record_video_size={"width": 1280, "height": 720},
             )
             return self.context
