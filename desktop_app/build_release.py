@@ -64,6 +64,9 @@ def build_with_pyinstaller(
 ) -> Path:
     """Invoke PyInstaller and return the path to the produced bundle."""
 
+    icon_candidate = repo_root / "desktop_app" / "resources" / "TaskCollector.icns"
+    icon_arg = str(icon_candidate) if icon_candidate.exists() else "NONE"
+
     run(
         [
             sys.executable,
@@ -83,6 +86,8 @@ def build_with_pyinstaller(
             str(work_dir),
             "--specpath",
             str(spec_dir),
+            "--icon",
+            icon_arg,
         ]
     )
 
