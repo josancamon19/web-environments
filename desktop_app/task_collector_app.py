@@ -115,10 +115,13 @@ class TextAreaDialog(tk.Toplevel):
 
 if getattr(sys, "frozen", False):  # Frozen executable (PyInstaller)
     BASE_PATH = Path(getattr(sys, "_MEIPASS"))  # type: ignore[attr-defined]
-    PROJECT_ROOT = Path.cwd()
+    PROJECT_ROOT = Path(sys.executable).resolve().parent
 else:
     BASE_PATH = Path(__file__).resolve().parents[1]
     PROJECT_ROOT = BASE_PATH
+
+PLAYWRIGHT_BROWSERS_DIR = PROJECT_ROOT / "playwright-browsers"
+os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(PLAYWRIGHT_BROWSERS_DIR))
 
 if str(BASE_PATH) not in sys.path:
     sys.path.insert(0, str(BASE_PATH))
