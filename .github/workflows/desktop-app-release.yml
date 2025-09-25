@@ -70,7 +70,9 @@ jobs:
 
   release:
     name: Publish GitHub release
-    needs: build
+    needs:
+      - prepare
+      - build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -80,7 +82,7 @@ jobs:
       - name: Publish release
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ needs.prepare.outputs.tag }}
+          tag: 0.0.1
           name: TaskCollector Desktop ${{ needs.prepare.outputs.version }}
           body: |
             Automated desktop builds for commit `${{ github.sha }}`.
