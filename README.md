@@ -1,17 +1,14 @@
-Minimal Playwright Task Recorder (MVP)
+Playwright Task Recorder
 
 Requirements
 - Python 3.11+ recommended
-- macOS arm64 supported (adjust as needed)
 
 Setup
 1) Create venv and install deps:
 ```
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install playwright
-python -m playwright install chromium
+pip install -r requirements.txt
 ```
 
 Run
@@ -23,13 +20,14 @@ RECORDER_BROWSER_CHANNEL=chrome python index.py
 Usage
 - Enter a task description when prompted (e.g., "Buy me a coffee in DoorDash").
 - A Chromium window opens. Interact freely.
-- For now ctrl + z to finish
+- For now ctrl + c to finish
 
 What gets recorded
 - Actions: click, contextmenu, keydown, input, scroll
 - State changes: DOMContentLoaded, load, frame navigations
 - Network: XHR/fetch requests and responses with headers, body (as bytes), and cookies
 - DOM snapshot and a full-page screenshot at each step
+- [ ] will store HAR files of the web environments + spin up a fake server out of requests processed.
 
 Storage
 - SQLite DB at `data/tasks.db`
