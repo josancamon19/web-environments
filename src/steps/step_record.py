@@ -83,7 +83,10 @@ class StepRecord:
 
             if should_snapshot:
                 page_candidate = source_page or self._safe_get_page()
-                dom_snapshot, snapshot_metadata = await self._build_accessibility_snapshot(
+                (
+                    dom_snapshot,
+                    snapshot_metadata,
+                ) = await self._build_accessibility_snapshot(
                     page_candidate,
                     context,
                     event_type,
@@ -269,7 +272,9 @@ class StepRecord:
         ref_counter = 1
         truncated = False
 
-        def process_node(node: Dict[str, Any], indent: int = 1, path: Optional[list] = None):
+        def process_node(
+            node: Dict[str, Any], indent: int = 1, path: Optional[list] = None
+        ):
             nonlocal ref_counter, truncated
 
             if not node:
@@ -321,9 +326,7 @@ class StepRecord:
                 if key.startswith("aria-") and value:
                     clean_value = self._clean_text(value)
                     attributes.append((key, clean_value))
-                    node_description.append(
-                        f"[{key}={self._quote_text(clean_value)}]"
-                    )
+                    node_description.append(f"[{key}={self._quote_text(clean_value)}]")
 
             tag = node.get("tag")
             if tag:
@@ -333,9 +336,7 @@ class StepRecord:
             class_name = self._clean_text(node.get("className"))
             if class_name:
                 attributes.append(("className", class_name))
-                node_description.append(
-                    f"[class={self._quote_text(class_name)}]"
-                )
+                node_description.append(f"[class={self._quote_text(class_name)}]")
 
             ref_id = f"e{ref_counter}"
             ref_counter += 1
@@ -403,9 +404,7 @@ class StepRecord:
         if focused_element:
             yaml_lines.append("focused_element:")
             for key, value in focused_element.items():
-                yaml_lines.append(
-                    f"  {key}: {self._format_yaml_scalar(value)}"
-                )
+                yaml_lines.append(f"  {key}: {self._format_yaml_scalar(value)}")
         if text_word_count is not None:
             yaml_lines.append(
                 f"text_word_count: {self._format_yaml_scalar(text_word_count)}"
@@ -445,5 +444,5 @@ class StepRecord:
         return normalized
 
     def _quote_text(self, value: str) -> str:
-        escaped = value.replace("\"", "\\\"")
+        escaped = value.replace('"', '\\"')
         return f'"{escaped}"'
