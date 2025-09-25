@@ -1,0 +1,90 @@
+name: Desktop App Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - id: meta
+        name: Compute version metadata
+        shell: bash
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          UTC_DATE="$(date -u +%Y.%m.%d)"
+          VERSION="${UTC_DATE}-${SHORT_SHA}"
+          TAG="desktop-${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            target: macos
+          - runner: windows-latest
+            target: windows
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller==6.11.0
+
+      - name: Build desktop bundle
+        shell: bash
+        env:
+          APP_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          python desktop_app/build_release.py --target ${{ matrix.target }}
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TaskCollector-${{ matrix.target }}-${{ needs.prepare.outputs.version }}
+          path: desktop_app/releases/${{ needs.prepare.outputs.version }}/TaskCollector-${{ matrix.target }}-${{ needs.prepare.outputs.version }}.zip
+
+  release:
+    name: Publish GitHub release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Publish release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ needs.prepare.outputs.tag }}
+          name: TaskCollector Desktop ${{ needs.prepare.outputs.version }}
+          body: |
+            Automated desktop builds for commit `${{ github.sha }}`.
+          artifacts: release-assets/**/TaskCollector-*.zip
+          allowUpdates: true
+          replacesArtifacts: true
+          token: ${{ secrets.GITHUB_TOKEN }}
