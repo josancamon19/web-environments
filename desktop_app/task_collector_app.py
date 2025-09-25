@@ -4,6 +4,8 @@ import logging
 import multiprocessing
 import os
 import queue
+import shutil
+import subprocess
 import sys
 import threading
 from pathlib import Path
@@ -20,6 +22,8 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog
 from tkinter.scrolledtext import ScrolledText
 from typing import Optional
+
+from src.config.storage_config import DATA_DIR
 
 
 class TextAreaDialog(tk.Toplevel):
@@ -238,6 +242,13 @@ class TaskCollectorApp:
         button_frame = tk.Frame(container)
         button_frame.pack(fill=tk.X, pady=(12, 6))
 
+        self.open_data_button = tk.Button(
+            button_frame,
+            text="Open Data Folder",
+            command=self.open_data_folder,
+        )
+        self.open_data_button.pack(side=tk.RIGHT)
+
         self.launch_button = tk.Button(button_frame, text="Launch Task", command=self.launch_task)
         self.launch_button.pack(side=tk.LEFT)
 
@@ -273,6 +284,44 @@ class TaskCollectorApp:
     def _set_status(self, text: str, *, is_error: bool = False) -> None:
         color = "red" if is_error else "green"
         self.status_label.config(text=text, fg=color)
+
+    def open_data_folder(self) -> None:
+        """Reveal the directory where recordings and logs are stored."""
+        target_dir = Path(DATA_DIR)
+
+        try:
+            target_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            error_msg = f"Failed to prepare data directory: {exc}"
+            self._log(f"❌ {error_msg}")
+            messagebox.showerror("Open Data Folder", error_msg)
+            return
+
+        self._log(f"Opening data folder at {target_dir}")
+
+        try:
+            if sys.platform == "darwin":
+                subprocess.Popen(
+                    ["open", str(target_dir)],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            elif sys.platform.startswith("win"):
+                os.startfile(str(target_dir))  # type: ignore[attr-defined]
+            else:
+                opener = shutil.which("xdg-open")
+                if opener:
+                    subprocess.Popen(
+                        [opener, str(target_dir)],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                else:
+                    raise RuntimeError("xdg-open not available on this system")
+        except Exception as exc:  # pylint: disable=broad-except
+            error_msg = f"Could not open folder: {exc}"
+            self._log(f"❌ {error_msg}")
+            messagebox.showerror("Open Data Folder", error_msg)
 
     def launch_task(self) -> None:
         if self.task_running:
