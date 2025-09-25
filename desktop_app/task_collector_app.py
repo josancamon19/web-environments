@@ -22,6 +22,97 @@ from tkinter.scrolledtext import ScrolledText
 from typing import Optional
 
 
+class TextAreaDialog(tk.Toplevel):
+    """Custom dialog with a text area for multi-line input."""
+    
+    def __init__(self, parent, title="Input", prompt="Enter text:", initial_text=""):
+        super().__init__(parent)
+        self.parent = parent
+        self.result = None
+        
+        self.title(title)
+        self.transient(parent)
+        self.grab_set()
+        
+        # Make dialog modal and centered
+        self.protocol("WM_DELETE_WINDOW", self.cancel)
+        
+        # Create and pack widgets
+        self.create_widgets(prompt, initial_text)
+        
+        # Center the dialog
+        self.center_window()
+        
+        # Focus on text area
+        self.text_area.focus_set()
+        
+    def create_widgets(self, prompt, initial_text):
+        # Main frame with padding
+        main_frame = tk.Frame(self, padx=20, pady=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Prompt label
+        label = tk.Label(main_frame, text=prompt, wraplength=400)
+        label.pack(anchor=tk.W, pady=(0, 10))
+        
+        # Text area with scrollbar
+        text_frame = tk.Frame(main_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.text_area = tk.Text(text_frame, width=60, height=15, wrap=tk.WORD)
+        scrollbar = tk.Scrollbar(text_frame, command=self.text_area.yview)
+        self.text_area.config(yscrollcommand=scrollbar.set)
+        
+        self.text_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        if initial_text:
+            self.text_area.insert("1.0", initial_text)
+        
+        # Button frame
+        button_frame = tk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=(10, 0))
+        
+        # OK and Cancel buttons
+        ok_button = tk.Button(button_frame, text="OK", command=self.ok, width=10)
+        ok_button.pack(side=tk.RIGHT, padx=(5, 0))
+        
+        cancel_button = tk.Button(button_frame, text="Cancel", command=self.cancel, width=10)
+        cancel_button.pack(side=tk.RIGHT)
+        
+        # Bind Enter key to OK (Ctrl+Enter for multiline)
+        self.bind("<Control-Return>", lambda e: self.ok())
+        
+    def center_window(self):
+        self.update_idletasks()
+        
+        # Get screen dimensions
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        
+        # Get window dimensions
+        window_width = self.winfo_width()
+        window_height = self.winfo_height()
+        
+        # Calculate position
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        
+        self.geometry(f"+{x}+{y}")
+        
+    def ok(self):
+        self.result = self.text_area.get("1.0", tk.END).strip()
+        self.destroy()
+        
+    def cancel(self):
+        self.result = None
+        self.destroy()
+        
+    def show(self):
+        self.wait_window()
+        return self.result
+
+
 if getattr(sys, "frozen", False):  # Frozen executable (PyInstaller)
     BASE_PATH = Path(getattr(sys, "_MEIPASS"))  # type: ignore[attr-defined]
     PROJECT_ROOT = Path.cwd()
@@ -230,11 +321,12 @@ class TaskCollectorApp:
 
         answer: Optional[str] = ""
         if self._active_task_type == "information_retrieval":
-            answer = simpledialog.askstring(
-                "Task Answer",
-                "Please enter the information you gathered (leave empty if none):",
-                parent=self.root,
+            dialog = TextAreaDialog(
+                self.root,
+                title="Task Answer",
+                prompt="Please enter the information you gathered (leave empty if none):"
             )
+            answer = dialog.show()
             if answer is None:
                 # User cancelled; don't finalize the task yet
                 return
