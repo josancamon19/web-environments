@@ -8,3 +8,6 @@ src/eval/results
 build/
 dist/
 TaskCollector.spec
+desktop_app/playwright-browsers
+playwright-browsers
+.DS_Store

@@ -21,7 +21,9 @@ if sys.platform == "darwin":
 import tkinter as tk
 from tkinter import messagebox, simpledialog
 from tkinter.scrolledtext import ScrolledText
+from tkinter import ttk
 from typing import Optional
+import sqlite3
 
 from src.config.storage_config import DATA_DIR
 
@@ -115,6 +117,180 @@ class TextAreaDialog(tk.Toplevel):
     def show(self):
         self.wait_window()
         return self.result
+
+
+class TasksViewDialog(tk.Toplevel):
+    """Dialog to display tasks from the database in a table format."""
+    
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
+        
+        self.title("View Collected Tasks")
+        self.transient(parent)
+        
+        # Make dialog large enough for table
+        self.geometry("1200x600")
+        
+        # Create and pack widgets
+        self.create_widgets()
+        
+        # Center the dialog
+        self.center_window()
+        
+        # Load tasks
+        self.load_tasks()
+        
+    def create_widgets(self):
+        # Main frame with padding
+        main_frame = tk.Frame(self, padx=10, pady=10)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title
+        title_label = tk.Label(main_frame, text="Collected Tasks", font=("Helvetica", 14, "bold"))
+        title_label.pack(anchor=tk.W, pady=(0, 10))
+        
+        # Create frame for treeview and scrollbars
+        tree_frame = tk.Frame(main_frame)
+        tree_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Create scrollbars
+        vsb = tk.Scrollbar(tree_frame, orient="vertical")
+        hsb = tk.Scrollbar(tree_frame, orient="horizontal")
+        
+        # Create treeview
+        columns = ("ID", "Description", "Type", "Answer", "Created At", "Duration", "Video Path")
+        self.tree = ttk.Treeview(tree_frame, columns=columns, show="headings", 
+                                yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        
+        # Configure scrollbars
+        vsb.config(command=self.tree.yview)
+        hsb.config(command=self.tree.xview)
+        
+        # Define column headings and widths
+        self.tree.heading("ID", text="ID")
+        self.tree.heading("Description", text="Description")
+        self.tree.heading("Type", text="Type")
+        self.tree.heading("Answer", text="Answer")
+        self.tree.heading("Created At", text="Created At")
+        self.tree.heading("Duration", text="Duration (s)")
+        self.tree.heading("Video Path", text="Video Path")
+        
+        # Set column widths
+        self.tree.column("ID", width=50)
+        self.tree.column("Description", width=300)
+        self.tree.column("Type", width=120)
+        self.tree.column("Answer", width=200)
+        self.tree.column("Created At", width=150)
+        self.tree.column("Duration", width=80)
+        self.tree.column("Video Path", width=250)
+        
+        # Grid layout
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+        hsb.grid(row=1, column=0, sticky="ew")
+        
+        # Configure grid weights
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
+        
+        # Add info label
+        self.info_label = tk.Label(main_frame, text="", fg="gray")
+        self.info_label.pack(anchor=tk.W, pady=(5, 0))
+        
+        # Close button
+        button_frame = tk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=(10, 0))
+        
+        close_button = tk.Button(button_frame, text="Close", command=self.destroy, width=10)
+        close_button.pack(side=tk.RIGHT)
+        
+        # Refresh button
+        refresh_button = tk.Button(button_frame, text="Refresh", command=self.load_tasks, width=10)
+        refresh_button.pack(side=tk.RIGHT, padx=(0, 5))
+        
+    def center_window(self):
+        self.update_idletasks()
+        
+        # Get screen dimensions
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        
+        # Get window dimensions
+        window_width = self.winfo_width()
+        window_height = self.winfo_height()
+        
+        # Calculate position
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        
+        self.geometry(f"+{x}+{y}")
+        
+    def load_tasks(self):
+        """Load tasks from the database and populate the treeview."""
+        # Clear existing items
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+            
+        db_path = Path(DATA_DIR) / "tasks.db"
+        
+        if not db_path.exists():
+            self.info_label.config(text="No tasks database found yet. Complete some tasks first.")
+            return
+            
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            
+            # Query to get tasks with the requested fields
+            cursor.execute("""
+                SELECT id, description, task_type, answer, created_at, duration_seconds, video_path
+                FROM tasks
+                ORDER BY created_at DESC
+            """)
+            
+            tasks = cursor.fetchall()
+            conn.close()
+            
+            if not tasks:
+                self.info_label.config(text="No tasks found in the database.")
+                return
+                
+            # Populate treeview
+            for task in tasks:
+                task_id, description, task_type, answer, created_at, duration, video_path = task
+                
+                # Format values for display
+                description = (description or "")[:100] + "..." if description and len(description) > 100 else description or ""
+                answer = (answer or "")[:50] + "..." if answer and len(answer) > 50 else answer or ""
+                
+                # Format duration to 2 decimal places if it exists
+                if duration is not None:
+                    duration = f"{duration:.2f}"
+                else:
+                    duration = ""
+                    
+                # Show just the filename for video path
+                if video_path:
+                    video_path = Path(video_path).name
+                else:
+                    video_path = ""
+                
+                # Insert into treeview
+                self.tree.insert("", tk.END, values=(
+                    task_id or "",
+                    description,
+                    task_type or "",
+                    answer,
+                    created_at or "",
+                    duration,
+                    video_path
+                ))
+                
+            self.info_label.config(text=f"Showing {len(tasks)} task(s)")
+            
+        except Exception as e:
+            self.info_label.config(text=f"Error loading tasks: {str(e)}", fg="red")
 
 
 if getattr(sys, "frozen", False):  # Frozen executable (PyInstaller)
@@ -249,6 +425,13 @@ class TaskCollectorApp:
         )
         self.open_data_button.pack(side=tk.RIGHT)
 
+        self.view_tasks_button = tk.Button(
+            button_frame,
+            text="View Tasks",
+            command=self.view_tasks,
+        )
+        self.view_tasks_button.pack(side=tk.RIGHT, padx=(0, 8))
+
         self.launch_button = tk.Button(button_frame, text="Launch Task", command=self.launch_task)
         self.launch_button.pack(side=tk.LEFT)
 
@@ -322,6 +505,17 @@ class TaskCollectorApp:
             error_msg = f"Could not open folder: {exc}"
             self._log(f"❌ {error_msg}")
             messagebox.showerror("Open Data Folder", error_msg)
+
+    def view_tasks(self) -> None:
+        """Open a dialog to view collected tasks from the database."""
+        try:
+            dialog = TasksViewDialog(self.root)
+            dialog.grab_set()  # Make dialog modal
+            self.root.wait_window(dialog)
+        except Exception as exc:
+            error_msg = f"Failed to view tasks: {exc}"
+            self._log(f"❌ {error_msg}")
+            messagebox.showerror("View Tasks", error_msg)
 
     def launch_task(self) -> None:
         if self.task_running:
