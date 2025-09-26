@@ -82,11 +82,12 @@ jobs:
       - name: Publish release
         uses: ncipollo/release-action@v1
         with:
-          tag: 0.0.1
+          tag: ${{ needs.prepare.outputs.tag }}
           name: TaskCollector Desktop ${{ needs.prepare.outputs.version }}
           body: |
             Automated desktop builds for commit `${{ github.sha }}`.
+            
+            Version: ${{ needs.prepare.outputs.version }}
           artifacts: release-assets/**/TaskCollector-*.zip
-          allowUpdates: true
-          replacesArtifacts: true
+          allowUpdates: false
           token: ${{ secrets.GITHUB_TOKEN }}
