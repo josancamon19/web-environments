@@ -390,6 +390,7 @@ def process_single_task(
                         type=ToolCall.CLICK.value,
                         params=params,
                         step_ids=[step_id],
+                        timestamp=timestamp,
                     )
 
         # Handle typing events - accumulate keydown/input events

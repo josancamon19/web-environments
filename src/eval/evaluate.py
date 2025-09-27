@@ -1,15 +1,8 @@
-#!/usr/bin/env python3
-"""
-Standalone script to evaluate model outputs using the LLM judge.
-Usage: python evaluate_outputs.py <model_name>
-"""
-
 import sys
 import json
 import logging
 from pathlib import Path
 from typing import Dict, Any, List
-from litellm import completion
 
 import sys
 import os
@@ -50,7 +43,6 @@ class JudgeCompletion(dspy.Signature):
     The answers might be different from human to model, because
     1) the web is in constant change, products, lists, stocks constantly change.
     2) the website might've been updated, thus some steps/navigations might differ as well.
-
     """
 
     task: str = dspy.InputField(description="The task description")
@@ -201,6 +193,8 @@ def main():
 
 if __name__ == "__main__":
     main()
-    # TODO: trigger multiple tasks in parallel kernel, faster evaluation.
+    # TODO: collect HAR files?
     # TODO: improve paths handling, and results storage.
     # TODO: if evaluation fails, do checkpoint identification matching. 1 prompt trajectory wise.
+    # TODO: improve db to jsonl format code, is shit.
+    # TODO: video is not being recorded on windows (?)

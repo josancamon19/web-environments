@@ -318,21 +318,27 @@ def chunked(iterable, n):
         yield chunk
 
 
-async def process_single_task(task: Dict[str, Any], model: str, output_file: Path, task_idx: int, total_tasks: int):
+async def process_single_task(
+    task: Dict[str, Any],
+    model: str,
+    output_file: Path,
+    task_idx: int,
+    total_tasks: int,
+):
     """Process a single task and write results to file"""
     logger.info(
         f"Processing task {task_idx}/{total_tasks}: "
         f"ID={task['task_id']}, {task['task_description'][:100]}..."
     )
-    
+
     try:
         result = await run_task_with_agent(task, model)
-        
+
         # Write result with thread-safe lock
         async with file_write_lock:
             with open(output_file, "a") as f:
                 f.write(json.dumps(result, default=str) + "\n")
-        
+
         logger.info(
             f"Task {task['task_id']} - Success: {result['success']}, "
             f"Actions: {result['action_count']}, "
@@ -352,7 +358,7 @@ async def process_single_task(task: Dict[str, Any], model: str, output_file: Pat
             "usage_summary": {},
             "step_dom_mapping": {},
         }
-        
+
         # Write error result with thread-safe lock
         async with file_write_lock:
             with open(output_file, "a") as f:
@@ -387,10 +393,10 @@ async def process_all_tasks(model: str):
     # Process remaining tasks in chunks of 2
     task_index = 0
     total_tasks = len(tasks_to_process)
-    
+
     for chunk in chunked(tasks_to_process, 2):
         logger.info(f"Processing chunk of {len(chunk)} tasks in parallel")
-        
+
         # Create tasks for concurrent execution
         chunk_tasks = []
         for task in chunk:
@@ -398,7 +404,7 @@ async def process_all_tasks(model: str):
             chunk_tasks.append(
                 process_single_task(task, model, output_file, task_index, total_tasks)
             )
-        
+
         # Execute tasks in chunk concurrently
         await asyncio.gather(*chunk_tasks)
 
