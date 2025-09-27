@@ -3,8 +3,16 @@ import sys
 from pathlib import Path
 
 APP_NAME = "TaskCollector"
-ROOT_DIR = Path(__file__).resolve().parents[1]
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+# Handle frozen (compiled) executables differently
+if getattr(sys, "frozen", False):
+    # For compiled apps, use the directory containing the executable
+    PROJECT_ROOT = Path(sys.executable).resolve().parent
+    ROOT_DIR = PROJECT_ROOT  # In frozen apps, these are the same
+else:
+    # For development, use the source tree structure
+    ROOT_DIR = Path(__file__).resolve().parents[1]
+    PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _platform_support_dir() -> Path:
@@ -34,6 +42,13 @@ def _resolve_storage_root() -> Path:
     if override:
         return Path(override).expanduser()
 
+    # For frozen executables, always create data next to the executable
+    if getattr(sys, "frozen", False):
+        data_dir = PROJECT_ROOT / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        return data_dir
+
+    # For development, try project root first
     candidate = PROJECT_ROOT / "data"
     if _ensure_writable(candidate):
         return candidate
