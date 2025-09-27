@@ -5,13 +5,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
-from browser_use import Agent, ChatOpenAI
+from browser_use import Agent, ChatOpenAI, Browser
+from kernel import Kernel
+from itertools import islice
 
+# Initialize Kernel client
 import sys
 import os
 
 if "--prod" in sys.argv:
-    DATA_DIR = os.path.join("data", "prod") 
+    DATA_DIR = os.path.join("data", "prod")
 else:
     DATA_DIR = os.path.join("data", "dev")
 
@@ -20,6 +23,11 @@ load_dotenv()
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# File write lock for thread-safe writes
+file_write_lock = asyncio.Lock()
+
+client = Kernel(api_key=os.getenv("KERNEL_API_KEY"))
 
 
 def extract_tool_calls(history: list[dict]) -> List[Dict[str, Any]]:
@@ -189,7 +197,7 @@ def extract_final_answer(history: list[dict], task_type: str) -> Optional[str]:
 
 
 async def run_task_with_agent(
-    task: Dict[str, Any], model: str = "gpt-5-2025-08-07"
+    task: Dict[str, Any], model: str = "o3-2025-04-16"
 ) -> Dict[str, Any]:
     """Run a single task with the Browser-Use agent and capture all data"""
     start_time = datetime.now()
@@ -206,7 +214,11 @@ async def run_task_with_agent(
         """Callback to capture accessibility tree at each step"""
         try:
             # The callback receives BrowserStateSummary which should contain DOM state
-            if browser_state and hasattr(browser_state, 'dom_state') and browser_state.dom_state:
+            if (
+                browser_state
+                and hasattr(browser_state, "dom_state")
+                and browser_state.dom_state
+            ):
                 # Get the accessibility tree content
                 accessibility_content = browser_state.dom_state.llm_representation()
 
@@ -220,22 +232,31 @@ async def run_task_with_agent(
                 step_dom_mapping[step_number] = relative_path
 
         except Exception as e:
-            logger.warning(f"Failed to capture accessibility tree at step {step_number}: {e}")
+            logger.warning(
+                f"Failed to capture accessibility tree at step {step_number}: {e}"
+            )
 
-    # Use a supported model for browser-use (o3 models are not supported by OpenAI API)
-    actual_model = "gpt-4o-mini" if "o3" in model else model
-    
-    llm = ChatOpenAI(model=actual_model, temperature=0.0)
+    llm = ChatOpenAI(model=model, temperature=0.0)
+    kernel_browser = client.browsers.create()
+    browser = Browser(
+        cdp_url=kernel_browser.cdp_ws_url,
+        headless=False,
+        window_size={"width": 1366, "height": 768},
+        viewport={"width": 1366, "height": 768},
+        device_scale_factor=1.0,
+    )
     agent = Agent(
+        browser_session=browser,
         task=task["task_description"],
         llm=llm,
         verbose=True,
         max_steps=20,
-        register_new_step_callback=capture_accessibility_tree
+        register_new_step_callback=capture_accessibility_tree,
     )
 
     history = await agent.run()
     duration = (datetime.now() - start_time).total_seconds()
+    client.browsers.delete_by_id(kernel_browser.session_id)
 
     # Extract tool calls instead of full history
     history_dump = history.model_dump()["history"]
@@ -246,13 +267,13 @@ async def run_task_with_agent(
 
     # Get token usage
     usage_summary = {}
-    if hasattr(agent, 'token_cost_service'):
+    if hasattr(agent, "token_cost_service"):
         try:
             # Get usage summary which is async
             usage_summary = await agent.token_cost_service.get_usage_summary()
             usage_summary = usage_summary.model_dump()
             logger.info(f"Token usage summary: {usage_summary}")
-            
+
         except Exception as e:
             logger.warning(f"Failed to get token usage: {e}")
             usage_summary = {}
@@ -287,6 +308,57 @@ def load_completed_tasks(output_file: Path) -> set:
     return completed_task_ids
 
 
+def chunked(iterable, n):
+    """Yield chunks of n items from iterable"""
+    iterator = iter(iterable)
+    while True:
+        chunk = list(islice(iterator, n))
+        if not chunk:
+            break
+        yield chunk
+
+
+async def process_single_task(task: Dict[str, Any], model: str, output_file: Path, task_idx: int, total_tasks: int):
+    """Process a single task and write results to file"""
+    logger.info(
+        f"Processing task {task_idx}/{total_tasks}: "
+        f"ID={task['task_id']}, {task['task_description'][:100]}..."
+    )
+    
+    try:
+        result = await run_task_with_agent(task, model)
+        
+        # Write result with thread-safe lock
+        async with file_write_lock:
+            with open(output_file, "a") as f:
+                f.write(json.dumps(result, default=str) + "\n")
+        
+        logger.info(
+            f"Task {task['task_id']} - Success: {result['success']}, "
+            f"Actions: {result['action_count']}, "
+            f"Duration: {result['duration_seconds']:.2f}s"
+        )
+    except Exception as e:
+        logger.error(f"Failed to process task {task['task_id']}: {e}")
+        # Save error result
+        error_result = {
+            "task_id": task["task_id"],
+            "task_description": task["task_description"],
+            "task_type": task.get("task_type"),
+            "success": False,
+            "error": str(e),
+            "tool_calls": [],
+            "answer": None,
+            "usage_summary": {},
+            "step_dom_mapping": {},
+        }
+        
+        # Write error result with thread-safe lock
+        async with file_write_lock:
+            with open(output_file, "a") as f:
+                f.write(json.dumps(error_result, default=str) + "\n")
+
+
 async def process_all_tasks(model: str):
     """Process all tasks and save to JSONL, skipping already completed ones"""
     # Load tasks from input file
@@ -312,41 +384,23 @@ async def process_all_tasks(model: str):
         logger.info("All tasks already processed!")
         return output_file
 
-    # Process remaining tasks
-    for i, task in enumerate(tasks_to_process):
-        logger.info(
-            f"Processing task {i + 1}/{len(tasks_to_process)}: "
-            f"ID={task['task_id']}, {task['task_description'][:100]}..."
-        )
-
-        try:
-            result = await run_task_with_agent(task, model)
-
-            # Append result to JSONL file immediately
-            with open(output_file, "a") as f:
-                f.write(json.dumps(result, default=str) + "\n")
-
-            logger.info(
-                f"Task {task['task_id']} - Success: {result['success']}, "
-                f"Actions: {result['action_count']}, "
-                f"Duration: {result['duration_seconds']:.2f}s"
+    # Process remaining tasks in chunks of 2
+    task_index = 0
+    total_tasks = len(tasks_to_process)
+    
+    for chunk in chunked(tasks_to_process, 2):
+        logger.info(f"Processing chunk of {len(chunk)} tasks in parallel")
+        
+        # Create tasks for concurrent execution
+        chunk_tasks = []
+        for task in chunk:
+            task_index += 1
+            chunk_tasks.append(
+                process_single_task(task, model, output_file, task_index, total_tasks)
             )
-        except Exception as e:
-            logger.error(f"Failed to process task {task['task_id']}: {e}")
-            # Save error result
-            error_result = {
-                "task_id": task["task_id"],
-                "task_description": task["task_description"],
-                "task_type": task.get("task_type"),
-                "success": False,
-                "error": str(e),
-                "tool_calls": [],
-                "answer": None,
-                "usage_summary": {},
-                "step_dom_mapping": {},
-            }
-            with open(output_file, "a") as f:
-                f.write(json.dumps(error_result, default=str) + "\n")
+        
+        # Execute tasks in chunk concurrently
+        await asyncio.gather(*chunk_tasks)
 
     logger.info(f"All results saved to {output_file}")
     return output_file

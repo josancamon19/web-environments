@@ -42,7 +42,7 @@ confidence: The extracted confidence score between 0% and 100% from [response]. 
 
 
 def verify_task_completion(
-    task: str, response: str, correct_response: str, model: str = "gpt-4.1-2025-04-14"
+    task: str, response: str, correct_response: str, model: str = "o3-2025-04-16"
 ) -> Dict[str, Any]:
     formatted_prompt = prompt.format(
         task=task, response=response, correct_response=correct_response

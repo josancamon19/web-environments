@@ -23,13 +23,23 @@ class ToolCall(Enum):
 
 
 @dataclass
-class ToolCallData:
+class BaseToolCallData:
     type: str
     params: Dict[str, Any]
+    timestamp: str
+
+    def to_dict(self):
+        return {"type": self.type, "params": self.params, "timestamp": self.timestamp}
+
+
+@dataclass
+class ToolCallData(BaseToolCallData):
     step_ids: List[int]
 
     def to_dict(self):
-        return {"type": self.type, "params": self.params, "step_ids": self.step_ids}
+        data = super().to_dict()
+        data["step_ids"] = self.step_ids
+        return data
 
 
 class ElementExtractor(HTMLParser):
@@ -119,7 +129,7 @@ def find_navigation_after_step(steps_list, current_idx, max_lookahead=10):
     for i in range(
         current_idx + 1, min(current_idx + max_lookahead + 1, len(steps_list))
     ):
-        _, event_type, event_data_str, _ = steps_list[i]
+        _, event_type, event_data_str, _, _ = steps_list[i]
         if event_type in [
             "state:browser:navigated",
             "state:page:navigate_start",
@@ -161,7 +171,7 @@ def process_single_task(
     # Get all steps for the task with DOM snapshots
     cursor.execute(
         """
-        SELECT id, event_type, event_data, dom_snapshot 
+        SELECT id, event_type, event_data, dom_snapshot, timestamp
         FROM steps 
         WHERE task_id = ? 
         ORDER BY id
@@ -201,9 +211,13 @@ def process_single_task(
     # Convert steps to list for lookahead
     steps_list = list(steps)
 
-    for idx, (step_id, event_type, event_data_str, dom_snapshot) in enumerate(
-        steps_list
-    ):
+    for idx, (
+        step_id,
+        event_type,
+        event_data_str,
+        dom_snapshot,
+        timestamp,
+    ) in enumerate(steps_list):
         if event_data_str:
             try:
                 event_data = json.loads(event_data_str)
@@ -222,6 +236,7 @@ def process_single_task(
                         type=ToolCall.GO_TO.value,
                         params={"url": url},
                         step_ids=[step_id],
+                        timestamp=timestamp,
                     )
                 )
         # Handle the first browser navigation (often the initial page load)
@@ -234,6 +249,7 @@ def process_single_task(
                         type=ToolCall.GO_TO.value,
                         params={"url": url},
                         step_ids=[step_id],
+                        timestamp=timestamp,
                     )
                 )
         # Also handle direct navigation to a new domain (not initial)
@@ -268,6 +284,7 @@ def process_single_task(
                                 type=ToolCall.GO_TO.value,
                                 params={"url": url},
                                 step_ids=[step_id],
+                                timestamp=timestamp,
                             )
                         )
 
@@ -292,6 +309,7 @@ def process_single_task(
                     type=ToolCall.CLICK.value,
                     params=params,
                     step_ids=[step_id],
+                    timestamp=timestamp,
                 )
             else:
                 click_buffer.step_ids.append(step_id)
@@ -342,6 +360,7 @@ def process_single_task(
                     type=ToolCall.CLICK.value,
                     params=params,
                     step_ids=[step_id],
+                    timestamp=timestamp,
                 )
             else:
                 # No buffer, check if last tool call was same click
@@ -411,6 +430,7 @@ def process_single_task(
                         type=ToolCall.TYPE.value,
                         params={"selector": prev_selector, "text": ""},
                         step_ids=[],
+                        timestamp=timestamp,
                     )
 
                 typing_buffer.step_ids.append(step_id)
@@ -457,7 +477,7 @@ def process_single_task(
         # Check if the last click buffer has a navigation
         if click_buffer.step_ids:
             last_step_idx = None
-            for i, (sid, _, _, _) in enumerate(steps_list):
+            for i, (sid, _, _, _, _) in enumerate(steps_list):
                 if sid == click_buffer.step_ids[-1]:
                     last_step_idx = i
                     break
@@ -508,20 +528,16 @@ def parse(
     all_results = []
 
     for task_id, task_description, task_type, answer in tasks:
-        try:
-            print(f"Processing task {task_id}: {task_description}")
-            result = process_single_task(
-                cursor, task_id, task_description, task_type, answer
+        print(f"Processing task {task_id}: {task_description}")
+        result = process_single_task(
+            cursor, task_id, task_description, task_type, answer
+        )
+        all_results.append(result)
+        print(f"  Found {len(result['tool_calls'])} tool calls")
+        if task_type == "information_retrieval":
+            print(
+                f"  Task type: {task_type}, Answer: {answer[:50] if answer else 'None'}..."
             )
-            all_results.append(result)
-            print(f"  Found {len(result['tool_calls'])} tool calls")
-            if task_type == "information_retrieval":
-                print(
-                    f"  Task type: {task_type}, Answer: {answer[:50] if answer else 'None'}..."
-                )
-        except Exception as e:
-            print(f"  Error processing task {task_id}: {e}")
-            continue
 
     conn.close()
 
