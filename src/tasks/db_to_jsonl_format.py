@@ -26,7 +26,7 @@ class ToolCall(Enum):
 class BaseToolCallData:
     type: str
     params: Dict[str, Any]
-    timestamp: str
+    timestamp: Optional[str]
 
     def to_dict(self):
         return {"type": self.type, "params": self.params, "timestamp": self.timestamp}
