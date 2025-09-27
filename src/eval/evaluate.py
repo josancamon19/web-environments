@@ -193,8 +193,11 @@ def main():
 
 if __name__ == "__main__":
     main()
-    # TODO: collect HAR files?
+    # TODO: collect HAR files? and much more data of every person
+    # TODO: video is not being recorded on windows (?)
     # TODO: improve paths handling, and results storage.
     # TODO: if evaluation fails, do checkpoint identification matching. 1 prompt trajectory wise.
     # TODO: improve db to jsonl format code, is shit.
-    # TODO: video is not being recorded on windows (?)
+    # TODO: script to merge multiple zips into one single task, when it comes from multiple people.
+    # TODO: ask for website for the task (?)
+    # TODO: record coordinates

@@ -19,7 +19,7 @@ if sys.platform == "darwin":
         os.environ["DISPLAY"] = ":0.0"
 
 import tkinter as tk
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox
 from tkinter.scrolledtext import ScrolledText
 from tkinter import ttk
 from typing import Optional
@@ -150,6 +150,10 @@ class TasksViewDialog(tk.Toplevel):
         title_label = tk.Label(main_frame, text="Collected Tasks", font=("Helvetica", 14, "bold"))
         title_label.pack(anchor=tk.W, pady=(0, 10))
         
+        # Instructions
+        instructions = tk.Label(main_frame, text="Select a task and click 'Delete Selected' or right-click for options", fg="gray")
+        instructions.pack(anchor=tk.W, pady=(0, 5))
+        
         # Create frame for treeview and scrollbars
         tree_frame = tk.Frame(main_frame)
         tree_frame.pack(fill=tk.BOTH, expand=True)
@@ -166,6 +170,14 @@ class TasksViewDialog(tk.Toplevel):
         # Configure scrollbars
         vsb.config(command=self.tree.yview)
         hsb.config(command=self.tree.xview)
+        
+        # Create context menu for delete option
+        self.context_menu = tk.Menu(self, tearoff=0)
+        self.context_menu.add_command(label="Delete Task", command=self.delete_selected_task)
+        
+        # Bind right-click to show context menu
+        self.tree.bind("<Button-2>", self.show_context_menu)  # Mac right-click
+        self.tree.bind("<Button-3>", self.show_context_menu)  # Windows/Linux right-click
         
         # Define column headings and widths
         self.tree.heading("ID", text="ID")
@@ -208,6 +220,10 @@ class TasksViewDialog(tk.Toplevel):
         # Refresh button
         refresh_button = tk.Button(button_frame, text="Refresh", command=self.load_tasks, width=10)
         refresh_button.pack(side=tk.RIGHT, padx=(0, 5))
+        
+        # Delete button
+        delete_button = tk.Button(button_frame, text="Delete Selected", command=self.delete_selected_task, width=15, fg="red")
+        delete_button.pack(side=tk.RIGHT, padx=(0, 5))
         
     def center_window(self):
         self.update_idletasks()
@@ -291,6 +307,76 @@ class TasksViewDialog(tk.Toplevel):
             
         except Exception as e:
             self.info_label.config(text=f"Error loading tasks: {str(e)}", fg="red")
+            
+    def show_context_menu(self, event):
+        """Show the context menu at the clicked position."""
+        # Select the item under the mouse
+        item = self.tree.identify_row(event.y)
+        if item:
+            self.tree.selection_set(item)
+            self.context_menu.post(event.x_root, event.y_root)
+            
+    def delete_selected_task(self):
+        """Delete the selected task after confirmation."""
+        selected_items = self.tree.selection()
+        if not selected_items:
+            return
+            
+        # Get task details from the selected row
+        item = selected_items[0]
+        values = self.tree.item(item, "values")
+        task_id = values[0]
+        description = values[1]
+        video_path = values[6]  # Video filename from the table
+        
+        # Show confirmation dialog
+        message = f"Are you sure you want to delete task {task_id}?\n\nDescription: {description}\n\nThis will also delete the associated video and DOM files."
+        if not messagebox.askyesno("Confirm Delete", message, parent=self):
+            return
+            
+        try:
+            # Delete from database
+            db_path = Path(DATA_DIR) / "tasks.db"
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            
+            # Delete task (CASCADE will handle related records)
+            cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+            conn.commit()
+            conn.close()
+            
+            # Delete video file if it exists
+            if video_path:
+                video_full_path = Path(DATA_DIR) / "videos" / video_path
+                if video_full_path.exists():
+                    try:
+                        video_full_path.unlink()
+                        print(f"Deleted video: {video_full_path}")
+                    except Exception as e:
+                        print(f"Error deleting video {video_full_path}: {e}")
+                        
+            # Delete DOM files directory
+            dom_dir = Path(DATA_DIR) / "doms" / f"task_{task_id}"
+            if dom_dir.exists():
+                try:
+                    shutil.rmtree(dom_dir)
+                    print(f"Deleted DOM directory: {dom_dir}")
+                except Exception as e:
+                    print(f"Error deleting DOM directory {dom_dir}: {e}")
+                    
+            # Remove from tree view
+            self.tree.delete(item)
+            
+            # Update info label
+            current_count = len(self.tree.get_children())
+            self.info_label.config(text=f"Task {task_id} deleted. Showing {current_count} task(s)")
+            
+            messagebox.showinfo("Success", f"Task {task_id} has been deleted.", parent=self)
+            
+        except Exception as e:
+            error_msg = f"Error deleting task: {str(e)}"
+            self.info_label.config(text=error_msg, fg="red")
+            messagebox.showerror("Delete Error", error_msg, parent=self)
 
 
 if getattr(sys, "frozen", False):  # Frozen executable (PyInstaller)
