@@ -76,7 +76,9 @@ class JudgeCompletion(dspy.Signature):
     reasoning: str = dspy.OutputField(description="The reasoning for your judgement")
     confidence: float = dspy.OutputField(
         description="The confidence score for your judgement"
-    )
+    )  # TODO: it's shit for a very simple ikea task.
+    # TODO: should use a rubric, agent evaluation.
+    # TODO: use parts of HLE prompt
 
 
 logging.basicConfig(level=logging.INFO)
@@ -93,53 +95,75 @@ def evaluate_model_outputs(model: str, judge_model: str = "gpt-4.1-2025-04-14"):
         return None
 
     # Load the original tasks to get correct answers
-    tasks_by_id = {}
+    human_tasks_by_id = {}
     with open(Path(f"{DATA_DIR}/tasks.jsonl"), "r") as f:
         for line in f:
-            if line.strip():
-                task = json.loads(line)
-                tasks_by_id[task["task_id"]] = task
+            if not line.strip():
+                continue
+            task = json.loads(line)
+            human_tasks_by_id[task["task_id"]] = task
 
     # Evaluate each result
-    evaluation_data = []
+    model_tasks = []
     with open(output_file, "r") as f:
         for line in f:
-            if line.strip():
-                model_task = json.loads(line)
-                task_id = model_task["task_id"]
+            if not line.strip():
+                continue
+            model_tasks.append(json.loads(line))
 
-                # Skip if not an information retrieval task
-                if model_task.get("task_type") != "information_retrieval":
-                    logger.info(f"Skipping task {task_id} (not information retrieval)")
-                    continue
+    def _get_model_completion_step(model_task: Dict[str, Any]) -> Dict[str, Any]:
+        for step in model_task["dump"]:
+            done = step["model_output"].get("action", [{}])[-1].get("done")
+            if done:
+                del step["result"]
+                return step
 
-                # Get the correct answer from original task
-                if task_id not in tasks_by_id:
-                    logger.warning(f"Task {task_id} not found in original tasks")
-                    continue
+    evaluations = {}
+    for model_task in model_tasks:
+        task_id = model_task["task_id"]
 
-                model_completion_step = None
-                for step in model_task["dump"]:
-                    done = step["model_output"].get("action", [{}])[-1].get("done")
-                    if done:
-                        del step["result"]
-                        model_completion_step = step
+        if model_task.get("task_type") != "information_retrieval":
+            logger.info(f"Skipping task {task_id} (not information retrieval)")
+            continue
 
-                if not model_completion_step:
-                    logger.warning(f"No final step found for task {task_id}")
-                    # TODO: raise is bad already.
-                    continue
+        model_completion_step = _get_model_completion_step(model_task)
+        if not model_completion_step:
+            logger.warning(f"No final step found for task {task_id}")
+            evaluations[task_id] = {
+                "correct": False,
+                "reasoning": "No final step found",
+                "confidence": 0,
+            }
+            continue
 
-                model_trajectory = model_task["tool_calls"]
-                model_last_dom = model_task["step_dom_mapping"][
-                    str(len(model_trajectory))
-                ]
-                model_last_dom_contents = open(
-                    Path(DATA_DIR) / model_last_dom, "r"
-                ).read()
-                human_task = tasks_by_id[task_id]
+        model_trajectory = model_task["tool_calls"]
+        model_last_dom = model_task["step_dom_mapping"][str(len(model_trajectory))]
+        model_last_dom = open(Path("src/eval/results") / model_last_dom, "r").read()
+        # ===
+        human_task = human_tasks_by_id[task_id]
+        human_trajectory = human_task["tool_calls"]
+        human_last_dom = human_trajectory[-1]["params"]["dom_state"]
+        human_last_dom = open(Path("data/dev") / human_last_dom, "r").read()
+        human_answer = human_task["answer"]
+        # ===
+        judge = dspy.Predict(JudgeCompletion)
+        result = judge(
+            task=human_task["task_description"],
+            agent_completion=model_completion_step,
+            agent_trajectory=model_trajectory,
+            agent_dom=model_last_dom,
+            human_trajectory=human_trajectory,
+            human_dom=human_last_dom,
+            human_answer=human_answer,
+        )
+        evaluations[task_id] = {
+            "correct": result.correct,
+            "reasoning": result.reasoning,
+            "confidence": result.confidence,
+        }
 
-                print(json.dumps(model_trajectory, indent=2))
+    print(json.dumps(evaluations, indent=2))
+    return evaluations
 
 
 def main():
@@ -159,19 +183,17 @@ def main():
         print("=" * 50)
         print(f"Model: {model}")
         print(f"Judge: {judge_model}")
-        print(f"Tasks evaluated: {evaluation['total_count']}")
-        print(f"Correct: {evaluation['correct_count']}")
-        print(f"Accuracy: {evaluation['accuracy']:.2f}%")
+        print(f"Tasks evaluated: {len(evaluation)}")
+        print(f"Correct: {sum(result['correct'] for result in evaluation.values())}")
+        print(
+            f"Accuracy: {sum(result['correct'] for result in evaluation.values()) / len(evaluation) * 100:.2f}%"
+        )
 
         # Show task-level results
         print("\nTask-level results:")
-        for result in evaluation["results"]:
+        for result in evaluation.values():
             status = "✓" if result["correct"] else "✗"
-            print(
-                f"  {status} Task {result['task_id']}: {result['task_description'][:50]}..."
-            )
-            if not result["correct"]:
-                print(f"    Reason: {result['reasoning'][:100]}...")
+            print(f"   Status: {status} Reason: {result['reasoning'][:100]}...")
     else:
         print("Evaluation failed or no results found")
         sys.exit(1)
@@ -179,3 +201,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # TODO: trigger multiple tasks in parallel kernel, faster evaluation.
+    # TODO: improve paths handling, and results storage.
+    # TODO: if evaluation fails, do checkpoint identification matching. 1 prompt trajectory wise.
