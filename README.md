@@ -33,6 +33,7 @@ Offline capture & replay
 - Capture happens automatically when you launch `main.py`; the session directory (see above) aggregates manifest, raw resources, storage dumps, and database extracts.
 - To replay a bundle locally, run `python -m src.capture.replay <bundle_dir>`; the helper spins up Chromium with recorded storage state, routes requests to the archived resources, and opens the first captured document. Use `--allow-network-fallback` if you want missing requests to fall back to the live web during debugging.
 - Bundles also ship with `steps.jsonl`, `requests_db.jsonl`, and `responses_db.jsonl` so you can audit actions or feed downstream tooling without touching the SQLite database.
+- You can run the eval agent inside the offline sandbox with `python src/eval/browseruse.py --sandbox-bundle <bundle_dir>` (add `--sandbox-allow-network` to let missing requests fall back to the real web).
 
 Storage
 - SQLite DB at `data/tasks.db`

@@ -193,7 +193,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-    # TODO: collect HAR files? and much more data of every person
     # TODO: video is not being recorded on windows (?)
     # TODO: improve paths handling, and results storage.
     # TODO: if evaluation fails, do checkpoint identification matching. 1 prompt trajectory wise.

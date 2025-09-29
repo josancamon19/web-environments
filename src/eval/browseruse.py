@@ -1,33 +1,33 @@
+import argparse
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 from dotenv import load_dotenv
-from browser_use import Agent, ChatOpenAI, Browser
+
+from browser_use import Agent, Browser, ChatOpenAI
 from kernel import Kernel
+
 from itertools import islice
-
-# Initialize Kernel client
 import sys
-import os
 
-if "--prod" in sys.argv:
-    DATA_DIR = os.path.join("data", "prod")
-else:
-    DATA_DIR = os.path.join("data", "dev")
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+from src.config.browser_config import CONTEXT_CONFIG
 
 load_dotenv()
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# File write lock for thread-safe writes
 file_write_lock = asyncio.Lock()
 
 client = Kernel(api_key=os.getenv("KERNEL_API_KEY"))
+
+DATA_DIR = os.path.join("data", "dev")
 
 
 def extract_tool_calls(history: list[dict]) -> List[Dict[str, Any]]:
@@ -36,19 +36,25 @@ def extract_tool_calls(history: list[dict]) -> List[Dict[str, Any]]:
 
     for step in history:
         if "model_output" in step and "action" in step["model_output"]:
-            actions = step["model_output"]["action"]
+            actions = step["model_output"].get("action")
+            if not actions:
+                continue
+            if isinstance(actions, dict):
+                actions = [actions]
 
             # Get interacted element info from state if available
             interacted_element = None
-            if "state" in step and "interacted_element" in step["state"]:
-                elements = step["state"]["interacted_element"]
+            state = step.get("state")
+            if isinstance(state, dict) and "interacted_element" in state:
+                elements = state["interacted_element"]
                 if elements and len(elements) > 0 and elements[0]:
                     interacted_element = elements[0]
 
             # Get click coordinates from result metadata if available
             click_coords = None
-            if "result" in step:
-                for result in step["result"]:
+            results = step.get("result")
+            if isinstance(results, list):
+                for result in results:
                     if "metadata" in result and "click_x" in result["metadata"]:
                         click_coords = {
                             "x": result["metadata"]["click_x"],
@@ -164,8 +170,9 @@ def extract_final_answer(history: list[dict], task_type: str) -> Optional[str]:
 
     # Look for the final result that marks task completion
     for step in reversed(history):
-        if "result" in step:
-            for result in step["result"]:
+        results = step.get("result")
+        if isinstance(results, list):
+            for result in results:
                 # Check if task is done and has extracted content
                 if result.get("is_done") and "extracted_content" in result:
                     extracted = result["extracted_content"]
@@ -197,66 +204,96 @@ def extract_final_answer(history: list[dict], task_type: str) -> Optional[str]:
 
 
 async def run_task_with_agent(
-    task: Dict[str, Any], model: str = "o3-2025-04-16"
+    task: Dict[str, Any],
+    model: str = "gpt-5-nano",
+    *,
+    sandbox_bundle: Optional[Path] = None,
+    sandbox_allow_network: bool = False,
+    sandbox_channel: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Run a single task with the Browser-Use agent and capture all data"""
+    """Run a single task with the Browser-Use agent and capture all data."""
+
     start_time = datetime.now()
 
-    # Directory for saving accessibility trees
     doms_output_dir = Path("src/eval/results/doms")
     task_dom_dir = doms_output_dir / f"task_{task['task_id']}"
     task_dom_dir.mkdir(parents=True, exist_ok=True)
 
-    # Storage for accessibility tree file paths mapped by step
-    step_dom_mapping = {}
+    step_dom_mapping: Dict[int, str] = {}
 
     def capture_accessibility_tree(browser_state, agent_output, step_number):
-        """Callback to capture accessibility tree at each step"""
         try:
-            # The callback receives BrowserStateSummary which should contain DOM state
             if (
                 browser_state
                 and hasattr(browser_state, "dom_state")
                 and browser_state.dom_state
             ):
-                # Get the accessibility tree content
                 accessibility_content = browser_state.dom_state.llm_representation()
-
-                # Save to file
                 dom_file_path = task_dom_dir / f"step_{step_number}.txt"
                 with open(dom_file_path, "w", encoding="utf-8") as f:
                     f.write(accessibility_content)
-
-                # Store relative path for reference
                 relative_path = f"doms/task_{task['task_id']}/step_{step_number}.txt"
                 step_dom_mapping[step_number] = relative_path
-
-        except Exception as e:
+        except Exception as exc:
             logger.warning(
-                f"Failed to capture accessibility tree at step {step_number}: {e}"
+                "Failed to capture accessibility tree at step %s: %s",
+                step_number,
+                exc,
             )
 
     llm = ChatOpenAI(model=model, temperature=0.0)
-    kernel_browser = client.browsers.create()
-    browser = Browser(
-        cdp_url=kernel_browser.cdp_ws_url,
-        headless=False,
-        window_size={"width": 1366, "height": 768},
-        viewport={"width": 1366, "height": 768},
-        device_scale_factor=1.0,
-    )
-    agent = Agent(
-        browser_session=browser,
-        task=task["task_description"],
-        llm=llm,
-        verbose=True,
-        max_steps=20,
-        register_new_step_callback=capture_accessibility_tree,
-    )
 
-    history = await agent.run()
-    duration = (datetime.now() - start_time).total_seconds()
-    client.browsers.delete_by_id(kernel_browser.session_id)
+    sandbox = None
+    kernel_browser = None
+
+    viewport = CONTEXT_CONFIG.get("viewport", {"width": 1366, "height": 768})
+    window_size = {"width": viewport.get("width", 1366), "height": viewport.get("height", 768)}
+
+    try:
+        if sandbox_bundle:
+            from src.capture.sandbox import SandboxEnvironment
+
+            sandbox = SandboxEnvironment(
+                sandbox_bundle,
+                allow_network_fallback=sandbox_allow_network,
+                channel=sandbox_channel,
+            )
+            cdp_url = await sandbox.start()
+            browser = Browser(
+                cdp_url=cdp_url,
+                headless=False,
+                viewport=viewport,
+                window_size=window_size,
+                device_scale_factor=1.0,
+                is_local=False,
+            )
+        else:
+            kernel_browser = client.browsers.create()
+            browser = Browser(
+                cdp_url=kernel_browser.cdp_ws_url,
+                headless=False,
+                viewport=viewport,
+                window_size=window_size,
+                device_scale_factor=1.0,
+            )
+
+        agent = Agent(
+            browser_session=browser,
+            task=task["task_description"],
+            llm=llm,
+            verbose=True,
+            max_steps=20,
+            register_new_step_callback=capture_accessibility_tree,
+        )
+
+        history = await agent.run()
+        duration = (datetime.now() - start_time).total_seconds()
+
+    finally:
+        if kernel_browser:
+            client.browsers.delete_by_id(kernel_browser.session_id)
+        if sandbox:
+            await sandbox.close()
 
     # Extract tool calls instead of full history
     history_dump = history.model_dump()["history"]
@@ -324,6 +361,10 @@ async def process_single_task(
     output_file: Path,
     task_idx: int,
     total_tasks: int,
+    *,
+    sandbox_bundle: Optional[Path],
+    sandbox_allow_network: bool,
+    sandbox_channel: Optional[str],
 ):
     """Process a single task and write results to file"""
     logger.info(
@@ -332,7 +373,13 @@ async def process_single_task(
     )
 
     try:
-        result = await run_task_with_agent(task, model)
+        result = await run_task_with_agent(
+            task,
+            model,
+            sandbox_bundle=sandbox_bundle,
+            sandbox_allow_network=sandbox_allow_network,
+            sandbox_channel=sandbox_channel,
+        )
 
         # Write result with thread-safe lock
         async with file_write_lock:
@@ -365,7 +412,13 @@ async def process_single_task(
                 f.write(json.dumps(error_result, default=str) + "\n")
 
 
-async def process_all_tasks(model: str):
+async def process_all_tasks(
+    model: str,
+    *,
+    sandbox_bundle: Optional[Path],
+    sandbox_allow_network: bool,
+    sandbox_channel: Optional[str],
+):
     """Process all tasks and save to JSONL, skipping already completed ones"""
     # Load tasks from input file
     with open(Path(f"{DATA_DIR}/tasks.jsonl"), "r") as f:
@@ -394,7 +447,9 @@ async def process_all_tasks(model: str):
     task_index = 0
     total_tasks = len(tasks_to_process)
 
-    for chunk in chunked(tasks_to_process, 2):
+    chunk_size = 1 if sandbox_bundle else 2
+
+    for chunk in chunked(tasks_to_process, chunk_size):
         logger.info(f"Processing chunk of {len(chunk)} tasks in parallel")
 
         # Create tasks for concurrent execution
@@ -402,7 +457,16 @@ async def process_all_tasks(model: str):
         for task in chunk:
             task_index += 1
             chunk_tasks.append(
-                process_single_task(task, model, output_file, task_index, total_tasks)
+                process_single_task(
+                    task,
+                    model,
+                    output_file,
+                    task_index,
+                    total_tasks,
+                    sandbox_bundle=sandbox_bundle,
+                    sandbox_allow_network=sandbox_allow_network,
+                    sandbox_channel=sandbox_channel,
+                )
             )
 
         # Execute tasks in chunk concurrently
@@ -412,11 +476,44 @@ async def process_all_tasks(model: str):
     return output_file
 
 
-async def main():
-    # Process tasks with browser-use
-    output_file = await process_all_tasks("o3-2025-04-16")
+async def main(args: argparse.Namespace) -> None:
+    global DATA_DIR
+
+    DATA_DIR = os.path.join("data", "prod") if args.prod else os.path.join("data", "dev")
+
+    sandbox_path = Path(args.sandbox_bundle).resolve() if args.sandbox_bundle else None
+    if sandbox_path and not sandbox_path.exists():
+        raise FileNotFoundError(f"Sandbox bundle not found: {sandbox_path}")
+
+    output_file = await process_all_tasks(
+        args.model,
+        sandbox_bundle=sandbox_path,
+        sandbox_allow_network=args.sandbox_allow_network,
+        sandbox_channel=args.sandbox_channel,
+    )
     print(f"\nFull data saved to: {output_file}")
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run browser-use agent over recorded tasks")
+    parser.add_argument("--model", default="gpt-5-nano", help="LLM model name to use")
+    parser.add_argument("--prod", action="store_true", help="Use production data directory")
+    parser.add_argument(
+        "--sandbox-bundle",
+        help="Path to an offline capture bundle directory to replay instead of using the Kernel browser",
+    )
+    parser.add_argument(
+        "--sandbox-allow-network",
+        action="store_true",
+        help="Allow sandboxed replay to fall back to live network requests",
+    )
+    parser.add_argument(
+        "--sandbox-channel",
+        help="Playwright browser channel to use in sandbox mode (e.g. chrome, msedge)",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    arguments = parse_args()
+    asyncio.run(main(arguments))
