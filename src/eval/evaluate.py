@@ -200,5 +200,5 @@ if __name__ == "__main__":
     # TODO: improve db to jsonl format code, is shit.
     # TODO: script to merge multiple zips into one single task, when it comes from multiple people.
     # TODO: ask for website for the task (?)
-    # TODO: record coordinates
+    # TODO: would bounding boxes help?
     # TODO: GUI is kinda trash

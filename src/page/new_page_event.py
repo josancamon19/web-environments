@@ -102,7 +102,10 @@ class NewPageEvent:
             handlers = self._page_event_handlers.pop(page, [])
             for event_name, handler in handlers:
                 try:
-                    page.off(event_name, handler)
+                    if hasattr(page, "off"):
+                        page.off(event_name, handler)
+                    else:
+                        page.remove_listener(event_name, handler)
                 except Exception as e:
                     logger.error(f"[DETACH_PAGE] Error detaching page listeners: {e}")
             # logger.info(f"[DETACH_PAGE] Page listeners detached")

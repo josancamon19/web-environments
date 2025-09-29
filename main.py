@@ -1,6 +1,5 @@
 import asyncio
 import signal
-import sys
 import logging
 from src.browser.stealth_browser import StealthBrowser
 from src.config.initial_tasks import InitialTasks
@@ -51,19 +50,28 @@ async def main():
         print("Page events will be logged to the console.")
         print("Press Ctrl+C to exit")
 
-        def signal_handler(signum, frame):
+        loop = asyncio.get_running_loop()
+        shutdown_complete = asyncio.Event()
+        shutdown_started = False
+
+        async def shutdown():
             print(f'\n🛑 Task completed: "{task_description}"')
-            
-            # If it's an information retrieval task, ask for the answer
+
             if task_type == "information_retrieval":
-                answer = get_answer_from_user()
+                answer = await asyncio.to_thread(get_answer_from_user)
                 task_manager.save_task_answer(answer)
-            
+
             print("🔄 Closing browser...")
             task_manager.end_actual_task()
             task_manager.save_task_video(task_manager.get_last_task_path())
-            asyncio.create_task(stealth_browser.close())
-            sys.exit(0)
+            await stealth_browser.close()
+            shutdown_complete.set()
+
+        def signal_handler(signum, frame):
+            nonlocal shutdown_started
+            if not shutdown_started:
+                shutdown_started = True
+                loop.create_task(shutdown())
 
         signal.signal(signal.SIGINT, signal_handler)
 
@@ -71,7 +79,7 @@ async def main():
         # await stealth_browser.page.goto("https://www.google.com")
         # await stealth_browser.page.wait_for_load_state("domcontentloaded")
 
-        await asyncio.Event().wait()
+        await shutdown_complete.wait()
 
     except Exception as error:
         print(f"Ha ocurrido un error al ejecutar la tarea: {error}")

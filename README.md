@@ -25,9 +25,14 @@ Usage
 What gets recorded
 - Actions: click, contextmenu, keydown, input, scroll
 - State changes: DOMContentLoaded, load, frame navigations
-- Network: XHR/fetch requests and responses with headers, body (as bytes), and cookies
+- Network: all browser requests (documents, XHR/fetch, assets) with normalized headers, payloads, and byte-accurate bodies
 - DOM snapshot and a full-page screenshot at each step
-- [ ] will store HAR files of the web environments + spin up a fake server out of requests processed.
+- Offline bundle: every run now emits a replayable package under `data/<env>/captures/task_<id>/<timestamp>/` containing the manifest, resource bodies, storage state, and DB exports so sessions can be reproduced without live network access.
+
+Offline capture & replay
+- Capture happens automatically when you launch `main.py`; the session directory (see above) aggregates manifest, raw resources, storage dumps, and database extracts.
+- To replay a bundle locally, run `python -m src.capture.replay <bundle_dir>`; the helper spins up Chromium with recorded storage state, routes requests to the archived resources, and opens the first captured document. Use `--allow-network-fallback` if you want missing requests to fall back to the live web during debugging.
+- Bundles also ship with `steps.jsonl`, `requests_db.jsonl`, and `responses_db.jsonl` so you can audit actions or feed downstream tooling without touching the SQLite database.
 
 Storage
 - SQLite DB at `data/tasks.db`

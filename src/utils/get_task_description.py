@@ -105,8 +105,8 @@ def get_answer_from_user() -> str:
     print("Please provide the answer/information you found:")
     print("(Enter the information you retrieved during this task)")
     print()
-    
-    answer = input("📝 Answer: ").strip()
+    print("📝 Answer (press Enter when done):")
+    answer = input("> ").strip()
     
     # Validate input
     if not answer:

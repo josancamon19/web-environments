@@ -12,6 +12,7 @@ from src.responses.response_event import Response_Event
 from src.page.new_page_event import NewPageEvent
 import os
 from src.config.storage_config import DATA_DIR
+from src.capture.offline_capture import OfflineCaptureManager
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ class StealthBrowser:
         self.response_event = Response_Event()
         self.step_record = StepRecord()
         self.page_event = NewPageEvent()
+        self.offline_capture = OfflineCaptureManager()
         self._binding_registered = False
         self._page_script_registered = False
 
@@ -41,6 +43,8 @@ class StealthBrowser:
         task_manager.set_last_task_path(VIDEO_TASK_PATH)
 
         self.context = await self.open_browser_context(VIDEO_TASK_PATH)
+
+        await self.offline_capture.start(self.context)
 
         self.context.on("request", self.request_event.listen_for_request)
         self.context.on("response", self.response_event.listen_for_response)
@@ -145,6 +149,10 @@ class StealthBrowser:
     async def close(self):
         """Close browser"""
         if self.context:
+            try:
+                await self.offline_capture.stop()
+            except Exception as exc:
+                logger.error("[CAPTURE] Failed to finalize offline capture: %s", exc)
             await self.context.close()
         if self.browser:
             await self.browser.close()
