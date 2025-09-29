@@ -3,9 +3,9 @@ import asyncio
 import json
 import logging
 import os
-from collections import defaultdict, deque
+from collections import defaultdict
 from pathlib import Path
-from typing import Any, Deque, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from playwright.async_api import Browser, BrowserContext, Route
 
@@ -38,7 +38,8 @@ class ReplayBundle:
         self.manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
         self.resources = self.manifest.get("resources", [])
         self.environment = self.manifest.get("environment", {})
-        self._payloads: Dict[Tuple[str, str, str], Deque[Dict[str, Any]]] = defaultdict(deque)
+        self._payloads: Dict[Tuple[str, str, str], list[Dict[str, Any]]] = defaultdict(list)
+        self._payload_indices: Dict[Tuple[str, str, str], int] = defaultdict(int)
 
         for resource in self.resources:
             key = self._resource_key(resource)
@@ -88,9 +89,30 @@ class ReplayBundle:
         post_data = await self._safe_post_data(request)
         key = (request.method, request.url, post_data or "")
 
-        queue = self._payloads.get(key)
-        if queue and queue:
-            payload = queue.popleft()
+        entries = self._payloads.get(key)
+        payload: Optional[Dict[str, Any]] = None
+
+        if entries:
+            idx = self._payload_indices[key]
+            if idx < len(entries):
+                payload = entries[idx]
+                self._payload_indices[key] = idx + 1
+            elif request.method.upper() == "GET":
+                payload = entries[-1]
+                logger.debug(
+                    "Reusing cached GET response for %s (recorded %d uses)",
+                    request.url,
+                    len(entries),
+                )
+            else:
+                payload = entries[-1]
+                logger.info(
+                    "Reusing last response for %s %s beyond recorded count",
+                    request.method,
+                    request.url,
+                )
+
+        if payload:
             body_bytes = self._load_body(payload)
             headers = dict(payload.get("response_headers") or {})
             if body_bytes is not None:
