@@ -11,3 +11,4 @@ TaskCollector.spec
 desktop_app/playwright-browsers
 playwright-browsers
 *.DS_Store
+src/eval/tars/images

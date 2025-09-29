@@ -69,6 +69,113 @@ if (!window.__RECORDER_EVENT_LISTENER_LOADED__) {
   }
 
 
+  const isFiniteNumber = (value) => typeof value === 'number' && Number.isFinite(value);
+
+  const toCoordinatePair = (x, y) => {
+    const pair = {
+      x: isFiniteNumber(x) ? x : null,
+      y: isFiniteNumber(y) ? y : null,
+    };
+    return pair.x === null && pair.y === null ? null : pair;
+  };
+
+  function captureCoordinates(event) {
+    if (!event) {
+      return null;
+    }
+
+    const coordinateSpaces = {
+      client: toCoordinatePair(event.clientX, event.clientY),
+      page: toCoordinatePair(event.pageX, event.pageY),
+      screen: toCoordinatePair(event.screenX, event.screenY),
+      offset: toCoordinatePair(event.offsetX, event.offsetY),
+    };
+
+    const docEl = document && document.documentElement ? document.documentElement : null;
+    const viewportWidth = typeof window !== 'undefined' && isFiniteNumber(window.innerWidth)
+      ? window.innerWidth
+      : docEl && isFiniteNumber(docEl.clientWidth)
+        ? docEl.clientWidth
+        : null;
+    const viewportHeight = typeof window !== 'undefined' && isFiniteNumber(window.innerHeight)
+      ? window.innerHeight
+      : docEl && isFiniteNumber(docEl.clientHeight)
+        ? docEl.clientHeight
+        : null;
+
+    const result = {};
+    for (const [space, pair] of Object.entries(coordinateSpaces)) {
+      if (pair) {
+        result[space] = pair;
+      }
+    }
+
+    if (isFiniteNumber(viewportWidth) || isFiniteNumber(viewportHeight)) {
+      result.viewport = {
+        width: isFiniteNumber(viewportWidth) ? viewportWidth : null,
+        height: isFiniteNumber(viewportHeight) ? viewportHeight : null,
+      };
+    }
+
+    const clientPair = coordinateSpaces.client;
+    if (
+      clientPair &&
+      clientPair.x !== null &&
+      clientPair.y !== null &&
+      isFiniteNumber(viewportWidth) &&
+      isFiniteNumber(viewportHeight) &&
+      viewportWidth !== 0 &&
+      viewportHeight !== 0
+    ) {
+      result.relative = {
+        x: clientPair.x / viewportWidth,
+        y: clientPair.y / viewportHeight,
+      };
+    }
+
+    if (isFiniteNumber(event.timeStamp)) {
+      result.eventTimestamp = event.timeStamp;
+    }
+
+    return Object.keys(result).length ? result : null;
+  }
+
+  function withPointerInfo(element, event, extra, options) {
+    const rect = element && element.getBoundingClientRect ? element.getBoundingClientRect() : null;
+
+    const payload = {
+      tag: element ? element.tagName : null,
+      id: element ? element.id : null,
+      className: element ? element.className : null,
+      coordinates: captureCoordinates(event),
+      elementRect: rect
+        ? {
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+            bottom: rect.bottom,
+            right: rect.right,
+            x: rect.x,
+            y: rect.y
+          }
+        : null
+    };
+
+    if (options && options.includeText) {
+      const textValue = element && typeof element.innerText === 'string' ? element.innerText.substring(0, 50) : '';
+      payload.text = textValue;
+    }
+
+    if (options && options.includeHref) {
+      const hrefValue = element && 'href' in element ? element.href || null : null;
+      payload.href = hrefValue;
+    }
+
+    return Object.assign(payload, extra || {});
+  }
+
+
   function setupPageEventListener() {
 
     let scrollArmed = true;
@@ -88,85 +195,66 @@ if (!window.__RECORDER_EVENT_LISTENER_LOADED__) {
     // Click event
     document.addEventListener('click', (e) => {
         const element = e.target;
-        const info = {
-            tag: element.tagName,
-            id: element.id,
-            className: element.className,
-            text: (element.innerText || '').substring(0, 50),
+        const info = withPointerInfo(element, e, {
             x: e.clientX,
             y: e.clientY
-        };
+        }, { includeText: true });
         sendEventPage('click', 'action:user', info);
     }, { capture: true });
 
     // Mousedown event
     document.addEventListener('mousedown', (e) => {
         const element = e.target;
-        const info = {
-            tag: element.tagName,
-            id: element.id,
-            className: element.className,
+        const info = withPointerInfo(element, e, {
+            button: e.button,
             x: e.clientX,
-            y: e.clientY,
-            button: e.button
-        };
+            y: e.clientY
+        });
         sendEventPage('mousedown', 'action:user', info);
     }, { capture: true });
 
     // Mouseup event
     document.addEventListener('mouseup', (e) => {
         const element = e.target;
-        const info = {
-            tag: element.tagName,
-            id: element.id,
-            className: element.className,
+        const info = withPointerInfo(element, e, {
+            button: e.button,
             x: e.clientX,
-            y: e.clientY,
-            button: e.button
-        };
+            y: e.clientY
+        });
         sendEventPage('mouseup', 'action:user', info);
     }, { capture: true });
 
     // Pointerdown event
     document.addEventListener('pointerdown', (e) => {
         const element = e.target;
-        const info = {
-            tag: element.tagName,
-            id: element.id,
-            className: element.className,
-            x: e.clientX,
-            y: e.clientY,
+        const info = withPointerInfo(element, e, {
             button: e.button,
-            pointerType: e.pointerType
-        };
+            pointerType: e.pointerType,
+            x: e.clientX,
+            y: e.clientY
+        });
         sendEventPage('pointerdown', 'action:user', info);
     }, { capture: true });
 
     // Pointerup event
     document.addEventListener('pointerup', (e) => {
         const element = e.target;
-        const info = {
-            tag: element.tagName,
-            id: element.id,
-            className: element.className,
-            x: e.clientX,
-            y: e.clientY,
+        const info = withPointerInfo(element, e, {
             button: e.button,
-            pointerType: e.pointerType
-        };
+            pointerType: e.pointerType,
+            x: e.clientX,
+            y: e.clientY
+        });
         sendEventPage('pointerup', 'action:user', info);
     }, { capture: true });
 
     // Contextmenu event
     document.addEventListener('contextmenu', (e) => {
         const element = e.target;
-        const info = {
-            tag: element.tagName,
-            id: element.id,
-            className: element.className,
+        const info = withPointerInfo(element, e, {
             x: e.clientX,
             y: e.clientY
-        };
+        });
         sendEventPage('contextmenu', 'action:user', info);
     }, { capture: true });
 
@@ -187,15 +275,10 @@ if (!window.__RECORDER_EVENT_LISTENER_LOADED__) {
         
         // Throttle hover events to reduce frequency
         hoverTimeout = setTimeout(() => {
-            const info = {
-                tag: element.tagName,
-                id: element.id,
-                className: element.className,
-                text: (element.innerText || '').substring(0, 50),
-                href: element.href || null,
+            const info = withPointerInfo(element, e, {
                 x: e.clientX,
                 y: e.clientY
-            };
+            }, { includeText: true, includeHref: true });
             sendEventPage('hover', 'action:user', info);
         }, 300); // Send after 300ms of stable hover
     }, { capture: true });

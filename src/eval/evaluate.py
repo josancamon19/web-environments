@@ -201,3 +201,4 @@ if __name__ == "__main__":
     # TODO: script to merge multiple zips into one single task, when it comes from multiple people.
     # TODO: ask for website for the task (?)
     # TODO: record coordinates
+    # TODO: GUI is kinda trash

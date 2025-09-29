@@ -124,6 +124,45 @@ def create_selector(event_data: Dict[str, Any]) -> str:
     return tag if tag else "*"
 
 
+def _extract_xy_pair(source: Any) -> Optional[list]:
+    if not isinstance(source, dict):
+        return None
+
+    x = source.get('x')
+    y = source.get('y')
+
+    if isinstance(x, (int, float)) and isinstance(y, (int, float)):
+        return [x, y]
+    return None
+
+
+def extract_coordinates_from_event(event_data: Dict[str, Any]) -> Optional[list]:
+    """Reduce raw event coordinates to a simple [x, y] pair."""
+    if not isinstance(event_data, dict):
+        return None
+
+    raw_coordinates = event_data.get('coordinates')
+    if isinstance(raw_coordinates, dict):
+        for candidate in (
+            raw_coordinates.get('page'),
+            raw_coordinates.get('client'),
+            raw_coordinates.get('offset'),
+        ):
+            pair = _extract_xy_pair(candidate)
+            if pair:
+                return pair
+
+    fallback_pair = _extract_xy_pair({'x': event_data.get('x'), 'y': event_data.get('y')})
+    if fallback_pair:
+        return fallback_pair
+
+    return None
+
+
+def merge_coordinates(params: Dict[str, Any], coordinates: Optional[list]):
+    if coordinates is not None and len(coordinates) == 2:
+        params['coordinates'] = coordinates
+
 def find_navigation_after_step(steps_list, current_idx, max_lookahead=10):
     """Find navigation URL after a click or Enter key event."""
     for i in range(
@@ -305,6 +344,9 @@ def process_single_task(
                     params["selector_details"] = context
                 if dom_state_path:
                     params["dom_state"] = dom_state_path
+                merge_coordinates(
+                    params, extract_coordinates_from_event(event_data)
+                )
                 click_buffer = ToolCallData(
                     type=ToolCall.CLICK.value,
                     params=params,
@@ -317,6 +359,10 @@ def process_single_task(
                     dom_state_path = save_dom_snapshot(step_id, dom_snapshot)
                     if dom_state_path:
                         click_buffer.params["dom_state"] = dom_state_path
+                merge_coordinates(
+                    click_buffer.params,
+                    extract_coordinates_from_event(event_data),
+                )
 
         # Handle the actual click event
         elif event_type == "action:user:click":
@@ -331,6 +377,7 @@ def process_single_task(
             selector = create_selector(event_data)
             context = extract_element_context(dom_snapshot, event_data)
             dom_state_path = save_dom_snapshot(step_id, dom_snapshot)
+            coordinates_payload = extract_coordinates_from_event(event_data)
 
             # Check for navigation after this click
             nav_url = find_navigation_after_step(steps_list, idx)
@@ -346,6 +393,7 @@ def process_single_task(
                     click_buffer.params["navigates_to"] = nav_url
                 if dom_state_path and "dom_state" not in click_buffer.params:
                     click_buffer.params["dom_state"] = dom_state_path
+                merge_coordinates(click_buffer.params, coordinates_payload)
             elif click_buffer:
                 # Different element, save the old buffer and start new
                 tool_calls.append(click_buffer)
@@ -356,6 +404,7 @@ def process_single_task(
                     params["navigates_to"] = nav_url
                 if dom_state_path:
                     params["dom_state"] = dom_state_path
+                merge_coordinates(params, coordinates_payload)
                 click_buffer = ToolCallData(
                     type=ToolCall.CLICK.value,
                     params=params,
@@ -378,6 +427,7 @@ def process_single_task(
                         tool_calls[-1].params["navigates_to"] = nav_url
                     if dom_state_path and "dom_state" not in tool_calls[-1].params:
                         tool_calls[-1].params["dom_state"] = dom_state_path
+                    merge_coordinates(tool_calls[-1].params, coordinates_payload)
                 else:
                     params = {"selector": selector}
                     if context:
@@ -386,6 +436,7 @@ def process_single_task(
                         params["navigates_to"] = nav_url
                     if dom_state_path:
                         params["dom_state"] = dom_state_path
+                    merge_coordinates(params, coordinates_payload)
                     click_buffer = ToolCallData(
                         type=ToolCall.CLICK.value,
                         params=params,
