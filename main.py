@@ -4,15 +4,20 @@ import logging
 from src.browser.stealth_browser import StealthBrowser
 from src.config.initial_tasks import InitialTasks
 from src.tasks.task import TaskManager, CreateTaskDto, Task
-from src.utils.get_task_description import get_task_description_from_user, get_task_type_from_user, get_answer_from_user, get_source_from_user
+from src.utils.get_task_description import (
+    get_task_description_from_user,
+    get_task_type_from_user,
+    get_answer_from_user,
+    get_source_from_user,
+)
 
 logging.basicConfig(
     level=logging.DEBUG,  # Changed to DEBUG to see all logs
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler('recorder_debug.log')  # Also save to file for analysis
-    ]
+        logging.FileHandler("recorder_debug.log"),  # Also save to file for analysis
+    ],
 )
 
 logger = logging.getLogger(__name__)

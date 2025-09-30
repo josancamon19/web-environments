@@ -15,7 +15,7 @@ from kernel import Kernel
 from itertools import islice
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.config.browser_config import CONTEXT_CONFIG
 
 load_dotenv()
@@ -247,7 +247,10 @@ async def run_task_with_agent(
     kernel_browser = None
 
     viewport = CONTEXT_CONFIG.get("viewport", {"width": 1366, "height": 768})
-    window_size = {"width": viewport.get("width", 1366), "height": viewport.get("height", 768)}
+    window_size = {
+        "width": viewport.get("width", 1366),
+        "height": viewport.get("height", 768),
+    }
 
     try:
         if sandbox_bundle:
@@ -479,7 +482,9 @@ async def process_all_tasks(
 async def main(args: argparse.Namespace) -> None:
     global DATA_DIR
 
-    DATA_DIR = os.path.join("data", "prod") if args.prod else os.path.join("data", "dev")
+    DATA_DIR = (
+        os.path.join("data", "prod") if args.prod else os.path.join("data", "dev")
+    )
 
     sandbox_path = Path(args.sandbox_bundle).resolve() if args.sandbox_bundle else None
     if sandbox_path and not sandbox_path.exists():
@@ -495,9 +500,13 @@ async def main(args: argparse.Namespace) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run browser-use agent over recorded tasks")
+    parser = argparse.ArgumentParser(
+        description="Run browser-use agent over recorded tasks"
+    )
     parser.add_argument("--model", default="gpt-5-nano", help="LLM model name to use")
-    parser.add_argument("--prod", action="store_true", help="Use production data directory")
+    parser.add_argument(
+        "--prod", action="store_true", help="Use production data directory"
+    )
     parser.add_argument(
         "--sandbox-bundle",
         help="Path to an offline capture bundle directory to replay instead of using the Kernel browser",
