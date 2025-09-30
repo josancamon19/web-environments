@@ -16,6 +16,7 @@ from itertools import islice
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+from src.capture.sandbox import SandboxEnvironment, resolve_recorded_bundle
 from src.config.browser_config import CONTEXT_CONFIG
 
 load_dotenv()
@@ -25,7 +26,20 @@ logger = logging.getLogger(__name__)
 
 file_write_lock = asyncio.Lock()
 
-client = Kernel(api_key=os.getenv("KERNEL_API_KEY"))
+_kernel_client: Optional[Kernel] = None
+
+
+def get_kernel_client() -> Kernel:
+    global _kernel_client
+    if _kernel_client is None:
+        api_key = os.getenv("KERNEL_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "KERNEL_API_KEY is required when running without a sandbox"
+            )
+        _kernel_client = Kernel(api_key=api_key)
+    return _kernel_client
+
 
 DATA_DIR = os.path.join("data", "dev")
 
@@ -210,6 +224,8 @@ async def run_task_with_agent(
     sandbox_bundle: Optional[Path] = None,
     sandbox_allow_network: bool = False,
     sandbox_channel: Optional[str] = None,
+    sandbox_headless: bool = True,
+    sandbox_safe_mode: bool = False,
 ) -> Dict[str, Any]:
     """Run a single task with the Browser-Use agent and capture all data."""
 
@@ -245,6 +261,7 @@ async def run_task_with_agent(
 
     sandbox = None
     kernel_browser = None
+    kernel_client: Optional[Kernel] = None
 
     viewport = CONTEXT_CONFIG.get("viewport", {"width": 1366, "height": 768})
     window_size = {
@@ -253,28 +270,70 @@ async def run_task_with_agent(
     }
 
     try:
+        sandbox_start_error: Optional[Exception] = None
+        sandbox_modes = []
         if sandbox_bundle:
-            from src.capture.sandbox import SandboxEnvironment
+            if sandbox_safe_mode:
+                sandbox_modes = [True]
+            else:
+                sandbox_modes = [False, True]
 
+        for safe_mode in sandbox_modes:
+            logger.info(
+                "Starting sandbox for task %s at %s (safe_mode=%s)",
+                task["task_id"],
+                sandbox_bundle,
+                safe_mode,
+            )
             sandbox = SandboxEnvironment(
                 sandbox_bundle,
                 allow_network_fallback=sandbox_allow_network,
                 channel=sandbox_channel,
+                headless=sandbox_headless,
+                safe_mode=safe_mode,
             )
-            cdp_url = await sandbox.start()
-            browser = Browser(
-                cdp_url=cdp_url,
-                headless=False,
-                viewport=viewport,
-                window_size=window_size,
-                device_scale_factor=1.0,
-                is_local=False,
-            )
-        else:
-            kernel_browser = client.browsers.create()
+            try:
+                cdp_url = await sandbox.start()
+                browser = Browser(
+                    cdp_url=cdp_url,
+                    headless=sandbox_headless if not safe_mode else True,
+                    viewport=viewport,
+                    window_size=window_size,
+                    device_scale_factor=1.0,
+                    is_local=True,
+                )
+                break
+            except Exception as exc:
+                sandbox_start_error = exc
+                logger.warning(
+                    "Sandbox launch failed for task %s (safe_mode=%s): %s",
+                    task["task_id"],
+                    safe_mode,
+                    exc,
+                )
+                try:
+                    await sandbox.close()
+                except Exception:
+                    pass
+                sandbox = None
+
+        if sandbox_bundle and sandbox is None:
+            if sandbox_allow_network:
+                logger.info(
+                    "Sandbox unavailable for task %s, falling back to Kernel browser",
+                    task["task_id"],
+                )
+            else:
+                raise sandbox_start_error or RuntimeError(
+                    "Sandbox launch failed and fallback disabled"
+                )
+
+        if sandbox is None:
+            kernel_client = get_kernel_client()
+            kernel_browser = kernel_client.browsers.create()
             browser = Browser(
                 cdp_url=kernel_browser.cdp_ws_url,
-                headless=False,
+                headless=sandbox_headless,
                 viewport=viewport,
                 window_size=window_size,
                 device_scale_factor=1.0,
@@ -293,8 +352,8 @@ async def run_task_with_agent(
         duration = (datetime.now() - start_time).total_seconds()
 
     finally:
-        if kernel_browser:
-            client.browsers.delete_by_id(kernel_browser.session_id)
+        if kernel_browser and kernel_client:
+            kernel_client.browsers.delete_by_id(kernel_browser.session_id)
         if sandbox:
             await sandbox.close()
 
@@ -365,15 +424,27 @@ async def process_single_task(
     task_idx: int,
     total_tasks: int,
     *,
-    sandbox_bundle: Optional[Path],
+    sandbox_root: Optional[Path],
     sandbox_allow_network: bool,
     sandbox_channel: Optional[str],
+    sandbox_headless: bool,
+    sandbox_safe_mode: bool,
 ):
     """Process a single task and write results to file"""
     logger.info(
         f"Processing task {task_idx}/{total_tasks}: "
         f"ID={task['task_id']}, {task['task_description'][:100]}..."
     )
+
+    sandbox_bundle: Optional[Path] = None
+    if sandbox_root:
+        sandbox_bundle = resolve_recorded_bundle(sandbox_root, task["task_id"])
+        if not sandbox_bundle:
+            logger.warning(
+                "No sandbox bundle found for task %s under %s; falling back to Kernel",
+                task["task_id"],
+                sandbox_root,
+            )
 
     try:
         result = await run_task_with_agent(
@@ -382,6 +453,8 @@ async def process_single_task(
             sandbox_bundle=sandbox_bundle,
             sandbox_allow_network=sandbox_allow_network,
             sandbox_channel=sandbox_channel,
+            sandbox_headless=sandbox_headless,
+            sandbox_safe_mode=sandbox_safe_mode,
         )
 
         # Write result with thread-safe lock
@@ -418,9 +491,11 @@ async def process_single_task(
 async def process_all_tasks(
     model: str,
     *,
-    sandbox_bundle: Optional[Path],
+    sandbox_root: Optional[Path],
     sandbox_allow_network: bool,
     sandbox_channel: Optional[str],
+    sandbox_headless: bool,
+    sandbox_safe_mode: bool,
 ):
     """Process all tasks and save to JSONL, skipping already completed ones"""
     # Load tasks from input file
@@ -450,7 +525,7 @@ async def process_all_tasks(
     task_index = 0
     total_tasks = len(tasks_to_process)
 
-    chunk_size = 1 if sandbox_bundle else 2
+    chunk_size = 1 if sandbox_root else 2
 
     for chunk in chunked(tasks_to_process, chunk_size):
         logger.info(f"Processing chunk of {len(chunk)} tasks in parallel")
@@ -466,9 +541,11 @@ async def process_all_tasks(
                     output_file,
                     task_index,
                     total_tasks,
-                    sandbox_bundle=sandbox_bundle,
+                    sandbox_root=sandbox_root,
                     sandbox_allow_network=sandbox_allow_network,
                     sandbox_channel=sandbox_channel,
+                    sandbox_headless=sandbox_headless,
+                    sandbox_safe_mode=sandbox_safe_mode,
                 )
             )
 
@@ -486,15 +563,34 @@ async def main(args: argparse.Namespace) -> None:
         os.path.join("data", "prod") if args.prod else os.path.join("data", "dev")
     )
 
-    sandbox_path = Path(args.sandbox_bundle).resolve() if args.sandbox_bundle else None
-    if sandbox_path and not sandbox_path.exists():
-        raise FileNotFoundError(f"Sandbox bundle not found: {sandbox_path}")
+    sandbox_root: Optional[Path] = None
+    if not args.no_sandbox:
+        root_arg = args.sandbox_root or os.path.join(DATA_DIR, "captures")
+        candidate_root = Path(root_arg).expanduser().resolve()
+        if candidate_root.exists():
+            sandbox_root = candidate_root
+            logger.info(f"Using sandbox captures under {sandbox_root}")
+        else:
+            logger.warning(
+                "Sandbox root %s not found; falling back to Kernel browser",
+                candidate_root,
+            )
+
+    sandbox_headless = not args.sandbox_headed
+    sandbox_safe_mode = args.sandbox_safe_mode
+    if sandbox_safe_mode and args.sandbox_headed:
+        logger.warning(
+            "Sandbox safe mode forces headless Chromium; ignoring --sandbox-headed"
+        )
+        sandbox_headless = True
 
     output_file = await process_all_tasks(
         args.model,
-        sandbox_bundle=sandbox_path,
+        sandbox_root=sandbox_root,
         sandbox_allow_network=args.sandbox_allow_network,
         sandbox_channel=args.sandbox_channel,
+        sandbox_headless=sandbox_headless,
+        sandbox_safe_mode=sandbox_safe_mode,
     )
     print(f"\nFull data saved to: {output_file}")
 
@@ -508,8 +604,13 @@ def parse_args() -> argparse.Namespace:
         "--prod", action="store_true", help="Use production data directory"
     )
     parser.add_argument(
-        "--sandbox-bundle",
-        help="Path to an offline capture bundle directory to replay instead of using the Kernel browser",
+        "--sandbox-root",
+        help="Root directory containing offline capture bundles (defaults to data/<env>/captures)",
+    )
+    parser.add_argument(
+        "--no-sandbox",
+        action="store_true",
+        help="Disable sandbox replay and use the Kernel browser",
     )
     parser.add_argument(
         "--sandbox-allow-network",
@@ -519,6 +620,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sandbox-channel",
         help="Playwright browser channel to use in sandbox mode (e.g. chrome, msedge)",
+    )
+    parser.add_argument(
+        "--sandbox-headed",
+        action="store_true",
+        help="Launch sandbox Chromium with a visible window",
+    )
+    parser.add_argument(
+        "--sandbox-safe-mode",
+        action="store_true",
+        help="Use a reduced argument set and headless Chromium for stability",
     )
     return parser.parse_args()
 

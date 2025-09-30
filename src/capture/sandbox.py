@@ -1,9 +1,12 @@
+import argparse
 import asyncio
 import json
 import logging
+import os
+import signal
 import socket
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 from urllib import request as urllib_request
 from urllib.error import URLError
 
@@ -23,6 +26,46 @@ def _get_free_port() -> int:
         return s.getsockname()[1]
 
 
+SAFE_BROWSER_ARGS = [
+    "--disable-gpu",
+    "--disable-dev-shm-usage",
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+]
+
+
+def resolve_recorded_bundle(root: Path, task_id: int) -> Optional[Path]:
+    """Return the newest valid capture bundle directory for a task."""
+
+    task_dir = root / f"task_{task_id}"
+    if not task_dir.exists():
+        return None
+
+    candidate_dirs = [p for p in task_dir.iterdir() if p.is_dir()]
+    candidate_dirs.sort(key=lambda p: (p.name, p.stat().st_mtime), reverse=True)
+
+    def _resolve(path: Path) -> Optional[Path]:
+        try:
+            manifest_path = ReplayBundle._resolve_manifest(path)
+            if manifest_path.exists():
+                return manifest_path.parent
+        except Exception as exc:
+            logger.debug(
+                "[SANDBOX] Failed to resolve manifest for task %s at %s: %s",
+                task_id,
+                path,
+                exc,
+            )
+        return None
+
+    for candidate in candidate_dirs:
+        resolved = _resolve(candidate)
+        if resolved:
+            return resolved
+
+    return _resolve(task_dir)
+
+
 class SandboxEnvironment:
     """Manage an offline replay browser that exposes a CDP endpoint."""
 
@@ -32,10 +75,34 @@ class SandboxEnvironment:
         *,
         allow_network_fallback: bool = False,
         channel: Optional[str] = None,
+        headless: Optional[bool] = None,
+        browser_args: Optional[List[str]] = None,
+        safe_mode: bool = False,
     ) -> None:
         self.bundle = ReplayBundle(bundle_path)
         self.allow_network_fallback = allow_network_fallback
         self.channel = channel
+        self.safe_mode = safe_mode
+
+        env_headless = os.environ.get("SANDBOX_HEADLESS")
+        env_safe_mode = os.environ.get("SANDBOX_SAFE_MODE")
+        if env_safe_mode is not None:
+            self.safe_mode = env_safe_mode.lower() in {"1", "true", "yes", "on"}
+
+        if self.safe_mode:
+            self.headless = True
+            base_args = SAFE_BROWSER_ARGS
+        else:
+            if env_headless is not None:
+                self.headless = env_headless.lower() in {"1", "true", "yes", "on"}
+            else:
+                self.headless = headless if headless is not None else False
+            base_args = browser_args if browser_args is not None else BROWSER_ARGS
+
+        if browser_args is not None and self.safe_mode:
+            base_args = browser_args
+
+        self.browser_args = list(base_args) if base_args else []
 
         self._playwright = None
         self._browser: Optional[PlaywrightBrowser] = None
@@ -57,13 +124,21 @@ class SandboxEnvironment:
         browser_type: BrowserType = self._playwright.chromium
 
         self._debug_port = _get_free_port()
-        launch_args = list(BROWSER_ARGS) + [
+        launch_args = list(self.browser_args) + [
             f"--remote-debugging-port={self._debug_port}",
+            "--remote-debugging-address=127.0.0.1",
         ]
+        logger.info(
+            "[SANDBOX] Launching Chromium with CDP port %s (safe_mode=%s, headless=%s)",
+            self._debug_port,
+            self.safe_mode,
+            self.headless,
+        )
 
         launch_kwargs = {
-            "headless": False,
+            "headless": self.headless,
             "args": launch_args,
+            "ignore_default_args": ["--remote-debugging-pipe"],
         }
         if self.channel:
             launch_kwargs["channel"] = self.channel
@@ -78,13 +153,12 @@ class SandboxEnvironment:
         if not self._browser.contexts:
             context = await self._browser.new_context(**CONTEXT_CONFIG)
             await self._configure_context(context)
-            if not context.pages:
-                await context.new_page()
         else:
             for context in list(self._browser.contexts):
                 await self._configure_context(context)
 
         self._ws_endpoint = await self._wait_for_ws_endpoint()
+        logger.info("[SANDBOX] Chromium CDP endpoint: %s", self._ws_endpoint)
 
         # Preload initial URL if available
         start_url = self.bundle.guess_start_url()
@@ -108,7 +182,13 @@ class SandboxEnvironment:
                         return None
                     data = json.loads(resp.read().decode("utf-8"))
                     return data.get("webSocketDebuggerUrl")
-            except (URLError, TimeoutError, ConnectionError, json.JSONDecodeError, socket.timeout):
+            except (
+                URLError,
+                TimeoutError,
+                ConnectionError,
+                json.JSONDecodeError,
+                socket.timeout,
+            ):
                 return None
 
         for _ in range(50):
@@ -144,3 +224,104 @@ class SandboxEnvironment:
         self._playwright = None
         self._contexts.clear()
         self._ws_endpoint = None
+
+
+async def _cli(args: argparse.Namespace) -> None:
+    if args.bundle and args.task_id is not None:
+        raise ValueError("Provide either --bundle or --task-id, not both")
+
+    if args.headless and args.headed:
+        raise ValueError("Use either --headless or --headed, not both")
+
+    if args.bundle:
+        bundle_path = Path(args.bundle).expanduser().resolve()
+    else:
+        if args.task_id is None:
+            raise ValueError("Either --bundle or --task-id must be provided")
+        root = Path(args.root).expanduser().resolve()
+        bundle_path = resolve_recorded_bundle(root, args.task_id)
+        if not bundle_path:
+            raise FileNotFoundError(
+                f"No capture bundle found for task {args.task_id} under {root}"
+            )
+
+    headless: Optional[bool] = None
+    if args.headless:
+        headless = True
+    elif args.headed:
+        headless = False
+
+    sandbox = SandboxEnvironment(
+        bundle_path,
+        allow_network_fallback=args.allow_network_fallback,
+        channel=args.channel,
+        headless=headless,
+        safe_mode=args.safe_mode,
+    )
+
+    ws_endpoint = await sandbox.start()
+    print(f"Sandbox running at {ws_endpoint}")
+    print("Press Ctrl+C to stop the sandbox")
+
+    stop_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+
+    def _trigger_stop(*_):
+        stop_event.set()
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, _trigger_stop)
+        except (NotImplementedError, RuntimeError):
+            pass
+
+    try:
+        await stop_event.wait()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        await sandbox.close()
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Launch a sandboxed replay browser")
+    parser.add_argument("--bundle", help="Path to a specific capture bundle directory")
+    parser.add_argument("--task-id", type=int, help="Task ID to replay from --root")
+    parser.add_argument(
+        "--root",
+        default="data/dev/captures",
+        help="Root directory containing task_<id>/<timestamp> bundles",
+    )
+    parser.add_argument(
+        "--allow-network-fallback",
+        action="store_true",
+        help="Allow missing resources to hit the live network",
+    )
+    parser.add_argument(
+        "--channel",
+        help="Playwright browser channel to use (e.g. chrome, msedge)",
+    )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Force headless Chromium (default behaviour in safe mode)",
+    )
+    parser.add_argument(
+        "--headed",
+        action="store_true",
+        help="Force headed Chromium window",
+    )
+    parser.add_argument(
+        "--safe-mode",
+        action="store_true",
+        help="Use a reduced argument set and headless Chromium for stability",
+    )
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(_cli(_parse_args()))
+    except Exception as exc:
+        print(f"Failed to launch sandbox: {exc}")
+        raise
