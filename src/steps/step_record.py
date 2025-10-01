@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 from typing import Any, Dict, Optional, Tuple
@@ -33,6 +34,7 @@ class StepRecord:
         self.task_manager = TaskManager()
         self.actual_page = ActualPage()
         self.step_manager = StepManager()
+        self._cdp_session = None
 
     async def record_step(self, step_info: dict, omit_screenshot: bool = False):
         try:
@@ -179,21 +181,47 @@ class StepRecord:
             # Default to false for unknown events to be safe
             return False
 
-    async def take_screenshot(self, screenshot_path: str):
-        """Take a screenshot - using regular method for stability."""
-        try:
-            logger.debug(f"[SCREENSHOT] Starting screenshot capture")
-            page = self.actual_page.get_page()
+    async def _get_cdp_session(self):
+        """Get or create a reusable CDP session for the current page."""
+        page = self.actual_page.get_page()
 
-            # For now, use the regular screenshot method for stability
-            # We can optimize later once we identify the crash cause
-            # page.waitForTimeout(500)
-            await page.screenshot(path=screenshot_path, full_page=False)
-            logger.debug(f"[SCREENSHOT] Screenshot captured successfully")
+        # Create new session if none exists or if page changed
+        if self._cdp_session is None:
+            self._cdp_session = await page.context.new_cdp_session(page)
+            logger.debug("[SCREENSHOT] Created new CDP session")
+
+        return self._cdp_session
+
+    async def take_screenshot(self, screenshot_path: str):
+        """Take a screenshot using CDP to avoid visual flicker from Playwright's method."""
+        try:
+            logger.debug(f"[SCREENSHOT] Starting CDP screenshot capture")
+
+            # Reuse CDP session to avoid overhead of creating new sessions
+            cdp_session = await self._get_cdp_session()
+            screenshot_data = await cdp_session.send("Page.captureScreenshot", {
+                "format": "png",
+                "captureBeyondViewport": False,
+            })
+
+            # Decode and save
+            with open(screenshot_path, "wb") as f:
+                f.write(base64.b64decode(screenshot_data["data"]))
+
+            logger.debug(f"[SCREENSHOT] CDP screenshot captured successfully")
 
         except Exception as e:
-            logger.error(f"[SCREENSHOT] Failed to take screenshot: {e}")
-            raise
+            logger.error(f"[SCREENSHOT] Failed to take CDP screenshot: {e}")
+            # Reset CDP session on error in case it became stale
+            self._cdp_session = None
+
+            # Fallback to regular screenshot if CDP fails
+            try:
+                page = self.actual_page.get_page()
+                await page.screenshot(path=screenshot_path, full_page=False)
+            except Exception as fallback_error:
+                logger.error(f"[SCREENSHOT] Fallback screenshot also failed: {fallback_error}")
+                raise
 
     def _parse_metadata(self, metadata: Any) -> Dict[str, Any]:
         if not metadata:
