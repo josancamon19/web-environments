@@ -73,14 +73,13 @@ class SandboxEnvironment:
         bundle_path: Path,
         *,
         allow_network_fallback: bool = False,
-        channel: Optional[str] = None,
         headless: Optional[bool] = None,
         browser_args: Optional[List[str]] = None,
         safe_mode: bool = False,
+        log_dir: Optional[Path] = None,
     ) -> None:
-        self.bundle = ReplayBundle(bundle_path)
+        self.bundle = ReplayBundle(bundle_path, log_dir=log_dir)
         self.allow_network_fallback = allow_network_fallback
-        self.channel = channel
         self.safe_mode = safe_mode
 
         env_headless = os.environ.get("SANDBOX_HEADLESS")
@@ -140,8 +139,6 @@ class SandboxEnvironment:
             "headless": self.headless,
             "args": launch_args,
         }
-        if self.channel:
-            launch_kwargs["channel"] = self.channel
 
         self._browser = await browser_type.launch(**launch_kwargs)
         self._browser.on(
@@ -156,7 +153,6 @@ class SandboxEnvironment:
         else:
             for context in list(self._browser.contexts):
                 await self._configure_context(context)
-
 
         self._ws_endpoint = await self._wait_for_ws_endpoint()
         logger.info("[SANDBOX] Chromium CDP endpoint: %s", self._ws_endpoint)
@@ -180,7 +176,9 @@ class SandboxEnvironment:
 
         def _fetch() -> Optional[str]:
             try:
-                conn = http.client.HTTPConnection("127.0.0.1", self._debug_port, timeout=0.5)
+                conn = http.client.HTTPConnection(
+                    "127.0.0.1", self._debug_port, timeout=0.5
+                )
                 conn.request("GET", "/json/version")
                 resp = conn.getresponse()
                 if resp.status != 200:
@@ -216,6 +214,13 @@ class SandboxEnvironment:
         )
 
     async def close(self) -> None:
+        # Flush logs before closing
+        if self.bundle:
+            try:
+                self.bundle.flush_logs()
+            except Exception as e:
+                logger.warning("Failed to flush logs: %s", e)
+        
         if self._browser:
             try:
                 await self._browser.close()
@@ -258,12 +263,16 @@ async def _cli(args: argparse.Namespace) -> None:
     elif args.headed:
         headless = False
 
+    log_dir = None
+    if args.log_dir:
+        log_dir = Path(args.log_dir).expanduser().resolve()
+
     sandbox = SandboxEnvironment(
         bundle_path,
         allow_network_fallback=args.allow_network_fallback,
-        channel=args.channel,
         headless=headless,
         safe_mode=args.safe_mode,
+        log_dir=log_dir,
     )
 
     ws_endpoint = await sandbox.start()
@@ -322,6 +331,10 @@ def _parse_args() -> argparse.Namespace:
         "--safe-mode",
         action="store_true",
         help="Use a reduced argument set and headless Chromium for stability",
+    )
+    parser.add_argument(
+        "--log-dir",
+        help="Directory to write cached.log and not-found.log files",
     )
     return parser.parse_args()
 

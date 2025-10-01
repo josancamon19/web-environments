@@ -223,7 +223,6 @@ async def run_task_with_agent(
     *,
     sandbox_bundle: Optional[Path] = None,
     sandbox_allow_network: bool = False,
-    sandbox_channel: Optional[str] = None,
     sandbox_headless: bool = True,
     sandbox_safe_mode: bool = False,
 ) -> Dict[str, Any]:
@@ -285,12 +284,16 @@ async def run_task_with_agent(
                 sandbox_bundle,
                 safe_mode,
             )
+            
+            # Set up log directory for tracking cached vs not-found URLs
+            log_dir = Path("src/eval/results") / f"task_{task['task_id']}"
+            
             sandbox = SandboxEnvironment(
                 sandbox_bundle,
                 allow_network_fallback=sandbox_allow_network,
-                channel=sandbox_channel,
                 headless=sandbox_headless,
                 safe_mode=safe_mode,
+                log_dir=log_dir,
             )
             try:
                 cdp_url = await sandbox.start()
@@ -426,7 +429,6 @@ async def process_single_task(
     *,
     sandbox_root: Optional[Path],
     sandbox_allow_network: bool,
-    sandbox_channel: Optional[str],
     sandbox_headless: bool,
     sandbox_safe_mode: bool,
 ):
@@ -452,7 +454,6 @@ async def process_single_task(
             model,
             sandbox_bundle=sandbox_bundle,
             sandbox_allow_network=sandbox_allow_network,
-            sandbox_channel=sandbox_channel,
             sandbox_headless=sandbox_headless,
             sandbox_safe_mode=sandbox_safe_mode,
         )
@@ -493,7 +494,6 @@ async def process_all_tasks(
     *,
     sandbox_root: Optional[Path],
     sandbox_allow_network: bool,
-    sandbox_channel: Optional[str],
     sandbox_headless: bool,
     sandbox_safe_mode: bool,
 ):
@@ -543,7 +543,6 @@ async def process_all_tasks(
                     total_tasks,
                     sandbox_root=sandbox_root,
                     sandbox_allow_network=sandbox_allow_network,
-                    sandbox_channel=sandbox_channel,
                     sandbox_headless=sandbox_headless,
                     sandbox_safe_mode=sandbox_safe_mode,
                 )
@@ -565,7 +564,7 @@ async def main(args: argparse.Namespace) -> None:
 
     sandbox_root: Optional[Path] = None
     if not args.no_sandbox:
-        root_arg = args.sandbox_root or os.path.join(DATA_DIR, "captures")
+        root_arg = os.path.join(DATA_DIR, "captures")
         candidate_root = Path(root_arg).expanduser().resolve()
         if candidate_root.exists():
             sandbox_root = candidate_root
@@ -588,7 +587,6 @@ async def main(args: argparse.Namespace) -> None:
         args.model,
         sandbox_root=sandbox_root,
         sandbox_allow_network=args.sandbox_allow_network,
-        sandbox_channel=args.sandbox_channel,
         sandbox_headless=sandbox_headless,
         sandbox_safe_mode=sandbox_safe_mode,
     )
@@ -596,16 +594,13 @@ async def main(args: argparse.Namespace) -> None:
 
 
 def parse_args() -> argparse.Namespace:
+    logger.info("Parsing arguments")
     parser = argparse.ArgumentParser(
         description="Run browser-use agent over recorded tasks"
     )
     parser.add_argument("--model", default="gpt-5-nano", help="LLM model name to use")
     parser.add_argument(
         "--prod", action="store_true", help="Use production data directory"
-    )
-    parser.add_argument(
-        "--sandbox-root",
-        help="Root directory containing offline capture bundles (defaults to data/<env>/captures)",
     )
     parser.add_argument(
         "--no-sandbox",
@@ -616,10 +611,6 @@ def parse_args() -> argparse.Namespace:
         "--sandbox-allow-network",
         action="store_true",
         help="Allow sandboxed replay to fall back to live network requests",
-    )
-    parser.add_argument(
-        "--sandbox-channel",
-        help="Playwright browser channel to use in sandbox mode (e.g. chrome, msedge)",
     )
     parser.add_argument(
         "--sandbox-headed",

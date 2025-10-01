@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class ReplayBundle:
     """Replay previously captured browsing resources."""
 
-    def __init__(self, bundle_path: Path):
+    def __init__(self, bundle_path: Path, log_dir: Optional[Path] = None):
         bundle_path = bundle_path.expanduser().resolve()
 
         if bundle_path.is_file():
@@ -38,8 +38,15 @@ class ReplayBundle:
         self.manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
         self.resources = self.manifest.get("resources", [])
         self.environment = self.manifest.get("environment", {})
-        self._payloads: Dict[Tuple[str, str, str], list[Dict[str, Any]]] = defaultdict(list)
+        self._payloads: Dict[Tuple[str, str, str], list[Dict[str, Any]]] = defaultdict(
+            list
+        )
         self._payload_indices: Dict[Tuple[str, str, str], int] = defaultdict(int)
+
+        # Set up logging for cached vs not-found URLs
+        self.log_dir = log_dir
+        self._cached_urls: set[str] = set()
+        self._not_found_urls: set[str] = set()
 
         for resource in self.resources:
             key = self._resource_key(resource)
@@ -53,7 +60,10 @@ class ReplayBundle:
 
     def guess_start_url(self) -> Optional[str]:
         for resource in self.resources:
-            if resource.get("resource_type") == "document" and resource.get("status", 200) < 400:
+            if (
+                resource.get("resource_type") == "document"
+                and resource.get("status", 200) < 400
+            ):
                 return resource.get("url")
         return None
 
@@ -113,6 +123,10 @@ class ReplayBundle:
                 )
 
         if payload:
+            # Log cached URL
+            if self.log_dir and request.url not in self._cached_urls:
+                self._cached_urls.add(request.url)
+
             body_bytes = self._load_body(payload)
             headers = dict(payload.get("response_headers") or {})
             if body_bytes is not None:
@@ -124,6 +138,10 @@ class ReplayBundle:
             await route.fulfill(status=status, headers=headers, body=body_bytes)
             return
 
+        # Log not-found URL
+        if self.log_dir and request.url not in self._not_found_urls:
+            self._not_found_urls.add(request.url)
+
         if allow_network_fallback:
             await route.continue_()
             return
@@ -132,12 +150,41 @@ class ReplayBundle:
         logger.warning(message)
         await route.fulfill(status=504, body=message)
 
+    def flush_logs(self) -> None:
+        """Write cached and not-found URLs to log files."""
+        if not self.log_dir:
+            return
+
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+
+        if self._cached_urls:
+            cached_log_path = self.log_dir / "cached.log"
+            with open(cached_log_path, "w", encoding="utf-8") as f:
+                for url in sorted(self._cached_urls):
+                    f.write(f"{url}\n")
+            logger.info(
+                "Wrote %d cached URLs to %s", len(self._cached_urls), cached_log_path
+            )
+
+        if self._not_found_urls:
+            not_found_log_path = self.log_dir / "not-found.log"
+            with open(not_found_log_path, "w", encoding="utf-8") as f:
+                for url in sorted(self._not_found_urls):
+                    f.write(f"{url}\n")
+            logger.info(
+                "Wrote %d not-found URLs to %s",
+                len(self._not_found_urls),
+                not_found_log_path,
+            )
+
     def _load_body(self, payload: Dict[str, Any]) -> Optional[bytes]:
         body_path = payload.get("body_path")
         if not body_path:
             size = payload.get("body_size")
             if size:
-                logger.debug("Recorded size without body path for %s", payload.get("url"))
+                logger.debug(
+                    "Recorded size without body path for %s", payload.get("url")
+                )
             return b"" if size == 0 else None
 
         target = self.bundle_path / body_path
@@ -207,15 +254,16 @@ async def _cli(bundle_path: Path, *, headless: bool, allow_fallback: bool) -> No
 
     async with async_playwright() as pw:
         launch_kwargs: Dict[str, Any] = {"headless": headless}
-        channel = (
-            os.environ.get("REPLAY_BROWSER_CHANNEL")
-            or os.environ.get("RECORDER_BROWSER_CHANNEL")
+        channel = os.environ.get("REPLAY_BROWSER_CHANNEL") or os.environ.get(
+            "RECORDER_BROWSER_CHANNEL"
         )
         if channel:
             launch_kwargs["channel"] = channel
 
         browser = await pw.chromium.launch(**launch_kwargs)
-        context = await bundle.build_context(browser, allow_network_fallback=allow_fallback)
+        context = await bundle.build_context(
+            browser, allow_network_fallback=allow_fallback
+        )
         page = await context.new_page()
         start_url = bundle.guess_start_url() or "about:blank"
         logger.info("Opening %s", start_url)
@@ -224,9 +272,15 @@ async def _cli(bundle_path: Path, *, headless: bool, allow_fallback: bool) -> No
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Replay a captured browser bundle offline")
-    parser.add_argument("bundle", type=Path, help="Path to the capture bundle directory")
-    parser.add_argument("--headless", action="store_true", help="Run browser in headless mode")
+    parser = argparse.ArgumentParser(
+        description="Replay a captured browser bundle offline"
+    )
+    parser.add_argument(
+        "bundle", type=Path, help="Path to the capture bundle directory"
+    )
+    parser.add_argument(
+        "--headless", action="store_true", help="Run browser in headless mode"
+    )
     parser.add_argument(
         "--allow-network-fallback",
         action="store_true",

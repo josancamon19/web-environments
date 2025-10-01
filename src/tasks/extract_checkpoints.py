@@ -14,7 +14,6 @@ lm = dspy.LM(
 dspy.configure(lm=lm)
 
 
-# TODO: how to make this dynamic properly.
 def get_checkpoint_extractor(checkpoints: int = 2):
     class CheckpointExtractor(dspy.Signature):
         """
@@ -35,11 +34,9 @@ def get_checkpoint_extractor(checkpoints: int = 2):
         task_description: str = dspy.InputField(
             description="The description of the task"
         )
-        # TODO: use the ToolCallData once using dom_states, otherwise seem irrelevant
         steps_taken: List[BaseToolCallData] = dspy.InputField(
             description="The steps taken by the human to perform the task."
         )
-        # TODO: to include later as agent, fields like too much context, and not sure if relevance would change this much
         # dom_states_files: List[Dict[str, Any]] = dspy.InputField(
         #     description="Some of the dom_states files "
         # )

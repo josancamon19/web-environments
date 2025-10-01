@@ -26,7 +26,6 @@ lm = dspy.LM(
 dspy.configure(lm=lm)
 
 
-# TODO: should be an agent.
 class JudgeCompletion(dspy.Signature):
     # - clarify that in the way the human trajectory and dom match the description, should determine if model last_step matches the dom and task completion, model not hallucinating.
     """
@@ -68,9 +67,7 @@ class JudgeCompletion(dspy.Signature):
     reasoning: str = dspy.OutputField(description="The reasoning for your judgement")
     confidence: float = dspy.OutputField(
         description="The confidence score for your judgement"
-    )  # TODO: it's shit for a very simple ikea task.
-    # TODO: should use a rubric, agent evaluation.
-    # TODO: use parts of HLE prompt
+    )
 
 
 logging.basicConfig(level=logging.INFO)
@@ -193,11 +190,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-    # TODO: video is not being recorded on windows (?)
-    # TODO: improve paths handling, and results storage.
-    # TODO: if evaluation fails, do checkpoint identification matching. 1 prompt trajectory wise.
     # TODO: improve db to jsonl format code, is shit.
-    # TODO: script to merge multiple zips into one single task, when it comes from multiple people.
     # TODO: ask for website for the task (?)
     # TODO: would bounding boxes help?
     # TODO: GUI is kinda trash
