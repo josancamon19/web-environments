@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 from typing import Any, Dict, Optional, Tuple
@@ -180,20 +181,35 @@ class StepRecord:
             return False
 
     async def take_screenshot(self, screenshot_path: str):
-        """Take a screenshot - using regular method for stability."""
+        """Take a screenshot using CDP to avoid visual flicker from Playwright's method."""
         try:
-            logger.debug(f"[SCREENSHOT] Starting screenshot capture")
+            logger.debug(f"[SCREENSHOT] Starting CDP screenshot capture")
             page = self.actual_page.get_page()
 
-            # For now, use the regular screenshot method for stability
-            # We can optimize later once we identify the crash cause
-            # page.waitForTimeout(500)
-            await page.screenshot(path=screenshot_path, full_page=False)
-            logger.debug(f"[SCREENSHOT] Screenshot captured successfully")
+            # Use Chrome DevTools Protocol directly - doesn't cause the same rendering pause
+            # as Playwright's screenshot() method
+            cdp_session = await page.context.new_cdp_session(page)
+            screenshot_data = await cdp_session.send("Page.captureScreenshot", {
+                "format": "png",
+                "captureBeyondViewport": False,
+            })
+            await cdp_session.detach()
+
+            # Decode and save
+            with open(screenshot_path, "wb") as f:
+                f.write(base64.b64decode(screenshot_data["data"]))
+
+            logger.debug(f"[SCREENSHOT] CDP screenshot captured successfully")
 
         except Exception as e:
-            logger.error(f"[SCREENSHOT] Failed to take screenshot: {e}")
-            raise
+            logger.error(f"[SCREENSHOT] Failed to take CDP screenshot: {e}")
+            # Fallback to regular screenshot if CDP fails
+            try:
+                page = self.actual_page.get_page()
+                await page.screenshot(path=screenshot_path, full_page=False)
+            except Exception as fallback_error:
+                logger.error(f"[SCREENSHOT] Fallback screenshot also failed: {fallback_error}")
+                raise
 
     def _parse_metadata(self, metadata: Any) -> Dict[str, Any]:
         if not metadata:
