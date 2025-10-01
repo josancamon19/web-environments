@@ -34,6 +34,7 @@ class StepRecord:
         self.task_manager = TaskManager()
         self.actual_page = ActualPage()
         self.step_manager = StepManager()
+        self._cdp_session = None
 
     async def record_step(self, step_info: dict, omit_screenshot: bool = False):
         try:
@@ -180,20 +181,28 @@ class StepRecord:
             # Default to false for unknown events to be safe
             return False
 
+    async def _get_cdp_session(self):
+        """Get or create a reusable CDP session for the current page."""
+        page = self.actual_page.get_page()
+
+        # Create new session if none exists or if page changed
+        if self._cdp_session is None:
+            self._cdp_session = await page.context.new_cdp_session(page)
+            logger.debug("[SCREENSHOT] Created new CDP session")
+
+        return self._cdp_session
+
     async def take_screenshot(self, screenshot_path: str):
         """Take a screenshot using CDP to avoid visual flicker from Playwright's method."""
         try:
             logger.debug(f"[SCREENSHOT] Starting CDP screenshot capture")
-            page = self.actual_page.get_page()
 
-            # Use Chrome DevTools Protocol directly - doesn't cause the same rendering pause
-            # as Playwright's screenshot() method
-            cdp_session = await page.context.new_cdp_session(page)
+            # Reuse CDP session to avoid overhead of creating new sessions
+            cdp_session = await self._get_cdp_session()
             screenshot_data = await cdp_session.send("Page.captureScreenshot", {
                 "format": "png",
                 "captureBeyondViewport": False,
             })
-            await cdp_session.detach()
 
             # Decode and save
             with open(screenshot_path, "wb") as f:
@@ -203,6 +212,9 @@ class StepRecord:
 
         except Exception as e:
             logger.error(f"[SCREENSHOT] Failed to take CDP screenshot: {e}")
+            # Reset CDP session on error in case it became stale
+            self._cdp_session = None
+
             # Fallback to regular screenshot if CDP fails
             try:
                 page = self.actual_page.get_page()
