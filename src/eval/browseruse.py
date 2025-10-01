@@ -225,12 +225,17 @@ async def run_task_with_agent(
     sandbox_allow_network: bool = False,
     sandbox_headless: bool = True,
     sandbox_safe_mode: bool = False,
+    results_dir: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """Run a single task with the Browser-Use agent and capture all data."""
 
     start_time = datetime.now()
 
-    doms_output_dir = Path("src/eval/results/doms")
+    # Use the results_dir passed from the main function
+    if results_dir is None:
+        results_dir = Path("results")
+
+    doms_output_dir = results_dir / "doms"
     task_dom_dir = doms_output_dir / f"task_{task['task_id']}"
     task_dom_dir.mkdir(parents=True, exist_ok=True)
 
@@ -284,10 +289,10 @@ async def run_task_with_agent(
                 sandbox_bundle,
                 safe_mode,
             )
-            
+
             # Set up log directory for tracking cached vs not-found URLs
-            log_dir = Path("src/eval/results") / f"task_{task['task_id']}"
-            
+            log_dir = results_dir / "logs" / f"task_{task['task_id']}"
+
             sandbox = SandboxEnvironment(
                 sandbox_bundle,
                 allow_network_fallback=sandbox_allow_network,
@@ -399,14 +404,15 @@ def load_completed_tasks(output_file: Path) -> set:
     """Load task IDs that have already been processed from the output file"""
     completed_task_ids = set()
     if output_file.exists():
-        with open(output_file, "r") as f:
-            for line in f:
-                if line.strip():
-                    try:
-                        result = json.loads(line)
-                        completed_task_ids.add(result["task_id"])
-                    except json.JSONDecodeError:
-                        continue
+        try:
+            with open(output_file, "r") as f:
+                results = json.load(f)
+                if isinstance(results, list):
+                    for result in results:
+                        if isinstance(result, dict) and "task_id" in result:
+                            completed_task_ids.add(result["task_id"])
+        except (json.JSONDecodeError, FileNotFoundError):
+            pass
     return completed_task_ids
 
 
@@ -431,6 +437,7 @@ async def process_single_task(
     sandbox_allow_network: bool,
     sandbox_headless: bool,
     sandbox_safe_mode: bool,
+    results_dir: Path,
 ):
     """Process a single task and write results to file"""
     logger.info(
@@ -456,12 +463,26 @@ async def process_single_task(
             sandbox_allow_network=sandbox_allow_network,
             sandbox_headless=sandbox_headless,
             sandbox_safe_mode=sandbox_safe_mode,
+            results_dir=results_dir,
         )
 
         # Write result with thread-safe lock
         async with file_write_lock:
-            with open(output_file, "a") as f:
-                f.write(json.dumps(result, default=str) + "\n")
+            # Load existing results
+            results_list = []
+            if output_file.exists():
+                try:
+                    with open(output_file, "r") as f:
+                        results_list = json.load(f)
+                except (json.JSONDecodeError, FileNotFoundError):
+                    results_list = []
+
+            # Append new result
+            results_list.append(result)
+
+            # Write back to file
+            with open(output_file, "w") as f:
+                json.dump(results_list, f, indent=2, default=str)
 
         logger.info(
             f"Task {task['task_id']} - Success: {result['success']}, "
@@ -485,8 +506,21 @@ async def process_single_task(
 
         # Write error result with thread-safe lock
         async with file_write_lock:
-            with open(output_file, "a") as f:
-                f.write(json.dumps(error_result, default=str) + "\n")
+            # Load existing results
+            results_list = []
+            if output_file.exists():
+                try:
+                    with open(output_file, "r") as f:
+                        results_list = json.load(f)
+                except (json.JSONDecodeError, FileNotFoundError):
+                    results_list = []
+
+            # Append error result
+            results_list.append(error_result)
+
+            # Write back to file
+            with open(output_file, "w") as f:
+                json.dump(results_list, f, indent=2, default=str)
 
 
 async def process_all_tasks(
@@ -497,15 +531,17 @@ async def process_all_tasks(
     sandbox_headless: bool,
     sandbox_safe_mode: bool,
 ):
-    """Process all tasks and save to JSONL, skipping already completed ones"""
+    """Process all tasks and save to JSON, skipping already completed ones"""
     # Load tasks from input file
     with open(Path(f"{DATA_DIR}/tasks.jsonl"), "r") as f:
         tasks = [json.loads(line) for line in f if line.strip()]
 
-    # Setup output file path
-    output_dir = Path("src/eval/results")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_file = output_dir / f"browseruse-{model.replace('/', '-')}.jsonl"
+    # Setup output directory with timestamp
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    model_safe = model.replace("/", "-")
+    results_dir = Path("results") / f"browseruse-{model_safe}-{timestamp}"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    output_file = results_dir / "results.json"
 
     # Load already completed tasks
     completed_task_ids = load_completed_tasks(output_file)
@@ -545,6 +581,7 @@ async def process_all_tasks(
                     sandbox_allow_network=sandbox_allow_network,
                     sandbox_headless=sandbox_headless,
                     sandbox_safe_mode=sandbox_safe_mode,
+                    results_dir=results_dir,
                 )
             )
 
