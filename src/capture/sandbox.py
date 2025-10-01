@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import http.client
 import json
 import logging
 import os
@@ -7,8 +8,6 @@ import signal
 import socket
 from pathlib import Path
 from typing import List, Optional
-from urllib import request as urllib_request
-from urllib.error import URLError
 
 from playwright.async_api import Browser as PlaywrightBrowser
 from playwright.async_api import BrowserContext, BrowserType, async_playwright
@@ -89,14 +88,16 @@ class SandboxEnvironment:
         if env_safe_mode is not None:
             self.safe_mode = env_safe_mode.lower() in {"1", "true", "yes", "on"}
 
+        # Determine headless setting (allow override even in safe mode)
+        if env_headless is not None:
+            self.headless = env_headless.lower() in {"1", "true", "yes", "on"}
+        else:
+            self.headless = headless if headless is not None else False
+
+        # Set browser args based on mode
         if self.safe_mode:
-            self.headless = True
             base_args = SAFE_BROWSER_ARGS
         else:
-            if env_headless is not None:
-                self.headless = env_headless.lower() in {"1", "true", "yes", "on"}
-            else:
-                self.headless = headless if headless is not None else False
             base_args = browser_args if browser_args is not None else BROWSER_ARGS
 
         if browser_args is not None and self.safe_mode:
@@ -138,7 +139,6 @@ class SandboxEnvironment:
         launch_kwargs = {
             "headless": self.headless,
             "args": launch_args,
-            "ignore_default_args": ["--remote-debugging-pipe"],
         }
         if self.channel:
             launch_kwargs["channel"] = self.channel
@@ -157,13 +157,17 @@ class SandboxEnvironment:
             for context in list(self._browser.contexts):
                 await self._configure_context(context)
 
+
         self._ws_endpoint = await self._wait_for_ws_endpoint()
         logger.info("[SANDBOX] Chromium CDP endpoint: %s", self._ws_endpoint)
 
         # Preload initial URL if available
         start_url = self.bundle.guess_start_url()
         if start_url and self._browser.contexts:
-            page = self._browser.contexts[0].pages[0]
+            context = self._browser.contexts[0]
+            if not context.pages:
+                await context.new_page()
+            page = context.pages[0]
             try:
                 await page.goto(start_url)
             except Exception as exc:
@@ -173,21 +177,24 @@ class SandboxEnvironment:
 
     async def _wait_for_ws_endpoint(self) -> str:
         assert self._debug_port is not None
-        url = f"http://127.0.0.1:{self._debug_port}/json/version"
 
         def _fetch() -> Optional[str]:
             try:
-                with urllib_request.urlopen(url, timeout=0.5) as resp:
-                    if getattr(resp, "status", 200) != 200:
-                        return None
-                    data = json.loads(resp.read().decode("utf-8"))
-                    return data.get("webSocketDebuggerUrl")
+                conn = http.client.HTTPConnection("127.0.0.1", self._debug_port, timeout=0.5)
+                conn.request("GET", "/json/version")
+                resp = conn.getresponse()
+                if resp.status != 200:
+                    conn.close()
+                    return None
+                data = json.loads(resp.read().decode("utf-8"))
+                conn.close()
+                return data.get("webSocketDebuggerUrl")
             except (
-                URLError,
                 TimeoutError,
                 ConnectionError,
                 json.JSONDecodeError,
                 socket.timeout,
+                OSError,
             ):
                 return None
 
