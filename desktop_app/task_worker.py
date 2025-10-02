@@ -1,4 +1,5 @@
 """Background worker process used by the desktop task collector GUI."""
+
 from __future__ import annotations
 
 import asyncio
@@ -30,7 +31,9 @@ async def _wait_for_command(pipe: Connection) -> Dict[str, Any]:
         return {"type": "cancel"}
 
 
-def run_task_worker(pipe: Connection, description: str, task_type: str, source: str) -> None:
+def run_task_worker(
+    pipe: Connection, description: str, task_type: str, source: str
+) -> None:
     """Entry point executed inside a separate process to run Playwright safely."""
 
     async def runner() -> None:

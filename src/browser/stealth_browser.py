@@ -107,6 +107,7 @@ class StealthBrowser:
         print("🔧 Setting up DOM listeners...")
 
         if not self._binding_registered:
+
             async def _on_page_event(source, event_info):
                 page = getattr(source, "page", None)
                 await self.page_event_handler(event_info, page)

@@ -22,6 +22,7 @@ class Step:
         self.dom_snapshot_metadata = dom_snapshot_metadata
         self.screenshot_path = screenshot_path
 
+
 class CreateStepDto:
     def __init__(
         self,
@@ -41,6 +42,7 @@ class CreateStepDto:
         self.dom_snapshot_metadata = dom_snapshot_metadata
         self.screenshot_path = screenshot_path
 
+
 class StepManager:
     _instance = None
     _initialized = False
@@ -58,10 +60,10 @@ class StepManager:
 
     def save_step(self, step: CreateStepDto):
         return self.step_repository.save(step)
-        
+
     def get_actual_step(self):
         return self.actual_step
-    
+
     def set_actual_step(self, step: Step):
         self.actual_step = step
 
@@ -79,7 +81,8 @@ class StepManager:
         cls._instance = None
         cls._initialized = False
 
-class StepRepository: 
+
+class StepRepository:
     def __init__(self):
         self.db = Database.get_instance()
 

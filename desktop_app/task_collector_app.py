@@ -81,9 +81,11 @@ def _load_env_files() -> None:
             load_dotenv(dotenv_path=dotenv_path, override=False)
 
 
-def ensure_google_credentials(creds_base64: Optional[str] = None) -> tuple[bool, Optional[str]]:
+def ensure_google_credentials(
+    creds_base64: Optional[str] = None,
+) -> tuple[bool, Optional[str]]:
     """Ensure Google credentials file exists for storage uploads.
-    
+
     Expects base64-encoded Google Cloud service account JSON credentials.
     """
 
@@ -115,27 +117,29 @@ def ensure_google_credentials(creds_base64: Optional[str] = None) -> tuple[bool,
         # Decode base64 credentials
         creds_bytes = base64.b64decode(creds_str)
         creds_json_str = creds_bytes.decode("utf-8")
-        
+
         # Clean the JSON string - ensure it starts with { and ends with }
         creds_json_str = creds_json_str.strip()
-        
+
         # Find the first { and last }
         start_idx = creds_json_str.find("{")
         end_idx = creds_json_str.rfind("}")
-        
+
         if start_idx == -1 or end_idx == -1 or start_idx >= end_idx:
             raise ValueError("Invalid JSON structure - missing braces")
-        
+
         # Extract clean JSON
-        clean_json = creds_json_str[start_idx:end_idx + 1]
-        
+        clean_json = creds_json_str[start_idx : end_idx + 1]
+
         # Validate it's proper JSON
         json.loads(clean_json)
-        
+
         # Write the clean JSON to file (overwrite, not append)
         creds_path.parent.mkdir(parents=True, exist_ok=True)
         creds_path.write_text(clean_json, encoding="utf-8")
-        logger.debug(f"Credentials written to {creds_path} (size: {len(clean_json)} chars)")
+        logger.debug(
+            f"Credentials written to {creds_path} (size: {len(clean_json)} chars)"
+        )
 
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(creds_path)
         _GOOGLE_CREDS_READY = True
@@ -151,6 +155,7 @@ def ensure_google_credentials(creds_base64: Optional[str] = None) -> tuple[bool,
         _GOOGLE_CREDS_ERROR = message
         logger.error(f"Credential setup failed: {exc}")
         return False, message
+
 
 # Config file to store user settings
 CONFIG_FILE = Path(DATA_DIR) / ".user_config.json"
@@ -1051,9 +1056,13 @@ class TaskCollectorApp:
                     creds = config.get("google_credentials_base64", "")
                     if creds:
                         # Only load if text widget is empty to avoid concatenating
-                        current_content = self.credentials_text.get("1.0", tk.END).strip()
+                        current_content = self.credentials_text.get(
+                            "1.0", tk.END
+                        ).strip()
                         if not current_content:
-                            self.credentials_text.delete("1.0", tk.END)  # Clear any content
+                            self.credentials_text.delete(
+                                "1.0", tk.END
+                            )  # Clear any content
                             self.credentials_text.insert("1.0", creds)
             except Exception as exc:
                 logger.warning(f"Failed to load credentials from config: {exc}")
@@ -1085,14 +1094,18 @@ class TaskCollectorApp:
 
         creds = self.credentials_text.get("1.0", tk.END).strip()
         if not creds:
-            self._log("⚠️ Upload requires Google Cloud credentials in the Settings field.")
+            self._log(
+                "⚠️ Upload requires Google Cloud credentials in the Settings field."
+            )
         else:
             # Test credentials
             creds_ready, error_message = ensure_google_credentials(creds)
             if creds_ready:
                 self._log("✅ Google Cloud credentials loaded successfully.")
             elif error_message:
-                self._log("⚠️ There's an issue with your credentials - please check the format.")
+                self._log(
+                    "⚠️ There's an issue with your credentials - please check the format."
+                )
 
     def _log(self, message: str) -> None:
         self.log_queue.put(message)
@@ -1269,7 +1282,10 @@ class TaskCollectorApp:
 
         creds_ready, error_message = ensure_google_credentials(creds)
         if not creds_ready:
-            error_text = error_message or "Google Cloud credentials are not configured correctly."
+            error_text = (
+                error_message
+                or "Google Cloud credentials are not configured correctly."
+            )
             self._log(f"❌ {error_text.splitlines()[0]}")
             messagebox.showerror("Upload Error", error_text, parent=self.root)
             return
@@ -1613,7 +1629,7 @@ if __name__ == "__main__":
         print(f"Python version: {sys.version}")
         print(f"Platform: {sys.platform}")
         print(f"Frozen: {getattr(sys, 'frozen', False)}")
-        
+
         app = TaskCollectorApp()
         print("App initialized successfully")
         app.run()
@@ -1623,11 +1639,12 @@ if __name__ == "__main__":
         try:
             import tkinter as tk
             from tkinter import messagebox
+
             root = tk.Tk()
             root.withdraw()
             messagebox.showerror(
                 "Application Error",
-                f"Failed to start Task Collector:\n\n{str(e)}\n\nCheck the log file for details."
+                f"Failed to start Task Collector:\n\n{str(e)}\n\nCheck the log file for details.",
             )
         except Exception:  # pylint: disable=broad-except
             print(f"ERROR: {e}")

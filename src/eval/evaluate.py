@@ -4,8 +4,6 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, List
 
-import sys
-import os
 import dspy
 from tasks.db_to_jsonl_format import BaseToolCallData
 

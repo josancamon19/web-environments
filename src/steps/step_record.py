@@ -195,7 +195,7 @@ class StepRecord:
     async def take_screenshot(self, screenshot_path: str):
         """Take a screenshot using CDP to avoid visual flicker from Playwright's method."""
         try:
-            logger.debug(f"[SCREENSHOT] Starting CDP screenshot capture")
+            logger.debug("[SCREENSHOT] Starting CDP screenshot capture")
 
             # Reuse CDP session to avoid overhead of creating new sessions
             cdp_session = await self._get_cdp_session()
@@ -211,7 +211,7 @@ class StepRecord:
             with open(screenshot_path, "wb") as f:
                 f.write(base64.b64decode(screenshot_data["data"]))
 
-            logger.debug(f"[SCREENSHOT] CDP screenshot captured successfully")
+            logger.debug("[SCREENSHOT] CDP screenshot captured successfully")
 
         except Exception as e:
             logger.error(f"[SCREENSHOT] Failed to take CDP screenshot: {e}")

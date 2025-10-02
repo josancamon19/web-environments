@@ -30,7 +30,7 @@ class NewPageEvent:
                             "event_context": "state:page",
                             "event_data": {"url": p.url},
                         },
-                        "prefix_action": f"state:page",
+                        "prefix_action": "state:page",
                         "source_page": p,
                     }
                 )
@@ -47,7 +47,7 @@ class NewPageEvent:
                             "event_context": "state:page",
                             "event_data": {"url": p.url},
                         },
-                        "prefix_action": f"state:page",
+                        "prefix_action": "state:page",
                         "source_page": p,
                     }
                 )
@@ -63,7 +63,7 @@ class NewPageEvent:
                                 "event_context": "state:browser",
                                 "event_data": {"url": frame.url},
                             },
-                            "prefix_action": f"state:browser",
+                            "prefix_action": "state:browser",
                             "source_page": p,
                         },
                         omit_screenshot=True,
@@ -78,7 +78,7 @@ class NewPageEvent:
                             "event_context": "state:browser",
                             "event_data": {"url": p.url, "final_url": p.url},
                         },
-                        "prefix_action": f"state:browser",
+                        "prefix_action": "state:browser",
                         "source_page": p,
                     },
                     omit_screenshot=True,
