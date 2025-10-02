@@ -112,12 +112,18 @@ class UsernameDialog(tk.Toplevel):
     def ok(self):
         username = self.username_entry.get().strip()
         if not username:
-            messagebox.showwarning("Invalid Username", "Please enter a username.", parent=self)
+            messagebox.showwarning(
+                "Invalid Username", "Please enter a username.", parent=self
+            )
             return
         # Sanitize username for filename
         self.result = "".join(c for c in username if c.isalnum() or c in "-_")
         if not self.result:
-            messagebox.showwarning("Invalid Username", "Username must contain alphanumeric characters.", parent=self)
+            messagebox.showwarning(
+                "Invalid Username",
+                "Username must contain alphanumeric characters.",
+                parent=self,
+            )
             return
         self.destroy()
 
@@ -141,7 +147,9 @@ class UploadProgressDialog(tk.Toplevel):
         self.transient(parent)
         self.grab_set()
 
-        self.protocol("WM_DELETE_WINDOW", lambda: None)  # Disable close button during upload
+        self.protocol(
+            "WM_DELETE_WINDOW", lambda: None
+        )  # Disable close button during upload
 
         # Create widgets
         self.create_widgets()
@@ -163,7 +171,9 @@ class UploadProgressDialog(tk.Toplevel):
         )
         self.progress.pack(pady=(0, 10))
 
-        self.detail_label = tk.Label(main_frame, text="", fg="gray", font=("Helvetica", 9))
+        self.detail_label = tk.Label(
+            main_frame, text="", fg="gray", font=("Helvetica", 9)
+        )
         self.detail_label.pack()
 
     def center_window(self):
@@ -178,7 +188,7 @@ class UploadProgressDialog(tk.Toplevel):
 
     def update_progress(self, status: str, progress: float, detail: str = ""):
         """Update the progress bar and labels.
-        
+
         Args:
             status: Main status text
             progress: Progress value (0-100)
@@ -856,12 +866,12 @@ class TaskCollectorApp:
         # Ask user for username
         dialog = UsernameDialog(self.root)
         username = dialog.show()
-        
+
         if username:
             # Save for next time
             self._save_username(username)
             return username
-        
+
         return None
 
     def _save_username(self, username: str) -> None:
@@ -914,7 +924,7 @@ class TaskCollectorApp:
             return
 
         self._log("Starting data upload process...")
-        
+
         # Create progress dialog
         progress_dialog = UploadProgressDialog(self.root)
         temp_zip_path = None
@@ -924,18 +934,22 @@ class TaskCollectorApp:
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             zip_filename = f"{username}-web-envs-data-{timestamp}.zip"
 
-            progress_dialog.update_progress("Preparing zip file...", 5, "Counting files...")
+            progress_dialog.update_progress(
+                "Preparing zip file...", 5, "Counting files..."
+            )
             self.root.update()
 
             # Count total files for progress tracking
             all_files = [f for f in data_dir.rglob("*") if f.is_file()]
             total_files = len(all_files)
-            
+
             # Create temporary zip file
             with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as temp_zip:
                 temp_zip_path = temp_zip.name
 
-            progress_dialog.update_progress("Creating zip archive...", 10, f"0 / {total_files} files")
+            progress_dialog.update_progress(
+                "Creating zip archive...", 10, f"0 / {total_files} files"
+            )
             self.root.update()
 
             # Create zip archive with progress tracking
@@ -951,23 +965,25 @@ class TaskCollectorApp:
                         zinfo.date_time = (1980, 1, 1, 0, 0, 0)
                         with open(file_path, "rb") as f:
                             zipf.writestr(zinfo, f.read())
-                    
+
                     # Update progress every 10 files or on last file
                     if idx % 10 == 0 or idx == total_files:
                         progress_pct = 10 + (idx / total_files) * 40  # 10-50%
                         progress_dialog.update_progress(
-                            "Creating zip archive...", 
+                            "Creating zip archive...",
                             progress_pct,
-                            f"{idx} / {total_files} files"
+                            f"{idx} / {total_files} files",
                         )
                         self.root.update()
 
             # Get file size for upload progress
             zip_size = os.path.getsize(temp_zip_path)
             zip_size_mb = zip_size / (1024 * 1024)
-            
+
             self._log(f"Created zip file: {zip_filename} ({zip_size_mb:.1f} MB)")
-            progress_dialog.update_progress("Uploading to Google Cloud...", 55, f"{zip_size_mb:.1f} MB")
+            progress_dialog.update_progress(
+                "Uploading to Google Cloud...", 55, f"{zip_size_mb:.1f} MB"
+            )
             self.root.update()
 
             # Initialize GCP client
@@ -979,7 +995,7 @@ class TaskCollectorApp:
             # Start upload in a thread to keep UI responsive
             upload_complete = threading.Event()
             upload_error = None
-            
+
             def do_upload():
                 nonlocal upload_error
                 try:
@@ -988,10 +1004,10 @@ class TaskCollectorApp:
                     upload_error = e
                 finally:
                     upload_complete.set()
-            
+
             upload_thread = threading.Thread(target=do_upload, daemon=True)
             upload_thread.start()
-            
+
             # Animate progress while uploading
             upload_progress = 55
             while not upload_complete.is_set():
@@ -1001,27 +1017,29 @@ class TaskCollectorApp:
                 progress_dialog.update_progress(
                     "Uploading to Google Cloud...",
                     upload_progress,
-                    f"{zip_size_mb:.1f} MB"
+                    f"{zip_size_mb:.1f} MB",
                 )
                 self.root.update()
                 self.root.after(100)  # Wait 100ms
-            
+
             # Check if upload succeeded
             if upload_error:
                 raise upload_error
-            
+
             progress_dialog.update_progress("Finalizing upload...", 95, "")
             self.root.update()
 
             # Clean up temporary file
             os.unlink(temp_zip_path)
 
-            progress_dialog.update_progress("Upload complete!", 100, f"Uploaded {zip_size_mb:.1f} MB")
+            progress_dialog.update_progress(
+                "Upload complete!", 100, f"Uploaded {zip_size_mb:.1f} MB"
+            )
             self.root.update()
-            
+
             # Small delay to show 100%
             self.root.after(500, progress_dialog.destroy)
-            
+
             self._set_status("Upload completed successfully!", is_error=False)
             self._log(
                 f"✅ Successfully uploaded {zip_filename} to collection-reports bucket"
@@ -1032,7 +1050,7 @@ class TaskCollectorApp:
 
         except Exception as exc:
             progress_dialog.destroy()
-            
+
             # Clean up temporary file if it exists
             if temp_zip_path and os.path.exists(temp_zip_path):
                 try:

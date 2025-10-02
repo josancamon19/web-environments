@@ -29,3 +29,8 @@ package-dir = { "" = "src" }
 
 [tool.ruff.lint]
 ignore = ["F722"]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.16.0",
+]
