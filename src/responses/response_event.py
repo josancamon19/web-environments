@@ -1,6 +1,6 @@
 import logging
 from tasks.task import TaskManager
-from requests.request_event import Request_Event
+from request_handlers.request_event import Request_Event
 import json
 from utils.get_iso_datetime import get_iso_datetime
 from source_data.database import Database

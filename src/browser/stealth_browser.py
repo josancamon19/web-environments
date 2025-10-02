@@ -7,7 +7,7 @@ from page.actual_page import ActualPage
 from utils.get_tasks_video_path import get_tasks_video_path
 from tasks.task import TaskManager
 import sys
-from requests.request_event import Request_Event
+from request_handlers.request_event import Request_Event
 from responses.response_event import Response_Event
 from page.new_page_event import NewPageEvent
 import os

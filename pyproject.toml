@@ -17,6 +17,9 @@ dependencies = [
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[project.scripts]
+data-collector = "main:cli"
+
 [tool.setuptools]
 package-dir = { "" = "src" }
 

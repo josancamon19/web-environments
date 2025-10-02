@@ -91,6 +91,11 @@ async def main():
         await stealth_browser.close()
 
 
+def cli():
+    """CLI entry point for the web-envs command."""
+    asyncio.run(main())
+
+
 if __name__ == "__main__":
     # Run the async main function
-    asyncio.run(main())
+    cli()
