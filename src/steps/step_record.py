@@ -199,10 +199,13 @@ class StepRecord:
 
             # Reuse CDP session to avoid overhead of creating new sessions
             cdp_session = await self._get_cdp_session()
-            screenshot_data = await cdp_session.send("Page.captureScreenshot", {
-                "format": "png",
-                "captureBeyondViewport": False,
-            })
+            screenshot_data = await cdp_session.send(
+                "Page.captureScreenshot",
+                {
+                    "format": "png",
+                    "captureBeyondViewport": False,
+                },
+            )
 
             # Decode and save
             with open(screenshot_path, "wb") as f:
@@ -220,7 +223,9 @@ class StepRecord:
                 page = self.actual_page.get_page()
                 await page.screenshot(path=screenshot_path, full_page=False)
             except Exception as fallback_error:
-                logger.error(f"[SCREENSHOT] Fallback screenshot also failed: {fallback_error}")
+                logger.error(
+                    f"[SCREENSHOT] Fallback screenshot also failed: {fallback_error}"
+                )
                 raise
 
     def _parse_metadata(self, metadata: Any) -> Dict[str, Any]:
