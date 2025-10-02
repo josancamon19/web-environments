@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import json
 import logging
@@ -7,7 +8,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
-from config.storage_config import DATA_DIR
 from browser_use import Agent, Browser, ChatOpenAI
 from kernel import Kernel
 
@@ -15,11 +15,10 @@ from itertools import islice
 
 import sys
 
-import typer
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.capture.sandbox import SandboxEnvironment, resolve_recorded_bundle
 from src.config.browser_config import CONTEXT_CONFIG
+from src.config.storage_config import DATA_DIR
 
 load_dotenv()
 
@@ -528,7 +527,11 @@ async def process_all_tasks(
 ):
     """Process all tasks and save to JSON, skipping already completed ones"""
     # Load tasks from input file
-    with open(Path(f"{DATA_DIR}/tasks.jsonl"), "r") as f:
+    tasks_path = DATA_DIR / "tasks.jsonl"
+    if not tasks_path.exists():
+        raise FileNotFoundError(f"Tasks file not found at {tasks_path}")
+
+    with open(tasks_path, "r") as f:
         tasks = [json.loads(line) for line in f if line.strip()]
 
     # Setup output directory with timestamp
@@ -587,46 +590,72 @@ async def process_all_tasks(
     return output_file
 
 
-def main(
-    model: str = "gpt-5-nano",
-    use_sandbox: bool = True,
-    sandbox_allow_network: bool = True,
-    sandbox_headless: bool = True,
-    sandbox_safe_mode: bool = False,
-) -> None:
-    async def wrapper(
-        use_sandbox: bool,
-        sandbox_allow_network: bool,
-        sandbox_headless: bool,
-        sandbox_safe_mode: bool,
-    ) -> None:
-        sandbox_root: Optional[Path] = None
-        if use_sandbox:
-            sandbox_root = Path("data/captures").expanduser().resolve()
-            assert sandbox_root.exists()
-
-        if sandbox_safe_mode and not sandbox_headless:
+async def main(args: argparse.Namespace) -> None:
+    sandbox_root: Optional[Path] = None
+    if not args.no_sandbox:
+        candidate_root = (DATA_DIR / "captures").expanduser().resolve()
+        if candidate_root.exists():
+            sandbox_root = candidate_root
+            logger.info("Using sandbox captures under %s", sandbox_root)
+        else:
             logger.warning(
-                "Sandbox safe mode forces headless Chromium; ignoring --no-sandbox-headless"
+                "Sandbox root %s not found; falling back to Kernel browser",
+                candidate_root,
             )
-            sandbox_headless = True
 
-        output_file = await process_all_tasks(
-            model,
-            sandbox_root=sandbox_root,
-            sandbox_allow_network=sandbox_allow_network,
-            sandbox_headless=sandbox_headless,
-            sandbox_safe_mode=sandbox_safe_mode,
+    sandbox_headless = not args.sandbox_headed
+    sandbox_safe_mode = args.sandbox_safe_mode
+    if sandbox_safe_mode and args.sandbox_headed:
+        logger.warning(
+            "Sandbox safe mode forces headless Chromium; ignoring --sandbox-headed"
         )
-        print(f"\nFull data saved to: {output_file}")
+        sandbox_headless = True
 
-    asyncio.run(
-        wrapper(use_sandbox, sandbox_allow_network, sandbox_headless, sandbox_safe_mode)
+    output_file = await process_all_tasks(
+        args.model,
+        sandbox_root=sandbox_root,
+        sandbox_allow_network=args.sandbox_allow_network,
+        sandbox_headless=sandbox_headless,
+        sandbox_safe_mode=sandbox_safe_mode,
     )
+    print(f"\nFull data saved to: {output_file}")
+
+
+def parse_args() -> argparse.Namespace:
+    logger.info("Parsing arguments")
+    parser = argparse.ArgumentParser(
+        description="Run browser-use agent over recorded tasks"
+    )
+    parser.add_argument("--model", default="gpt-5-nano", help="LLM model name to use")
+    parser.add_argument(
+        "--prod", action="store_true", help="Use production data directory"
+    )
+    parser.add_argument(
+        "--no-sandbox",
+        action="store_true",
+        help="Disable sandbox replay and use the Kernel browser",
+    )
+    parser.add_argument(
+        "--sandbox-allow-network",
+        action="store_true",
+        help="Allow sandboxed replay to fall back to live network requests",
+    )
+    parser.add_argument(
+        "--sandbox-headed",
+        action="store_true",
+        help="Launch sandbox Chromium with a visible window",
+    )
+    parser.add_argument(
+        "--sandbox-safe-mode",
+        action="store_true",
+        help="Use a reduced argument set and headless Chromium for stability",
+    )
+    return parser.parse_args()
 
 
 def _main() -> None:
-    typer.run(main)
+    cli_args = parse_args()
+    asyncio.run(main(cli_args))
 
 
 if __name__ == "__main__":
