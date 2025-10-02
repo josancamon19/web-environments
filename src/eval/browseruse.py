@@ -19,14 +19,14 @@ import typer
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from src.eval.harness.definitions import (
+from eval.harness.definitions import (
     AgentContext,
     AgentRunResult,
     CaptureCallback,
     HarnessRunConfig,
 )
-from src.eval.harness.harness import HarnessConfig
-from src.eval.harness.harness import EvaluationHarness
+from eval.harness.harness import HarnessConfig
+from eval.harness.harness import EvaluationHarness
 
 load_dotenv()
 

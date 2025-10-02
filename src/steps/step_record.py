@@ -3,13 +3,13 @@ import json
 import logging
 from typing import Any, Dict, Optional, Tuple
 
-from src.source_data.database import Database
-from src.utils.get_iso_datetime import get_iso_datetime
-from src.tasks.task import TaskManager
-from src.page.actual_page import ActualPage
-from src.steps.step import StepManager
-from src.utils.get_screenshot_path import get_screenshot_path
-from src.steps.step import Step
+from source_data.database import Database
+from utils.get_iso_datetime import get_iso_datetime
+from tasks.task import TaskManager
+from page.actual_page import ActualPage
+from steps.step import StepManager
+from utils.get_screenshot_path import get_screenshot_path
+from steps.step import Step
 
 logger = logging.getLogger(__name__)
 

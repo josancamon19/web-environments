@@ -1,10 +1,10 @@
 import asyncio
 import signal
 import logging
-from src.browser.stealth_browser import StealthBrowser
-from src.config.initial_tasks import InitialTasks
-from src.tasks.task import TaskManager, CreateTaskDto, Task
-from src.utils.get_task_description import (
+from browser.stealth_browser import StealthBrowser
+from config.initial_tasks import InitialTasks
+from tasks.task import TaskManager, CreateTaskDto, Task
+from utils.get_task_description import (
     get_task_description_from_user,
     get_task_type_from_user,
     get_answer_from_user,

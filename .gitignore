@@ -14,3 +14,5 @@ playwright-browsers
 src/eval/tars/images
 results/
 data/
+.DS_Store
+*.egg-info

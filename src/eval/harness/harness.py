@@ -17,15 +17,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from src.config.browser_config import CONTEXT_CONFIG
-from src.capture.sandbox import resolve_recorded_bundle
-from src.eval.harness.definitions import (
+from config.browser_config import CONTEXT_CONFIG
+from capture.sandbox import resolve_recorded_bundle
+from eval.harness.definitions import (
     AgentContext,
     AgentRunner,
     HarnessRunConfig,
     SessionResources,
 )
-from src.eval.harness.session_provider import DefaultSessionProvider
+from eval.harness.session_provider import DefaultSessionProvider
 
 logger = logging.getLogger(__name__)
 tasks_file = Path("data/tasks.jsonl")

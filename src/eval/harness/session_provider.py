@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
-from src.capture.sandbox import SandboxEnvironment
+from capture.sandbox import SandboxEnvironment
 from kernel import Kernel
-from src.eval.harness.definitions import HarnessRunConfig, SessionResources
+from eval.harness.definitions import HarnessRunConfig, SessionResources
 
 logger = logging.getLogger(__name__)
 

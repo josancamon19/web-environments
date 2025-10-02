@@ -7,7 +7,7 @@ from typing import Dict, Any, List
 import sys
 import os
 import dspy
-from src.tasks.db_to_jsonl_format import BaseToolCallData
+from tasks.db_to_jsonl_format import BaseToolCallData
 
 
 # Add src to path

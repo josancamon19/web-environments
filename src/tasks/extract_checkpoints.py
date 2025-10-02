@@ -2,7 +2,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
 import dspy
-from src.tasks.db_to_jsonl_format import BaseToolCallData
+from tasks.db_to_jsonl_format import BaseToolCallData
 
 
 lm = dspy.LM(

@@ -13,7 +13,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Protocol
-from src.capture.sandbox import SandboxEnvironment
+from capture.sandbox import SandboxEnvironment
 
 logger = logging.getLogger(__name__)
 

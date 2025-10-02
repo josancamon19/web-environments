@@ -1,5 +1,5 @@
 import logging
-from src.steps.step_record import StepRecord
+from steps.step_record import StepRecord
 
 logger = logging.getLogger(__name__)
 

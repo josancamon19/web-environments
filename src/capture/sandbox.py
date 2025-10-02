@@ -10,8 +10,8 @@ from typing import List, Optional
 from playwright.async_api import Browser as PlaywrightBrowser
 from playwright.async_api import BrowserContext, BrowserType, async_playwright
 
-from src.capture.replay import ReplayBundle
-from src.config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
+from capture.replay import ReplayBundle
+from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
 
 
 logger = logging.getLogger(__name__)

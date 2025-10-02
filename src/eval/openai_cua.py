@@ -13,8 +13,8 @@ import sys
 import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-from src.config.browser_config import CONTEXT_CONFIG
-from src.eval.harness import (
+from config.browser_config import CONTEXT_CONFIG
+from eval.harness import (
     AgentContext,
     AgentRunResult,
     EvaluationHarness,
