@@ -10,6 +10,7 @@ Playwright's Chromium runtime into the bundle, adds a user-friendly
 from __future__ import annotations
 
 import argparse
+import importlib
 import os
 import shutil
 import subprocess
@@ -55,6 +56,16 @@ def install_playwright_browser(target_dir: Path) -> None:
     )
 
 
+def module_importable(name: str) -> bool:
+    """Return True if the module can be imported."""
+
+    try:
+        importlib.import_module(name)
+    except Exception:  # pragma: no cover - defensive, matches PyInstaller env
+        return False
+    return True
+
+
 def build_with_pyinstaller(
     target: str,
     repo_root: Path,
@@ -67,29 +78,93 @@ def build_with_pyinstaller(
     icon_candidate = repo_root / "desktop_app" / "resources" / "TaskCollector.icns"
     icon_arg = str(icon_candidate) if icon_candidate.exists() else "NONE"
 
-    run(
-        [
-            sys.executable,
-            "-m",
-            "PyInstaller",
-            str(repo_root / "desktop_app" / "task_collector_app.py"),
-            "--name",
-            APP_NAME,
-            "--windowed",
-            "--noconfirm",
-            "--clean",
-            "--paths",
-            str(repo_root),
-            "--distpath",
-            str(dist_dir),
-            "--workpath",
-            str(work_dir),
-            "--specpath",
-            str(spec_dir),
-            "--icon",
-            icon_arg,
-        ]
-    )
+    # Build PyInstaller command with all necessary hidden imports and data
+    cmd = [
+        sys.executable,
+        "-m",
+        "PyInstaller",
+        str(repo_root / "desktop_app" / "task_collector_app.py"),
+        "--name",
+        APP_NAME,
+        "--windowed",
+        "--noconfirm",
+        "--clean",
+        "--paths",
+        str(repo_root),
+        "--distpath",
+        str(dist_dir),
+        "--workpath",
+        str(work_dir),
+        "--specpath",
+        str(spec_dir),
+        "--icon",
+        icon_arg,
+        # Add entire src package
+        "--add-data",
+        f"{repo_root / 'src'}:src",
+        # Hidden imports for dependencies
+        "--hidden-import",
+        "google.cloud",
+        "--hidden-import",
+        "google.cloud.storage",
+        "--hidden-import",
+        "google.auth",
+        "--hidden-import",
+        "google.auth.transport.requests",
+        "--hidden-import",
+        "google.protobuf",
+        "--hidden-import",
+        "playwright",
+        "--hidden-import",
+        "playwright.async_api",
+        "--hidden-import",
+        "playwright.sync_api",
+        "--hidden-import",
+        "dotenv",
+        "--hidden-import",
+        "sqlite3",
+        "--hidden-import",
+        "multiprocessing",
+        "--hidden-import",
+        "multiprocessing.connection",
+        # Hidden imports for src modules
+        "--hidden-import",
+        "src.config.storage_config",
+        "--hidden-import",
+        "src.config.browser_config",
+        "--hidden-import",
+        "src.config.initial_tasks",
+        "--hidden-import",
+        "src.browser.stealth_browser",
+        "--hidden-import",
+        "src.source_data.database",
+        "--hidden-import",
+        "src.tasks.task",
+        "--hidden-import",
+        "desktop_app.task_worker",
+        # Collect all submodules
+        "--collect-all",
+        "google.cloud",
+        "--collect-all",
+        "google.auth",
+        "--collect-all",
+        "google.protobuf",
+        "--collect-all",
+        "playwright",
+        "--collect-all",
+        "greenlet",
+        # macOS specific
+    ]
+
+    if target == "macos":
+        cmd.extend(
+            [
+                "--osx-bundle-identifier",
+                "com.taskcollector.app",
+            ]
+        )
+
+    run(cmd)
 
     if target == "macos":
         bundle = dist_dir / f"{APP_NAME}.app"
@@ -224,3 +299,10 @@ if __name__ == "__main__":
     except BuildError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)
+    if module_importable("google.cloud._storage_v2"):
+        cmd.extend(["--hidden-import", "google.cloud._storage_v2"])
+
+    if module_importable("grpc"):
+        cmd.extend(["--hidden-import", "grpc", "--collect-all", "grpc"])
+        if module_importable("grpc._cython.cygrpc"):
+            cmd.extend(["--hidden-import", "grpc._cython.cygrpc"])

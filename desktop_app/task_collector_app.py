@@ -29,20 +29,104 @@ from typing import Optional
 import sqlite3
 
 from src.config.storage_config import DATA_DIR
-from google.cloud import storage
+
+try:
+    from google.cloud import storage
+except ModuleNotFoundError:  # pragma: no cover - optional dependency for uploads
+    storage = None  # type: ignore[assignment]
+
 import base64
 from dotenv import load_dotenv
 import json
 
 load_dotenv()
 
-creds_base64 = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_BASE64")
-decoded_creds = base64.b64decode(creds_base64)
+_GOOGLE_CREDS_READY = False
+_GOOGLE_CREDS_ERROR: Optional[str] = None
+_GOOGLE_CREDS_PATH: Optional[Path] = None
 
-with open("google-credentials.json", "wb") as f:
-    f.write(decoded_creds)
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "google-credentials.json"
+def _load_env_files() -> None:
+    """Attempt to load .env files from common locations."""
+
+    candidate_dirs = []
+
+    # Allow explicit override via environment variable
+    override = os.environ.get("TASK_COLLECTOR_ENV_PATH")
+    if override:
+        candidate_dirs.append(Path(override))
+
+    candidate_dirs.extend(
+        [
+            Path.cwd(),
+            Path(__file__).resolve().parent,
+            Path(__file__).resolve().parents[1],
+            Path(__file__).resolve().parents[2],
+            DATA_DIR,
+            Path.home() / ".taskcollector",
+        ]
+    )
+
+    seen = set()
+    for directory in candidate_dirs:
+        try:
+            directory = directory.resolve()
+        except FileNotFoundError:
+            continue
+        if directory in seen:
+            continue
+        seen.add(directory)
+        dotenv_path = directory / ".env"
+        if dotenv_path.exists():
+            load_dotenv(dotenv_path=dotenv_path, override=False)
+
+
+def ensure_google_credentials() -> tuple[bool, Optional[str]]:
+    """Ensure Google credentials file exists for storage uploads."""
+
+    global _GOOGLE_CREDS_READY  # pylint: disable=global-statement
+    global _GOOGLE_CREDS_ERROR  # pylint: disable=global-statement
+    global _GOOGLE_CREDS_PATH  # pylint: disable=global-statement
+
+    if _GOOGLE_CREDS_READY:
+        return True, None
+
+    creds_base64 = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_BASE64")
+    if not creds_base64:
+        message = (
+            "Missing required environment variable: GOOGLE_APPLICATION_CREDENTIALS_BASE64\n\n"
+            "This application requires Google Cloud Storage credentials to upload collected data.\n\n"
+            "To fix this:\n"
+            "1. Create a .env file next to the app (or set the variable globally)\n"
+            "2. Add the following line:\n"
+            "   GOOGLE_APPLICATION_CREDENTIALS_BASE64=<your-base64-encoded-credentials>\n\n"
+            "Contact your administrator to obtain the credentials."
+        )
+        _GOOGLE_CREDS_ERROR = message
+        return False, message
+
+    try:
+        decoded_creds = base64.b64decode(creds_base64)
+        if getattr(sys, "frozen", False):
+            creds_path = Path(tempfile.gettempdir()) / "google-credentials.json"
+        else:
+            creds_path = Path("google-credentials.json")
+
+        creds_path.parent.mkdir(parents=True, exist_ok=True)
+        creds_path.write_bytes(decoded_creds)
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(creds_path)
+        _GOOGLE_CREDS_READY = True
+        _GOOGLE_CREDS_ERROR = None
+        _GOOGLE_CREDS_PATH = creds_path
+        return True, None
+    except Exception as exc:  # pragma: no cover - defensive
+        message = (
+            f"Failed to setup Google Cloud credentials: {exc}\n\n"
+            "The credentials may be corrupted or invalid.\n"
+            "Contact your administrator for assistance."
+        )
+        _GOOGLE_CREDS_ERROR = message
+        return False, message
 
 # Config file to store user settings
 CONFIG_FILE = Path(DATA_DIR) / ".user_config.json"
@@ -636,13 +720,29 @@ class TasksViewDialog(tk.Toplevel):
 
 if getattr(sys, "frozen", False):  # Frozen executable (PyInstaller)
     BASE_PATH = Path(getattr(sys, "_MEIPASS"))  # type: ignore[attr-defined]
-    PROJECT_ROOT = Path(sys.executable).resolve().parent
+    # For macOS .app bundles, the executable is in .app/Contents/MacOS/
+    # For Windows, it's in the root directory
+    if sys.platform == "darwin":
+        # Navigate from Contents/MacOS to the app bundle root
+        PROJECT_ROOT = Path(sys.executable).resolve().parent
+    else:
+        PROJECT_ROOT = Path(sys.executable).resolve().parent
 else:
     BASE_PATH = Path(__file__).resolve().parents[1]
     PROJECT_ROOT = BASE_PATH
 
+_load_env_files()
+
 PLAYWRIGHT_BROWSERS_DIR = PROJECT_ROOT / "playwright-browsers"
 os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(PLAYWRIGHT_BROWSERS_DIR))
+
+# Debug logging for frozen apps
+if getattr(sys, "frozen", False):
+    print("Running as frozen app")
+    print(f"BASE_PATH: {BASE_PATH}")
+    print(f"PROJECT_ROOT: {PROJECT_ROOT}")
+    print(f"PLAYWRIGHT_BROWSERS_DIR: {PLAYWRIGHT_BROWSERS_DIR}")
+    print(f"Browsers exist: {PLAYWRIGHT_BROWSERS_DIR.exists()}")
 
 if str(BASE_PATH) not in sys.path:
     sys.path.insert(0, str(BASE_PATH))
@@ -699,6 +799,7 @@ class TaskCollectorApp:
 
         self._build_ui()
         self._process_log_queue()
+        self._warn_if_credentials_missing()
 
     def run(self) -> None:
         """Start the Tkinter main loop."""
@@ -891,6 +992,21 @@ class TaskCollectorApp:
             self.log_output.config(state=tk.DISABLED)
         self.root.after(150, self._process_log_queue)
 
+    def _warn_if_credentials_missing(self) -> None:
+        if storage is None:
+            warning = (
+                "Google Cloud Storage library is not installed. Uploading data will "
+                "be disabled until the dependency is available."
+            )
+            self._log(f"⚠️ {warning}")
+            messagebox.showwarning("Upload Unavailable", warning, parent=self.root)
+            return
+
+        creds_ready, error_message = ensure_google_credentials()
+        if not creds_ready and error_message:
+            self._log("⚠️ Upload requires Google Cloud credentials.")
+            messagebox.showwarning("Upload Setup Required", error_message, parent=self.root)
+
     def _log(self, message: str) -> None:
         self.log_queue.put(message)
         logger.info(message)
@@ -1050,6 +1166,13 @@ class TaskCollectorApp:
         username = self._get_username()
         if not username:
             self._log("Upload cancelled - no username provided")
+            return
+
+        creds_ready, error_message = ensure_google_credentials()
+        if not creds_ready:
+            error_text = error_message or "Google Cloud credentials are not configured."
+            self._log(f"❌ {error_text.splitlines()[0]}")
+            messagebox.showerror("Upload Error", error_text, parent=self.root)
             return
 
         # Confirm upload
@@ -1387,7 +1510,26 @@ if __name__ == "__main__":
         os.environ["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = "YES"
 
     try:
-        TaskCollectorApp().run()
+        print("Starting Task Collector App...")
+        print(f"Python version: {sys.version}")
+        print(f"Platform: {sys.platform}")
+        print(f"Frozen: {getattr(sys, 'frozen', False)}")
+        
+        app = TaskCollectorApp()
+        print("App initialized successfully")
+        app.run()
     except Exception as e:
         logger.error(f"Application crashed: {e}", exc_info=True)
+        # Show error dialog
+        try:
+            import tkinter as tk
+            from tkinter import messagebox
+            root = tk.Tk()
+            root.withdraw()
+            messagebox.showerror(
+                "Application Error",
+                f"Failed to start Task Collector:\n\n{str(e)}\n\nCheck the log file for details."
+            )
+        except Exception:  # pylint: disable=broad-except
+            print(f"ERROR: {e}")
         sys.exit(1)
