@@ -98,6 +98,7 @@ class DefaultSessionProvider:
             try:
                 cdp_url = await sandbox.start()
                 headless = run_config.sandbox_headless if not safe_mode else True
+                logger.info("Sandbox launched for task %s", task.get("task_id"))
                 return cdp_url, sandbox, headless, safe_mode
             except Exception as exc:  # pragma: no cover - best effort cleanup
                 last_error = exc

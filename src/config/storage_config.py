@@ -58,8 +58,7 @@ def _resolve_storage_root() -> Path:
     return fallback
 
 
-MODE = "prod" if "--prod" in sys.argv else "dev"
-DATA_DIR = _resolve_storage_root() / MODE
+DATA_DIR = _resolve_storage_root()
 SCREENSHOTS_DIR = DATA_DIR / "screenshots"
 VIDEOS_DIR = DATA_DIR / "videos"
 DB_PATH = DATA_DIR / "tasks.db"

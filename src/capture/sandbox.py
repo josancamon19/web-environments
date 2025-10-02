@@ -1,10 +1,8 @@
-import argparse
 import asyncio
 import http.client
 import json
 import logging
 import os
-import signal
 import socket
 from pathlib import Path
 from typing import List, Optional
