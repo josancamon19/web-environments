@@ -6,14 +6,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 from html.parser import HTMLParser
-import sys
-import os
-
-
-if "--prod" in sys.argv:
-    DATA_DIR = os.path.join("data", "prod")
-else:
-    DATA_DIR = os.path.join("data", "dev")
+from config.storage_config import DATA_DIR
 
 
 class ToolCall(Enum):
@@ -128,8 +121,8 @@ def _extract_xy_pair(source: Any) -> Optional[list]:
     if not isinstance(source, dict):
         return None
 
-    x = source.get('x')
-    y = source.get('y')
+    x = source.get("x")
+    y = source.get("y")
 
     if isinstance(x, (int, float)) and isinstance(y, (int, float)):
         return [x, y]
@@ -141,18 +134,20 @@ def extract_coordinates_from_event(event_data: Dict[str, Any]) -> Optional[list]
     if not isinstance(event_data, dict):
         return None
 
-    raw_coordinates = event_data.get('coordinates')
+    raw_coordinates = event_data.get("coordinates")
     if isinstance(raw_coordinates, dict):
         for candidate in (
-            raw_coordinates.get('page'),
-            raw_coordinates.get('client'),
-            raw_coordinates.get('offset'),
+            raw_coordinates.get("page"),
+            raw_coordinates.get("client"),
+            raw_coordinates.get("offset"),
         ):
             pair = _extract_xy_pair(candidate)
             if pair:
                 return pair
 
-    fallback_pair = _extract_xy_pair({'x': event_data.get('x'), 'y': event_data.get('y')})
+    fallback_pair = _extract_xy_pair(
+        {"x": event_data.get("x"), "y": event_data.get("y")}
+    )
     if fallback_pair:
         return fallback_pair
 
@@ -161,7 +156,8 @@ def extract_coordinates_from_event(event_data: Dict[str, Any]) -> Optional[list]
 
 def merge_coordinates(params: Dict[str, Any], coordinates: Optional[list]):
     if coordinates is not None and len(coordinates) == 2:
-        params['coordinates'] = coordinates
+        params["coordinates"] = coordinates
+
 
 def find_navigation_after_step(steps_list, current_idx, max_lookahead=10):
     """Find navigation URL after a click or Enter key event."""
@@ -220,7 +216,7 @@ def process_single_task(
 
     steps = cursor.fetchall()
 
-    dom_output_root = Path(DATA_DIR) / "doms"
+    dom_output_root = DATA_DIR / "doms"
     dom_output_root.mkdir(parents=True, exist_ok=True)
 
     def save_dom_snapshot(step_id: int, dom_snapshot: Optional[str]) -> Optional[str]:
@@ -233,7 +229,7 @@ def process_single_task(
             return None
 
         relative_path = Path("doms") / f"task_{task_id}" / f"step_{step_id}.txt"
-        output_path = Path(DATA_DIR) / relative_path
+        output_path = DATA_DIR / relative_path
         try:
             output_path.parent.mkdir(parents=True, exist_ok=True)
             with open(output_path, "w", encoding="utf-8") as dom_file:
@@ -344,9 +340,7 @@ def process_single_task(
                     params["selector_details"] = context
                 if dom_state_path:
                     params["dom_state"] = dom_state_path
-                merge_coordinates(
-                    params, extract_coordinates_from_event(event_data)
-                )
+                merge_coordinates(params, extract_coordinates_from_event(event_data))
                 click_buffer = ToolCallData(
                     type=ToolCall.CLICK.value,
                     params=params,
@@ -557,7 +551,8 @@ def process_single_task(
 
 
 def parse(
-    db_path: str = f"{DATA_DIR}/tasks.db", output_path: str = f"{DATA_DIR}/tasks.jsonl"
+    db_path: str = f"{DATA_DIR}/tasks.db",
+    output_path: str = f"{DATA_DIR}/tasks.jsonl",
 ):
     """
     Convert all tasks from the database into tool calls and write to JSONL file.

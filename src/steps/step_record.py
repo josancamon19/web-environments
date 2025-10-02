@@ -3,13 +3,13 @@ import json
 import logging
 from typing import Any, Dict, Optional, Tuple
 
-from src.source_data.database import Database
-from src.utils.get_iso_datetime import get_iso_datetime
-from src.tasks.task import TaskManager
-from src.page.actual_page import ActualPage
-from src.steps.step import StepManager
-from src.utils.get_screenshot_path import get_screenshot_path
-from src.steps.step import Step
+from source_data.database import Database
+from utils.get_iso_datetime import get_iso_datetime
+from tasks.task import TaskManager
+from page.actual_page import ActualPage
+from steps.step import StepManager
+from utils.get_screenshot_path import get_screenshot_path
+from steps.step import Step
 
 logger = logging.getLogger(__name__)
 
@@ -199,10 +199,13 @@ class StepRecord:
 
             # Reuse CDP session to avoid overhead of creating new sessions
             cdp_session = await self._get_cdp_session()
-            screenshot_data = await cdp_session.send("Page.captureScreenshot", {
-                "format": "png",
-                "captureBeyondViewport": False,
-            })
+            screenshot_data = await cdp_session.send(
+                "Page.captureScreenshot",
+                {
+                    "format": "png",
+                    "captureBeyondViewport": False,
+                },
+            )
 
             # Decode and save
             with open(screenshot_path, "wb") as f:
@@ -220,7 +223,9 @@ class StepRecord:
                 page = self.actual_page.get_page()
                 await page.screenshot(path=screenshot_path, full_page=False)
             except Exception as fallback_error:
-                logger.error(f"[SCREENSHOT] Fallback screenshot also failed: {fallback_error}")
+                logger.error(
+                    f"[SCREENSHOT] Fallback screenshot also failed: {fallback_error}"
+                )
                 raise
 
     def _parse_metadata(self, metadata: Any) -> Dict[str, Any]:

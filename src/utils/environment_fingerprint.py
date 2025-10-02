@@ -4,7 +4,7 @@ import platform
 import sys
 from typing import Any, Dict
 
-from src.config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
+from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
 
 
 def _safe_playwright_info() -> Dict[str, Any]:

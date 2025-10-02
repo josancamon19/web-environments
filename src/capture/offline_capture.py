@@ -9,11 +9,11 @@ from urllib.parse import urlsplit
 
 from playwright.async_api import BrowserContext, Request, Response
 
-from src.config.browser_config import CONTEXT_CONFIG
-from src.config.storage_config import DATA_DIR
-from src.tasks.task import TaskManager, Task
-from src.utils.get_iso_datetime import get_iso_datetime
-from src.source_data.database import Database
+from config.browser_config import CONTEXT_CONFIG
+from config.storage_config import DATA_DIR
+from tasks.task import TaskManager, Task
+from utils.get_iso_datetime import get_iso_datetime
+from source_data.database import Database
 
 
 logger = logging.getLogger(__name__)

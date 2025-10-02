@@ -8,16 +8,17 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
-
 from browser_use import Agent, Browser, ChatOpenAI
 from kernel import Kernel
 
 from itertools import islice
+
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.capture.sandbox import SandboxEnvironment, resolve_recorded_bundle
 from src.config.browser_config import CONTEXT_CONFIG
+from src.config.storage_config import DATA_DIR
 
 load_dotenv()
 
@@ -39,9 +40,6 @@ def get_kernel_client() -> Kernel:
             )
         _kernel_client = Kernel(api_key=api_key)
     return _kernel_client
-
-
-DATA_DIR = os.path.join("data", "dev")
 
 
 def extract_tool_calls(history: list[dict]) -> List[Dict[str, Any]]:
@@ -219,21 +217,17 @@ def extract_final_answer(history: list[dict], task_type: str) -> Optional[str]:
 
 async def run_task_with_agent(
     task: Dict[str, Any],
+    results_dir: Path,
     model: str = "gpt-5-nano",
     *,
     sandbox_bundle: Optional[Path] = None,
     sandbox_allow_network: bool = False,
     sandbox_headless: bool = True,
     sandbox_safe_mode: bool = False,
-    results_dir: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """Run a single task with the Browser-Use agent and capture all data."""
 
     start_time = datetime.now()
-
-    # Use the results_dir passed from the main function
-    if results_dir is None:
-        results_dir = Path("results")
 
     doms_output_dir = results_dir / "doms"
     task_dom_dir = doms_output_dir / f"task_{task['task_id']}"
@@ -458,12 +452,12 @@ async def process_single_task(
     try:
         result = await run_task_with_agent(
             task,
+            results_dir,
             model,
             sandbox_bundle=sandbox_bundle,
             sandbox_allow_network=sandbox_allow_network,
             sandbox_headless=sandbox_headless,
             sandbox_safe_mode=sandbox_safe_mode,
-            results_dir=results_dir,
         )
 
         # Write result with thread-safe lock
@@ -533,7 +527,11 @@ async def process_all_tasks(
 ):
     """Process all tasks and save to JSON, skipping already completed ones"""
     # Load tasks from input file
-    with open(Path(f"{DATA_DIR}/tasks.jsonl"), "r") as f:
+    tasks_path = DATA_DIR / "tasks.jsonl"
+    if not tasks_path.exists():
+        raise FileNotFoundError(f"Tasks file not found at {tasks_path}")
+
+    with open(tasks_path, "r") as f:
         tasks = [json.loads(line) for line in f if line.strip()]
 
     # Setup output directory with timestamp
@@ -593,19 +591,12 @@ async def process_all_tasks(
 
 
 async def main(args: argparse.Namespace) -> None:
-    global DATA_DIR
-
-    DATA_DIR = (
-        os.path.join("data", "prod") if args.prod else os.path.join("data", "dev")
-    )
-
     sandbox_root: Optional[Path] = None
     if not args.no_sandbox:
-        root_arg = os.path.join(DATA_DIR, "captures")
-        candidate_root = Path(root_arg).expanduser().resolve()
+        candidate_root = (DATA_DIR / "captures").expanduser().resolve()
         if candidate_root.exists():
             sandbox_root = candidate_root
-            logger.info(f"Using sandbox captures under {sandbox_root}")
+            logger.info("Using sandbox captures under %s", sandbox_root)
         else:
             logger.warning(
                 "Sandbox root %s not found; falling back to Kernel browser",
@@ -662,6 +653,10 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _main() -> None:
+    cli_args = parse_args()
+    asyncio.run(main(cli_args))
+
+
 if __name__ == "__main__":
-    arguments = parse_args()
-    asyncio.run(main(arguments))
+    _main()

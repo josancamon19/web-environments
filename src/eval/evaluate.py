@@ -7,12 +7,8 @@ from typing import Dict, Any, List
 import sys
 import os
 import dspy
-from src.tasks.db_to_jsonl_format import BaseToolCallData
+from tasks.db_to_jsonl_format import BaseToolCallData
 
-if "--prod" in sys.argv:
-    DATA_DIR = os.path.join("data", "prod")
-else:
-    DATA_DIR = os.path.join("data", "dev")
 
 # Add src to path
 sys.path.insert(0, ".")
@@ -75,9 +71,7 @@ logger = logging.getLogger(__name__)
 
 
 def evaluate_model_outputs(model: str, judge_model: str = "gpt-4.1-2025-04-14"):
-    output_file = (
-        Path("src/eval/results") / f"browseruse-{model.replace('/', '-')}.jsonl"
-    )
+    output_file = Path("results") / f"browseruse-{model.replace('/', '-')}.jsonl"
     print(output_file)
     if not output_file.exists():
         logger.error(f"Output file not found: {output_file}")
@@ -85,7 +79,7 @@ def evaluate_model_outputs(model: str, judge_model: str = "gpt-4.1-2025-04-14"):
 
     # Load the original tasks to get correct answers
     human_tasks_by_id = {}
-    with open(Path(f"{DATA_DIR}/tasks.jsonl"), "r") as f:
+    with open(Path("data/tasks.jsonl"), "r") as f:
         for line in f:
             if not line.strip():
                 continue
@@ -127,7 +121,7 @@ def evaluate_model_outputs(model: str, judge_model: str = "gpt-4.1-2025-04-14"):
 
         model_trajectory = model_task["tool_calls"]
         model_last_dom = model_task["step_dom_mapping"][str(len(model_trajectory))]
-        model_last_dom = open(Path("src/eval/results") / model_last_dom, "r").read()
+        model_last_dom = open(Path("results") / model_last_dom, "r").read()
         # ===
         human_task = human_tasks_by_id[task_id]
         human_trajectory = human_task["tool_calls"]
@@ -194,3 +188,11 @@ if __name__ == "__main__":
     # TODO: ask for website for the task (?)
     # TODO: would bounding boxes help?
     # TODO: GUI is kinda trash
+
+    # ----
+
+    # 1. harness + browseruse works
+    # 2. openai cua setup agent eval
+    # 3. quick mvp claude cua + issue
+    # 4. data directories refactor
+    # 5. checkpoint based evaluation if task completion failed. Agent based.

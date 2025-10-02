@@ -2,9 +2,9 @@ import os
 import sqlite3
 from datetime import datetime
 from typing import Optional
-from src.utils.get_iso_datetime import get_iso_datetime
-from src.source_data.schema import SCHEMA_SQL
-from src.config.storage_config import DB_PATH
+from utils.get_iso_datetime import get_iso_datetime
+from source_data.schema import SCHEMA_SQL
+from config.storage_config import DB_PATH
 import logging
 
 logger = logging.getLogger(__name__)

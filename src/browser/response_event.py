@@ -1,9 +1,9 @@
 import logging
-from src.tasks.task import TaskManager
-from src.requests.request_event import Request_Event
+from tasks.task import TaskManager
+from browser.request_event import Request_Event
 import json
-from src.utils.get_iso_datetime import get_iso_datetime
-from src.source_data.database import Database
+from utils.get_iso_datetime import get_iso_datetime
+from source_data.database import Database
 
 logger = logging.getLogger(__name__)
 

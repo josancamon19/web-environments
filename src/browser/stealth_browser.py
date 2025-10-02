@@ -1,18 +1,18 @@
 import logging
 from playwright.async_api import async_playwright
-from src.config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
-from src.config.stealth_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
-from src.steps.step_record import StepRecord
-from src.page.actual_page import ActualPage
-from src.utils.get_tasks_video_path import get_tasks_video_path
-from src.tasks.task import TaskManager
+from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
+from config.stealth_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
+from steps.step_record import StepRecord
+from page.actual_page import ActualPage
+from utils.get_tasks_video_path import get_tasks_video_path
+from tasks.task import TaskManager
 import sys
-from src.requests.request_event import Request_Event
-from src.responses.response_event import Response_Event
-from src.page.new_page_event import NewPageEvent
+from browser.request_event import Request_Event
+from browser.response_event import Response_Event
+from page.new_page_event import NewPageEvent
 import os
-from src.config.storage_config import DATA_DIR
-from src.capture.offline_capture import OfflineCaptureManager
+from config.storage_config import DATA_DIR
+from capture.offline_capture import OfflineCaptureManager
 
 logger = logging.getLogger(__name__)
 
