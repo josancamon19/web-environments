@@ -8,9 +8,11 @@ requires-python = ">=3.13"
 dependencies = [
     "browser-use>=0.7.10",
     "dspy>=3.0.3",
+    "kernel>=0.12.0",
     "litellm>=1.77.5",
     "playwright>=1.55.0",
     "python-dotenv>=1.1.1",
+    "typer>=0.19.2",
 ]
 
 [build-system]
@@ -19,6 +21,7 @@ build-backend = "setuptools.build_meta"
 
 [project.scripts]
 data-collector = "main:cli"
+evaluate-browseruse = "eval.browseruse:_main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

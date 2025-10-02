@@ -1,272 +1,632 @@
-"""Evaluation entrypoint for the BrowserUse agent built on the shared harness."""
-
-from __future__ import annotations
-
 import asyncio
+import json
 import logging
 import os
+from datetime import datetime
 from pathlib import Path
-import sys
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
-from browser_use import (
-    Agent as BrowserUseAgent,
-    Browser as BrowserUseBrowser,
-    ChatOpenAI as BrowserUseChatOpenAI,
-)
+from config.storage_config import DATA_DIR
+from browser_use import Agent, Browser, ChatOpenAI
+from kernel import Kernel
+
+from itertools import islice
+
+import sys
+
 import typer
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-
-from eval.harness.definitions import (
-    AgentContext,
-    AgentRunResult,
-    CaptureCallback,
-    HarnessRunConfig,
-)
-from eval.harness.harness import HarnessConfig
-from eval.harness.harness import EvaluationHarness
+from src.capture.sandbox import SandboxEnvironment, resolve_recorded_bundle
+from src.config.browser_config import CONTEXT_CONFIG
 
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+file_write_lock = asyncio.Lock()
 
-def extract_tool_calls(history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Extract tool call summaries from BrowserUse's step history."""
+_kernel_client: Optional[Kernel] = None
 
-    tool_calls: List[Dict[str, Any]] = []
+
+def get_kernel_client() -> Kernel:
+    global _kernel_client
+    if _kernel_client is None:
+        api_key = os.getenv("KERNEL_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "KERNEL_API_KEY is required when running without a sandbox"
+            )
+        _kernel_client = Kernel(api_key=api_key)
+    return _kernel_client
+
+
+def extract_tool_calls(history: list[dict]) -> List[Dict[str, Any]]:
+    """Extract tool calls from browser-use history"""
+    tool_calls = []
 
     for step in history:
-        if "model_output" not in step or "action" not in step["model_output"]:
-            continue
-
-        actions = step["model_output"].get("action")
-        if not actions:
-            continue
-
-        if isinstance(actions, dict):
-            actions = [actions]
-
-        interacted_element = None
-        state = step.get("state")
-        if isinstance(state, dict) and "interacted_element" in state:
-            elements = state["interacted_element"]
-            if elements and len(elements) > 0 and elements[0]:
-                interacted_element = elements[0]
-
-        click_coords = None
-        results = step.get("result")
-        if isinstance(results, list):
-            for result in results:
-                metadata = result.get("metadata") or {}
-                if "click_x" in metadata and "click_y" in metadata:
-                    click_coords = {"x": metadata["click_x"], "y": metadata["click_y"]}
-
-        for action in actions:
-            if not isinstance(action, dict):
+        if "model_output" in step and "action" in step["model_output"]:
+            actions = step["model_output"].get("action")
+            if not actions:
                 continue
+            if isinstance(actions, dict):
+                actions = [actions]
 
-            for action_type, params in action.items():
-                if action_type == "search_google":
-                    tool_calls.append(
-                        {
-                            "type": "search",
-                            "params": {"query": params.get("query", "")},
+            # Get interacted element info from state if available
+            interacted_element = None
+            state = step.get("state")
+            if isinstance(state, dict) and "interacted_element" in state:
+                elements = state["interacted_element"]
+                if elements and len(elements) > 0 and elements[0]:
+                    interacted_element = elements[0]
+
+            # Get click coordinates from result metadata if available
+            click_coords = None
+            results = step.get("result")
+            if isinstance(results, list):
+                for result in results:
+                    if "metadata" in result and "click_x" in result["metadata"]:
+                        click_coords = {
+                            "x": result["metadata"]["click_x"],
+                            "y": result["metadata"]["click_y"],
                         }
-                    )
-                elif action_type == "go_to_url":
-                    tool_calls.append(
-                        {
-                            "type": "go_to",
-                            "params": {"url": params.get("url", "")},
-                        }
-                    )
-                elif action_type in {"click_element", "click_element_by_index"}:
-                    click_params: Dict[str, Any] = {}
 
-                    if interacted_element:
-                        node_name = interacted_element.get("node_name", "").lower()
-                        attrs = interacted_element.get("attributes", {})
-
-                        if attrs.get("id"):
-                            click_params["selector"] = f"#{attrs['id']}"
-                        elif attrs.get("jsname"):
-                            click_params["selector"] = f"[jsname='{attrs['jsname']}']"
-                        elif attrs.get("class"):
-                            classes = attrs["class"].replace(" ", ".")
-                            click_params["selector"] = f"{node_name}.{classes}"
-                        elif attrs.get("href"):
-                            click_params["selector"] = (
-                                f"{node_name}[href='{attrs['href']}']"
+            for action in actions:
+                # Convert browser-use action format to our tool call format
+                if isinstance(action, dict):
+                    for action_type, params in action.items():
+                        if action_type == "search_google":
+                            tool_calls.append(
+                                {
+                                    "type": "search",
+                                    "params": {"query": params.get("query", "")},
+                                }
                             )
-                        else:
-                            click_params["selector"] = node_name or "*"
+                        elif action_type == "go_to_url":
+                            tool_calls.append(
+                                {
+                                    "type": "go_to",
+                                    "params": {"url": params.get("url", "")},
+                                }
+                            )
+                        elif (
+                            action_type == "click_element"
+                            or action_type == "click_element_by_index"
+                        ):
+                            click_params = {}
 
-                        click_params["element_details"] = {
-                            "node_name": node_name,
-                            "attributes": attrs,
-                            "xpath": interacted_element.get("x_path", ""),
-                        }
-                    elif "selector" in params:
-                        click_params["selector"] = params["selector"]
-                    elif "index" in params:
-                        click_params["selector"] = f"[index:{params['index']}]"
+                            # Try to extract selector from interacted element
+                            if interacted_element:
+                                # Build selector from element attributes
+                                node_name = interacted_element.get(
+                                    "node_name", ""
+                                ).lower()
+                                attrs = interacted_element.get("attributes", {})
 
-                    if click_coords:
-                        click_params["coordinates"] = click_coords
+                                # Priority order for selectors: id > jsname > class > href > node
+                                if "id" in attrs and attrs["id"]:
+                                    click_params["selector"] = f"#{attrs['id']}"
+                                elif "jsname" in attrs and attrs["jsname"]:
+                                    # jsname is Google's custom attribute that acts like an ID
+                                    click_params["selector"] = (
+                                        f"[jsname='{attrs['jsname']}']"
+                                    )
+                                elif "class" in attrs and attrs["class"]:
+                                    classes = attrs["class"].replace(" ", ".")
+                                    click_params["selector"] = f"{node_name}.{classes}"
+                                elif "href" in attrs:
+                                    click_params["selector"] = (
+                                        f"{node_name}[href='{attrs['href']}']"
+                                    )
+                                else:
+                                    click_params["selector"] = node_name or "*"
 
-                    tool_calls.append({"type": "click", "params": click_params})
-                elif action_type == "input_text":
-                    tool_calls.append(
-                        {
-                            "type": "type",
-                            "params": {
-                                "selector": params.get("selector", ""),
-                                "text": params.get("text", ""),
-                            },
-                        }
-                    )
-                elif action_type == "scroll":
-                    scroll_params: Dict[str, Any] = {}
-                    if "down" in params:
-                        scroll_params["direction"] = "down" if params["down"] else "up"
-                    if "num_pages" in params:
-                        scroll_params["pages"] = params["num_pages"]
-                    tool_calls.append({"type": "scroll", "params": scroll_params})
+                                # Add element details including all attributes
+                                click_params["element_details"] = {
+                                    "node_name": node_name,
+                                    "attributes": attrs,
+                                    "xpath": interacted_element.get("x_path", ""),
+                                }
+                            elif "selector" in params:
+                                click_params["selector"] = params["selector"]
+                            elif "index" in params:
+                                click_params["selector"] = f"[index:{params['index']}]"
+
+                            # Add click coordinates if available
+                            if click_coords:
+                                click_params["coordinates"] = click_coords
+
+                            tool_calls.append(
+                                {
+                                    "type": "click",
+                                    "params": click_params,
+                                }
+                            )
+                        elif action_type == "input_text":
+                            tool_calls.append(
+                                {
+                                    "type": "type",
+                                    "params": {
+                                        "selector": params.get("selector", ""),
+                                        "text": params.get("text", ""),
+                                    },
+                                }
+                            )
+                        elif action_type == "scroll":
+                            scroll_params = {}
+                            if "down" in params:
+                                scroll_params["direction"] = (
+                                    "down" if params["down"] else "up"
+                                )
+                            if "num_pages" in params:
+                                scroll_params["pages"] = params["num_pages"]
+                            tool_calls.append(
+                                {
+                                    "type": "scroll",
+                                    "params": scroll_params,
+                                }
+                            )
+                        elif action_type == "done":
+                            # Task completion marker, not a tool call
+                            pass
 
     return tool_calls
 
 
-def extract_final_answer(
-    history: List[Dict[str, Any]], task_type: Optional[str]
-) -> Optional[str]:
+def extract_final_answer(history: list[dict], task_type: str) -> Optional[str]:
+    """Extract the final answer for information retrieval tasks"""
     if task_type != "information_retrieval":
         return None
 
+    # Look for the final result that marks task completion
     for step in reversed(history):
         results = step.get("result")
         if isinstance(results, list):
             for result in results:
-                if result.get("is_done") and result.get("extracted_content") not in {
-                    None,
-                    "None",
-                }:
-                    return result["extracted_content"]
+                # Check if task is done and has extracted content
+                if result.get("is_done") and "extracted_content" in result:
+                    extracted = result["extracted_content"]
+                    # Return the extracted content as the answer
+                    if extracted and extracted != "None":
+                        return extracted
 
+    # If no explicit answer found in results, check the final model output's memory
+    # as it might contain the collected information
     for step in reversed(history):
-        model_output = step.get("model_output")
-        if not isinstance(model_output, dict):
-            continue
-        memory = model_output.get("memory")
-        if memory and len(memory) > 50:
-            status_keywords = {
-                "searching",
-                "navigating",
-                "clicking",
-                "loading",
-                "looking",
-            }
-            if not any(keyword in memory.lower() for keyword in status_keywords):
-                return memory
+        if "model_output" in step and "memory" in step["model_output"]:
+            memory = step["model_output"]["memory"]
+            # Only return memory if it seems to contain actual information (not just status)
+            if (
+                memory and len(memory) > 50
+            ):  # Arbitrary threshold for meaningful content
+                # Check if this is likely the final answer (not intermediate status)
+                status_keywords = [
+                    "searching",
+                    "navigating",
+                    "clicking",
+                    "loading",
+                    "looking",
+                ]
+                if not any(keyword in memory.lower() for keyword in status_keywords):
+                    return memory
 
     return None
 
 
-class BrowserUseAgentRunner:
-    def __init__(self, max_steps: int = 20, verbose: bool = True) -> None:
-        self.max_steps = max_steps
-        self.verbose = verbose
+async def run_task_with_agent(
+    task: Dict[str, Any],
+    results_dir: Path,
+    model: str = "gpt-5-nano",
+    *,
+    sandbox_bundle: Optional[Path] = None,
+    sandbox_allow_network: bool = False,
+    sandbox_headless: bool = True,
+    sandbox_safe_mode: bool = False,
+) -> Dict[str, Any]:
+    """Run a single task with the Browser-Use agent and capture all data."""
 
-    async def __call__(
-        self,
-        task: Dict[str, Any],
-        context: AgentContext,
-        capture_dom: CaptureCallback,
-    ) -> AgentRunResult:
-        resources = context.resources
+    start_time = datetime.now()
 
-        llm = BrowserUseChatOpenAI(model=context.model, temperature=0.0)
-        browser = BrowserUseBrowser(
-            cdp_url=resources.cdp_url,
-            headless=resources.headless,
-            viewport=resources.viewport,
-            window_size=resources.window_size,
-            device_scale_factor=1.0,
-            is_local=resources.sandbox is not None,
-        )
+    doms_output_dir = results_dir / "doms"
+    task_dom_dir = doms_output_dir / f"task_{task['task_id']}"
+    task_dom_dir.mkdir(parents=True, exist_ok=True)
 
-        agent = BrowserUseAgent(
+    step_dom_mapping: Dict[int, str] = {}
+
+    def capture_accessibility_tree(browser_state, agent_output, step_number):
+        try:
+            if (
+                browser_state
+                and hasattr(browser_state, "dom_state")
+                and browser_state.dom_state
+            ):
+                accessibility_content = browser_state.dom_state.llm_representation()
+                dom_file_path = task_dom_dir / f"step_{step_number}.txt"
+                with open(dom_file_path, "w", encoding="utf-8") as f:
+                    f.write(accessibility_content)
+                relative_path = f"doms/task_{task['task_id']}/step_{step_number}.txt"
+                step_dom_mapping[step_number] = relative_path
+        except Exception as exc:
+            logger.warning(
+                "Failed to capture accessibility tree at step %s: %s",
+                step_number,
+                exc,
+            )
+
+    llm = ChatOpenAI(model=model, temperature=0.0)
+
+    sandbox = None
+    kernel_browser = None
+    kernel_client: Optional[Kernel] = None
+
+    viewport = CONTEXT_CONFIG.get("viewport", {"width": 1366, "height": 768})
+    window_size = {
+        "width": viewport.get("width", 1366),
+        "height": viewport.get("height", 768),
+    }
+
+    try:
+        sandbox_start_error: Optional[Exception] = None
+        sandbox_modes = []
+        if sandbox_bundle:
+            if sandbox_safe_mode:
+                sandbox_modes = [True]
+            else:
+                sandbox_modes = [False, True]
+
+        for safe_mode in sandbox_modes:
+            logger.info(
+                "Starting sandbox for task %s at %s (safe_mode=%s)",
+                task["task_id"],
+                sandbox_bundle,
+                safe_mode,
+            )
+
+            # Set up log directory for tracking cached vs not-found URLs
+            log_dir = results_dir / "logs" / f"task_{task['task_id']}"
+
+            sandbox = SandboxEnvironment(
+                sandbox_bundle,
+                allow_network_fallback=sandbox_allow_network,
+                headless=sandbox_headless,
+                safe_mode=safe_mode,
+                log_dir=log_dir,
+            )
+            try:
+                cdp_url = await sandbox.start()
+                browser = Browser(
+                    cdp_url=cdp_url,
+                    headless=sandbox_headless if not safe_mode else True,
+                    viewport=viewport,
+                    window_size=window_size,
+                    device_scale_factor=1.0,
+                    is_local=True,
+                )
+                break
+            except Exception as exc:
+                sandbox_start_error = exc
+                logger.warning(
+                    "Sandbox launch failed for task %s (safe_mode=%s): %s",
+                    task["task_id"],
+                    safe_mode,
+                    exc,
+                )
+                try:
+                    await sandbox.close()
+                except Exception:
+                    pass
+                sandbox = None
+
+        if sandbox_bundle and sandbox is None:
+            if sandbox_allow_network:
+                logger.info(
+                    "Sandbox unavailable for task %s, falling back to Kernel browser",
+                    task["task_id"],
+                )
+            else:
+                raise sandbox_start_error or RuntimeError(
+                    "Sandbox launch failed and fallback disabled"
+                )
+
+        if sandbox is None:
+            kernel_client = get_kernel_client()
+            kernel_browser = kernel_client.browsers.create()
+            browser = Browser(
+                cdp_url=kernel_browser.cdp_ws_url,
+                headless=sandbox_headless,
+                viewport=viewport,
+                window_size=window_size,
+                device_scale_factor=1.0,
+            )
+
+        agent = Agent(
             browser_session=browser,
             task=task["task_description"],
             llm=llm,
-            verbose=self.verbose,
-            max_steps=self.max_steps,
-            register_new_step_callback=capture_dom,
+            verbose=True,
+            max_steps=20,
+            register_new_step_callback=capture_accessibility_tree,
         )
 
         history = await agent.run()
+        duration = (datetime.now() - start_time).total_seconds()
 
-        usage_summary: Optional[Dict[str, Any]] = None
-        if hasattr(agent, "token_cost_service"):
-            try:
-                usage_summary = (
-                    await agent.token_cost_service.get_usage_summary()
-                ).model_dump()
-            except Exception as exc:
-                logger.warning("Failed to get token usage: %s", exc)
+    finally:
+        if kernel_browser and kernel_client:
+            kernel_client.browsers.delete_by_id(kernel_browser.session_id)
+        if sandbox:
+            await sandbox.close()
 
-        return AgentRunResult(
-            history_dump=history.model_dump()["history"],
-            action_count=len(history.model_actions()),
-            usage_summary=usage_summary,
+    # Extract tool calls instead of full history
+    history_dump = history.model_dump()["history"]
+    tool_calls = extract_tool_calls(history_dump)
+    task_type = task.get("task_type")
+    print("task", task)
+    answer = extract_final_answer(history_dump, task_type)
+
+    # Get token usage
+    usage_summary = {}
+    if hasattr(agent, "token_cost_service"):
+        try:
+            # Get usage summary which is async
+            usage_summary = await agent.token_cost_service.get_usage_summary()
+            usage_summary = usage_summary.model_dump()
+            logger.info(f"Token usage summary: {usage_summary}")
+
+        except Exception as e:
+            logger.warning(f"Failed to get token usage: {e}")
+            usage_summary = {}
+
+    return {
+        "task_id": task["task_id"],
+        "task_description": task["task_description"],
+        "task_type": task_type,
+        "success": True,
+        "duration_seconds": duration,
+        "action_count": len(history.model_actions()),
+        "tool_calls": tool_calls,
+        "answer": answer,
+        "usage_summary": usage_summary,
+        "step_dom_mapping": step_dom_mapping,
+        "dump": history_dump,
+    }
+
+
+def load_completed_tasks(output_file: Path) -> set:
+    """Load task IDs that have already been processed from the output file"""
+    completed_task_ids = set()
+    if output_file.exists():
+        try:
+            with open(output_file, "r") as f:
+                results = json.load(f)
+                if isinstance(results, list):
+                    for result in results:
+                        if isinstance(result, dict) and "task_id" in result:
+                            completed_task_ids.add(result["task_id"])
+        except (json.JSONDecodeError, FileNotFoundError):
+            pass
+    return completed_task_ids
+
+
+def chunked(iterable, n):
+    """Yield chunks of n items from iterable"""
+    iterator = iter(iterable)
+    while True:
+        chunk = list(islice(iterator, n))
+        if not chunk:
+            break
+        yield chunk
+
+
+async def process_single_task(
+    task: Dict[str, Any],
+    model: str,
+    output_file: Path,
+    task_idx: int,
+    total_tasks: int,
+    *,
+    sandbox_root: Optional[Path],
+    sandbox_allow_network: bool,
+    sandbox_headless: bool,
+    sandbox_safe_mode: bool,
+    results_dir: Path,
+):
+    """Process a single task and write results to file"""
+    logger.info(
+        f"Processing task {task_idx}/{total_tasks}: "
+        f"ID={task['task_id']}, {task['task_description'][:100]}..."
+    )
+
+    sandbox_bundle: Optional[Path] = None
+    if sandbox_root:
+        sandbox_bundle = resolve_recorded_bundle(sandbox_root, task["task_id"])
+        if not sandbox_bundle:
+            logger.warning(
+                "No sandbox bundle found for task %s under %s; falling back to Kernel",
+                task["task_id"],
+                sandbox_root,
+            )
+
+    try:
+        result = await run_task_with_agent(
+            task,
+            results_dir,
+            model,
+            sandbox_bundle=sandbox_bundle,
+            sandbox_allow_network=sandbox_allow_network,
+            sandbox_headless=sandbox_headless,
+            sandbox_safe_mode=sandbox_safe_mode,
         )
 
+        # Write result with thread-safe lock
+        async with file_write_lock:
+            # Load existing results
+            results_list = []
+            if output_file.exists():
+                try:
+                    with open(output_file, "r") as f:
+                        results_list = json.load(f)
+                except (json.JSONDecodeError, FileNotFoundError):
+                    results_list = []
 
-async def main(
+            # Append new result
+            results_list.append(result)
+
+            # Write back to file
+            with open(output_file, "w") as f:
+                json.dump(results_list, f, indent=2, default=str)
+
+        logger.info(
+            f"Task {task['task_id']} - Success: {result['success']}, "
+            f"Actions: {result['action_count']}, "
+            f"Duration: {result['duration_seconds']:.2f}s"
+        )
+    except Exception as e:
+        logger.error(f"Failed to process task {task['task_id']}: {e}")
+        # Save error result
+        error_result = {
+            "task_id": task["task_id"],
+            "task_description": task["task_description"],
+            "task_type": task.get("task_type"),
+            "success": False,
+            "error": str(e),
+            "tool_calls": [],
+            "answer": None,
+            "usage_summary": {},
+            "step_dom_mapping": {},
+        }
+
+        # Write error result with thread-safe lock
+        async with file_write_lock:
+            # Load existing results
+            results_list = []
+            if output_file.exists():
+                try:
+                    with open(output_file, "r") as f:
+                        results_list = json.load(f)
+                except (json.JSONDecodeError, FileNotFoundError):
+                    results_list = []
+
+            # Append error result
+            results_list.append(error_result)
+
+            # Write back to file
+            with open(output_file, "w") as f:
+                json.dump(results_list, f, indent=2, default=str)
+
+
+async def process_all_tasks(
+    model: str,
+    *,
+    sandbox_root: Optional[Path],
+    sandbox_allow_network: bool,
+    sandbox_headless: bool,
+    sandbox_safe_mode: bool,
+):
+    """Process all tasks and save to JSON, skipping already completed ones"""
+    # Load tasks from input file
+    with open(Path(f"{DATA_DIR}/tasks.jsonl"), "r") as f:
+        tasks = [json.loads(line) for line in f if line.strip()]
+
+    # Setup output directory with timestamp
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    model_safe = model.replace("/", "-")
+    results_dir = Path("results") / f"browseruse-{model_safe}-{timestamp}"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    output_file = results_dir / "results.json"
+
+    # Load already completed tasks
+    completed_task_ids = load_completed_tasks(output_file)
+
+    # Filter out already completed tasks
+    tasks_to_process = [t for t in tasks if t["task_id"] not in completed_task_ids]
+
+    logger.info(f"Loaded {len(tasks)} total tasks")
+    logger.info(f"Already completed: {len(completed_task_ids)} tasks")
+    logger.info(f"Tasks to process: {len(tasks_to_process)}")
+
+    if not tasks_to_process:
+        logger.info("All tasks already processed!")
+        return output_file
+
+    # Process remaining tasks in chunks of 2
+    task_index = 0
+    total_tasks = len(tasks_to_process)
+
+    chunk_size = 1 if sandbox_root else 2
+
+    for chunk in chunked(tasks_to_process, chunk_size):
+        logger.info(f"Processing chunk of {len(chunk)} tasks in parallel")
+
+        # Create tasks for concurrent execution
+        chunk_tasks = []
+        for task in chunk:
+            task_index += 1
+            chunk_tasks.append(
+                process_single_task(
+                    task,
+                    model,
+                    output_file,
+                    task_index,
+                    total_tasks,
+                    sandbox_root=sandbox_root,
+                    sandbox_allow_network=sandbox_allow_network,
+                    sandbox_headless=sandbox_headless,
+                    sandbox_safe_mode=sandbox_safe_mode,
+                    results_dir=results_dir,
+                )
+            )
+
+        # Execute tasks in chunk concurrently
+        await asyncio.gather(*chunk_tasks)
+
+    logger.info(f"All results saved to {output_file}")
+    return output_file
+
+
+def main(
     model: str = "gpt-5-nano",
     use_sandbox: bool = True,
     sandbox_allow_network: bool = True,
-    sandbox_headed: bool = False,
+    sandbox_headless: bool = True,
     sandbox_safe_mode: bool = False,
-    allow_kernel_fallback: bool = True,
 ) -> None:
-    sandbox_root: Optional[Path] = None
-    if use_sandbox:
-        sandbox_root = Path("data/captures").expanduser().resolve()
-        assert sandbox_root.exists()
+    async def wrapper(
+        use_sandbox: bool,
+        sandbox_allow_network: bool,
+        sandbox_headless: bool,
+        sandbox_safe_mode: bool,
+    ) -> None:
+        sandbox_root: Optional[Path] = None
+        if use_sandbox:
+            sandbox_root = Path("data/captures").expanduser().resolve()
+            assert sandbox_root.exists()
 
-    run_config = HarnessRunConfig(
-        model=model,
-        use_sandbox=use_sandbox,
-        sandbox_root=sandbox_root,
-        sandbox_allow_network=sandbox_allow_network,
-        sandbox_headless=not sandbox_headed,
-        sandbox_safe_mode=sandbox_safe_mode,
-        allow_kernel_fallback=allow_kernel_fallback,
-    )
+        if sandbox_safe_mode and not sandbox_headless:
+            logger.warning(
+                "Sandbox safe mode forces headless Chromium; ignoring --no-sandbox-headless"
+            )
+            sandbox_headless = True
 
-    if run_config.sandbox_safe_mode and not run_config.sandbox_headless:
-        logger.warning(
-            "Safe mode enforces headless Chromium; overriding headed setting"
+        output_file = await process_all_tasks(
+            model,
+            sandbox_root=sandbox_root,
+            sandbox_allow_network=sandbox_allow_network,
+            sandbox_headless=sandbox_headless,
+            sandbox_safe_mode=sandbox_safe_mode,
         )
-        run_config.sandbox_headless = True
+        print(f"\nFull data saved to: {output_file}")
 
-    harness_config = HarnessConfig(
-        agent_name="browseruse",
-        agent_runner=BrowserUseAgentRunner(),
-        tool_extractor=extract_tool_calls,
-        answer_extractor=extract_final_answer,
+    asyncio.run(
+        wrapper(use_sandbox, sandbox_allow_network, sandbox_headless, sandbox_safe_mode)
     )
-    harness = EvaluationHarness(harness_config)
-    output_file = await harness.run_all_tasks(run_config)
-    print(f"\nFull data saved to: {output_file}")
 
 
 def _main() -> None:
-    typer.run(asyncio.run(main()))
+    typer.run(main)
 
 
 if __name__ == "__main__":

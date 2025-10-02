@@ -83,12 +83,6 @@ class EvaluationHarness:
             / "results.json"
         )
 
-    def _ensure_directories(self) -> None:
-        """Ensure that all required directories exist."""
-        # Note: data/ directory is assumed to exist and contain tasks.jsonl
-        # results/ will be created automatically when writing files
-        pass
-
     def _load_tasks(self) -> List[Dict[str, Any]]:
         if not tasks_file.exists():
             raise FileNotFoundError(f"Tasks file not found at {tasks_file}")
@@ -119,7 +113,6 @@ class EvaluationHarness:
                 json.dump(existing_data, handle, default=str, indent=2)
 
     async def run_all_tasks(self, run_config: HarnessRunConfig) -> Path:
-        self._ensure_directories()
         tasks = self._load_tasks()
         output_file = self._output_file_for_model(run_config.model)
 

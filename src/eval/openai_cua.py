@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import asyncio
 import logging
 from pathlib import Path
@@ -14,13 +13,8 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from config.browser_config import CONTEXT_CONFIG
-from eval.harness import (
-    AgentContext,
-    AgentRunResult,
-    EvaluationHarness,
-    HarnessConfig,
-    HarnessRunConfig,
-)
+from eval.harness.definitions import AgentContext, AgentRunResult, HarnessRunConfig
+from eval.harness.harness import EvaluationHarness, HarnessConfig
 
 
 load_dotenv()
@@ -190,8 +184,6 @@ class OpenAICUAAgentRunner:
 
 
 async def main() -> None:
-    data_dir = Path("data/dev")
-
     viewport = CONTEXT_CONFIG.get("viewport", {"width": 1366, "height": 768})
     window_size = {
         "width": viewport.get("width", 1366),
@@ -209,7 +201,6 @@ async def main() -> None:
 
     run_config = HarnessRunConfig(
         model="computer-use-preview",
-        data_dir=data_dir,
         use_sandbox=False,
         sandbox_root=None,
         sandbox_allow_network=False,

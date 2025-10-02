@@ -949,6 +949,23 @@ wheels = [
 ]
 
 [[package]]
+name = "kernel"
+version = "0.12.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "distro" },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "sniffio" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7c/81/db60d603bb7a5c05877dbc87826e9d0f05a9bbf3ed655c14c042c184d1bd/kernel-0.12.0.tar.gz", hash = "sha256:bfbe5fc21d99bff17f248eafd6bad8abfbffd0e597c5d5ad8fe0d2218b125fa3", size = 139526, upload-time = "2025-09-30T23:56:38.575Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cd/4e/43c42b7c10cd3fa7dd129a6b32e877d68c3fd35d4954efdcdb9eb0753c84/kernel-0.12.0-py3-none-any.whl", hash = "sha256:5fa9d583f89f2595b9cbcd09edcce890eba1ea0c3784208e340dcadf5b45f203", size = 146113, upload-time = "2025-09-30T23:56:37.061Z" },
+]
+
+[[package]]
 name = "litellm"
 version = "1.77.5"
 source = { registry = "https://pypi.org/simple" }
@@ -4462,6 +4479,15 @@ wheels = [
 ]
 
 [[package]]
+name = "shellingham"
+version = "1.5.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/58/15/8b3609fd3830ef7b27b655beb4b4e9c62313a4e8da8c676e142cc210d58e/shellingham-1.5.4.tar.gz", hash = "sha256:8dbca0739d487e5bd35ab3ca4b36e11c4078f3a234bfce294b0a0291363404de", size = 10310, upload-time = "2023-10-24T04:13:40.426Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e0/f9/0595336914c5619e5f28a1fb793285925a8cd4b432c9da0a987836c7f822/shellingham-1.5.4-py2.py3-none-any.whl", hash = "sha256:7ecfff8f2fd72616f7481040475a65b2bf8af90a56c89140852d1120324e8686", size = 9755, upload-time = "2023-10-24T04:13:38.866Z" },
+]
+
+[[package]]
 name = "six"
 version = "1.17.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4589,6 +4615,21 @@ wheels = [
 ]
 
 [[package]]
+name = "typer"
+version = "0.19.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+    { name = "rich" },
+    { name = "shellingham" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/21/ca/950278884e2ca20547ff3eb109478c6baf6b8cf219318e6bc4f666fad8e8/typer-0.19.2.tar.gz", hash = "sha256:9ad824308ded0ad06cc716434705f691d4ee0bfd0fb081839d2e426860e7fdca", size = 104755, upload-time = "2025-09-23T09:47:48.256Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/00/22/35617eee79080a5d071d0f14ad698d325ee6b3bf824fc0467c03b30e7fa8/typer-0.19.2-py3-none-any.whl", hash = "sha256:755e7e19670ffad8283db353267cb81ef252f595aa6834a0d1ca9312d9326cb9", size = 46748, upload-time = "2025-09-23T09:47:46.777Z" },
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4656,18 +4697,22 @@ source = { editable = "." }
 dependencies = [
     { name = "browser-use" },
     { name = "dspy" },
+    { name = "kernel" },
     { name = "litellm" },
     { name = "playwright" },
     { name = "python-dotenv" },
+    { name = "typer" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "browser-use", specifier = ">=0.7.10" },
     { name = "dspy", specifier = ">=3.0.3" },
+    { name = "kernel", specifier = ">=0.12.0" },
     { name = "litellm", specifier = ">=1.77.5" },
     { name = "playwright", specifier = ">=1.55.0" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
+    { name = "typer", specifier = ">=0.19.2" },
 ]
 
 [[package]]
