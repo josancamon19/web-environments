@@ -1,4 +1,0 @@
-playwright
-litellm
-browser-use
-python-dotenv

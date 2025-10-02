@@ -66,6 +66,41 @@ Storage
 - Screenshots at `data/<env>/screenshots/`
 - Video Tasks at `data/<env>/videos`
 
+## GCP Data Upload
+
+Upload collected data to Google Cloud Storage:
+
+### Setup Authentication
+If your organization has disabled service account key creation, use the recommended authentication method:
+
+**Option 1: Using the Desktop App**
+- Launch the Task Collector app (`python desktop_app/task_collector_app.py`)
+- Click "Setup GCP Auth" button
+- Follow the browser authentication flow
+
+**Option 2: Using the Setup Script**
+```bash
+./setup_gcp_auth.sh
+```
+
+**Option 3: Manual Setup**
+```bash
+# Install Google Cloud SDK if not already installed
+# Then authenticate:
+gcloud auth application-default login
+```
+
+### Upload Data
+- Launch the Task Collector app
+- Click "Upload Data" button
+- The app will zip all data and upload to the `collection-reports` bucket
+- Uploaded files are timestamped: `web-envs-data-YYYY-MM-DD_HH-MM-SS.zip`
+
+### Troubleshooting
+- **Service account key creation disabled**: Use `gcloud auth application-default login` instead
+- **Bucket access denied**: Ensure you have write access to the `collection-reports` bucket
+- **Authentication expired**: Re-run the authentication setup
+
 Notes
 - This is an MVP and will capture response bodies which can be large. For production, consider size limits and redaction.
 - To reduce CAPTCHA/detections, the recorder prefers launching a persistent Chrome profile and disables some automation flags. You can customize:

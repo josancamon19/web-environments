@@ -16,3 +16,4 @@ results/
 data/
 .DS_Store
 *.egg-info
+google-credentials.json
