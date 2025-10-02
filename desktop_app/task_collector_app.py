@@ -81,7 +81,7 @@ def _load_env_files() -> None:
             load_dotenv(dotenv_path=dotenv_path, override=False)
 
 
-def ensure_google_credentials() -> tuple[bool, Optional[str]]:
+def ensure_google_credentials(creds_base64: Optional[str] = None) -> tuple[bool, Optional[str]]:
     """Ensure Google credentials file exists for storage uploads."""
 
     global _GOOGLE_CREDS_READY  # pylint: disable=global-statement
@@ -89,31 +89,49 @@ def ensure_google_credentials() -> tuple[bool, Optional[str]]:
     global _GOOGLE_CREDS_PATH  # pylint: disable=global-statement
 
     if _GOOGLE_CREDS_READY:
+        logger.debug("Google credentials already ready")
         return True, None
 
-    creds_base64 = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_BASE64")
     if not creds_base64:
         message = (
-            "Missing required environment variable: GOOGLE_APPLICATION_CREDENTIALS_BASE64\n\n"
-            "This application requires Google Cloud Storage credentials to upload collected data.\n\n"
-            "To fix this:\n"
-            "1. Create a .env file next to the app (or set the variable globally)\n"
-            "2. Add the following line:\n"
-            "   GOOGLE_APPLICATION_CREDENTIALS_BASE64=<your-base64-encoded-credentials>\n\n"
-            "Contact your administrator to obtain the credentials."
+            "Google Cloud Storage credentials are required to upload collected data.\n\n"
+            "Please paste your base64-encoded credentials in the Settings field above."
         )
         _GOOGLE_CREDS_ERROR = message
         return False, message
 
+    creds_str = creds_base64.strip()
+    logger.debug(f"Processing credentials input (length: {len(creds_str)}, starts with: {creds_str[:20]!r})")
+
+    if getattr(sys, "frozen", False):
+        creds_path = Path(tempfile.gettempdir()) / "google-credentials.json"
+    else:
+        creds_path = Path("google-credentials.json")
+
     try:
-        decoded_creds = base64.b64decode(creds_base64)
-        if getattr(sys, "frozen", False):
-            creds_path = Path(tempfile.gettempdir()) / "google-credentials.json"
+        # Check if it's a direct JSON string (with optional trailing whitespace)
+        stripped_creds = creds_str.strip()
+        if stripped_creds.startswith("{") and stripped_creds.endswith("}"):
+            logger.debug("Detected as JSON input")
+            creds_bytes = creds_str.encode("utf-8")
+        # Check if it's a file path (short string that exists as a file)
+        elif len(creds_str) < 500 and Path(creds_str).expanduser().is_file():
+            logger.debug("Detected as file path")
+            creds_path = Path(creds_str).expanduser().resolve()
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(creds_path)
+            _GOOGLE_CREDS_READY = True
+            _GOOGLE_CREDS_ERROR = None
+            _GOOGLE_CREDS_PATH = creds_path
+            return True, None
+        # Otherwise treat as base64-encoded
         else:
-            creds_path = Path("google-credentials.json")
+            logger.debug("Detected as base64 input")
+            creds_bytes = base64.b64decode(creds_str)
 
         creds_path.parent.mkdir(parents=True, exist_ok=True)
-        creds_path.write_bytes(decoded_creds)
+        creds_path.write_bytes(creds_bytes)
+        logger.debug(f"Credentials written to {creds_path} (size: {len(creds_bytes)} bytes)")
+
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(creds_path)
         _GOOGLE_CREDS_READY = True
         _GOOGLE_CREDS_ERROR = None
@@ -731,8 +749,6 @@ else:
     BASE_PATH = Path(__file__).resolve().parents[1]
     PROJECT_ROOT = BASE_PATH
 
-_load_env_files()
-
 PLAYWRIGHT_BROWSERS_DIR = PROJECT_ROOT / "playwright-browsers"
 os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(PLAYWRIGHT_BROWSERS_DIR))
 
@@ -827,6 +843,34 @@ class TaskCollectorApp:
             fg="#555555",
         )
         subtitle.pack(anchor=tk.W, pady=(0, 20))
+
+        # Google Cloud credentials input
+        creds_frame = tk.Frame(container)
+        creds_frame.pack(fill=tk.X, pady=(0, 12))
+        tk.Label(
+            creds_frame,
+            text="Google Cloud Credentials:",
+            font=("Helvetica", 12),
+        ).pack(anchor=tk.W, pady=(0, 4))
+        tk.Label(
+            creds_frame,
+            text="Paste your Google Cloud service account JSON here (raw JSON or base64-encoded)",
+            font=("Helvetica", 9),
+            fg="#777777",
+        ).pack(anchor=tk.W, pady=(0, 4))
+        self.credentials_text = tk.Text(
+            creds_frame,
+            height=6,
+            width=80,
+            font=("Courier", 9),
+            wrap=tk.WORD,
+            relief=tk.SOLID,
+            borderwidth=1,
+        )
+        self.credentials_text.pack(fill=tk.X, pady=(0, 0))
+
+        # Try to load saved credentials
+        self._load_credentials()
 
         # Source dropdown
         source_frame = tk.Frame(container)
@@ -992,6 +1036,37 @@ class TaskCollectorApp:
             self.log_output.config(state=tk.DISABLED)
         self.root.after(150, self._process_log_queue)
 
+    def _load_credentials(self) -> None:
+        """Load saved credentials from config file."""
+        if CONFIG_FILE.exists():
+            try:
+                with open(CONFIG_FILE, "r") as f:
+                    config = json.load(f)
+                    creds = config.get("google_credentials_base64", "")
+                    if creds:
+                        # Only load if text widget is empty to avoid concatenating
+                        current_content = self.credentials_text.get("1.0", tk.END).strip()
+                        if not current_content:
+                            self.credentials_text.delete("1.0", tk.END)  # Clear any content
+                            self.credentials_text.insert("1.0", creds)
+            except Exception as exc:
+                logger.warning(f"Failed to load credentials from config: {exc}")
+
+    def _save_credentials(self) -> None:
+        """Save credentials to config file."""
+        creds = self.credentials_text.get("1.0", tk.END).strip()
+        try:
+            CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+            config = {}
+            if CONFIG_FILE.exists():
+                with open(CONFIG_FILE, "r") as f:
+                    config = json.load(f)
+            config["google_credentials_base64"] = creds
+            with open(CONFIG_FILE, "w") as f:
+                json.dump(config, f, indent=2)
+        except Exception as exc:
+            logger.warning(f"Failed to save credentials: {exc}")
+
     def _warn_if_credentials_missing(self) -> None:
         if storage is None:
             warning = (
@@ -1002,10 +1077,16 @@ class TaskCollectorApp:
             messagebox.showwarning("Upload Unavailable", warning, parent=self.root)
             return
 
-        creds_ready, error_message = ensure_google_credentials()
-        if not creds_ready and error_message:
-            self._log("⚠️ Upload requires Google Cloud credentials.")
-            messagebox.showwarning("Upload Setup Required", error_message, parent=self.root)
+        creds = self.credentials_text.get("1.0", tk.END).strip()
+        if not creds:
+            self._log("⚠️ Upload requires Google Cloud credentials in the Settings field.")
+        else:
+            # Test credentials
+            creds_ready, error_message = ensure_google_credentials(creds)
+            if creds_ready:
+                self._log("✅ Google Cloud credentials loaded successfully.")
+            elif error_message:
+                self._log("⚠️ There's an issue with your credentials - please check the format.")
 
     def _log(self, message: str) -> None:
         self.log_queue.put(message)
@@ -1168,9 +1249,21 @@ class TaskCollectorApp:
             self._log("Upload cancelled - no username provided")
             return
 
-        creds_ready, error_message = ensure_google_credentials()
+        # Get and save credentials
+        creds = self.credentials_text.get("1.0", tk.END).strip()
+        if not creds:
+            error_msg = "Please paste your Google Cloud credentials in the Settings field above."
+            self._log(f"❌ {error_msg}")
+            messagebox.showerror("Upload Error", error_msg, parent=self.root)
+            self.credentials_text.focus_set()
+            return
+
+        # Save credentials for next time
+        self._save_credentials()
+
+        creds_ready, error_message = ensure_google_credentials(creds)
         if not creds_ready:
-            error_text = error_message or "Google Cloud credentials are not configured."
+            error_text = error_message or "Google Cloud credentials are not configured correctly."
             self._log(f"❌ {error_text.splitlines()[0]}")
             messagebox.showerror("Upload Error", error_text, parent=self.root)
             return
