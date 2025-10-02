@@ -82,7 +82,10 @@ def _load_env_files() -> None:
 
 
 def ensure_google_credentials(creds_base64: Optional[str] = None) -> tuple[bool, Optional[str]]:
-    """Ensure Google credentials file exists for storage uploads."""
+    """Ensure Google credentials file exists for storage uploads.
+    
+    Expects base64-encoded Google Cloud service account JSON credentials.
+    """
 
     global _GOOGLE_CREDS_READY  # pylint: disable=global-statement
     global _GOOGLE_CREDS_ERROR  # pylint: disable=global-statement
@@ -101,7 +104,7 @@ def ensure_google_credentials(creds_base64: Optional[str] = None) -> tuple[bool,
         return False, message
 
     creds_str = creds_base64.strip()
-    logger.debug(f"Processing credentials input (length: {len(creds_str)}, starts with: {creds_str[:20]!r})")
+    logger.debug(f"Processing credentials input (length: {len(creds_str)})")
 
     if getattr(sys, "frozen", False):
         creds_path = Path(tempfile.gettempdir()) / "google-credentials.json"
@@ -109,28 +112,30 @@ def ensure_google_credentials(creds_base64: Optional[str] = None) -> tuple[bool,
         creds_path = Path("google-credentials.json")
 
     try:
-        # Check if it's a direct JSON string (with optional trailing whitespace)
-        stripped_creds = creds_str.strip()
-        if stripped_creds.startswith("{") and stripped_creds.endswith("}"):
-            logger.debug("Detected as JSON input")
-            creds_bytes = creds_str.encode("utf-8")
-        # Check if it's a file path (short string that exists as a file)
-        elif len(creds_str) < 500 and Path(creds_str).expanduser().is_file():
-            logger.debug("Detected as file path")
-            creds_path = Path(creds_str).expanduser().resolve()
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(creds_path)
-            _GOOGLE_CREDS_READY = True
-            _GOOGLE_CREDS_ERROR = None
-            _GOOGLE_CREDS_PATH = creds_path
-            return True, None
-        # Otherwise treat as base64-encoded
-        else:
-            logger.debug("Detected as base64 input")
-            creds_bytes = base64.b64decode(creds_str)
-
+        # Decode base64 credentials
+        creds_bytes = base64.b64decode(creds_str)
+        creds_json_str = creds_bytes.decode("utf-8")
+        
+        # Clean the JSON string - ensure it starts with { and ends with }
+        creds_json_str = creds_json_str.strip()
+        
+        # Find the first { and last }
+        start_idx = creds_json_str.find("{")
+        end_idx = creds_json_str.rfind("}")
+        
+        if start_idx == -1 or end_idx == -1 or start_idx >= end_idx:
+            raise ValueError("Invalid JSON structure - missing braces")
+        
+        # Extract clean JSON
+        clean_json = creds_json_str[start_idx:end_idx + 1]
+        
+        # Validate it's proper JSON
+        json.loads(clean_json)
+        
+        # Write the clean JSON to file (overwrite, not append)
         creds_path.parent.mkdir(parents=True, exist_ok=True)
-        creds_path.write_bytes(creds_bytes)
-        logger.debug(f"Credentials written to {creds_path} (size: {len(creds_bytes)} bytes)")
+        creds_path.write_text(clean_json, encoding="utf-8")
+        logger.debug(f"Credentials written to {creds_path} (size: {len(clean_json)} chars)")
 
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(creds_path)
         _GOOGLE_CREDS_READY = True
@@ -140,10 +145,11 @@ def ensure_google_credentials(creds_base64: Optional[str] = None) -> tuple[bool,
     except Exception as exc:  # pragma: no cover - defensive
         message = (
             f"Failed to setup Google Cloud credentials: {exc}\n\n"
-            "The credentials may be corrupted or invalid.\n"
+            "The credentials must be base64-encoded Google Cloud service account JSON.\n"
             "Contact your administrator for assistance."
         )
         _GOOGLE_CREDS_ERROR = message
+        logger.error(f"Credential setup failed: {exc}")
         return False, message
 
 # Config file to store user settings
@@ -854,7 +860,7 @@ class TaskCollectorApp:
         ).pack(anchor=tk.W, pady=(0, 4))
         tk.Label(
             creds_frame,
-            text="Paste your Google Cloud service account JSON here (raw JSON or base64-encoded)",
+            text="Paste your base64-encoded Google Cloud service account JSON here",
             font=("Helvetica", 9),
             fg="#777777",
         ).pack(anchor=tk.W, pady=(0, 4))
