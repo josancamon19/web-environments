@@ -13,3 +13,4 @@ playwright-browsers
 *.DS_Store
 src/eval/tars/images
 results/
+data/

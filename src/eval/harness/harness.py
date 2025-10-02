@@ -17,7 +17,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from config.browser_config import CONTEXT_CONFIG
+from src.config.browser_config import CONTEXT_CONFIG
 from src.capture.sandbox import resolve_recorded_bundle
 from src.eval.harness.definitions import (
     AgentContext,
@@ -28,7 +28,7 @@ from src.eval.harness.definitions import (
 from src.eval.harness.session_provider import DefaultSessionProvider
 
 logger = logging.getLogger(__name__)
-
+tasks_file = Path("data/tasks.jsonl")
 
 # ---------------------------------------------------------------------------
 # Harness implementation
@@ -55,14 +55,17 @@ def load_completed_tasks(path: Path) -> set[int]:
     if not path.exists():
         return completed
 
-    with open(path, "r", encoding="utf-8") as handle:
-        for line in handle:
-            if not line.strip():
-                continue
-            try:
-                completed.add(json.loads(line)["task_id"])
-            except json.JSONDecodeError:
-                continue
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+            if isinstance(data, list):
+                for item in data:
+                    if isinstance(item, dict) and "task_id" in item:
+                        completed.add(item["task_id"])
+            elif isinstance(data, dict) and "task_id" in data:
+                completed.add(data["task_id"])
+    except (json.JSONDecodeError, FileNotFoundError):
+        pass
     return completed
 
 
@@ -73,32 +76,59 @@ class EvaluationHarness:
 
     def _output_file_for_model(self, model: str) -> Path:
         safe_name = model.replace("/", "-")
+        date_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
         return (
             Path("results")
-            / f"{self.config.agent_name}-{safe_name}.jsonl"
+            / f"{self.config.agent_name}-{safe_name}-{date_str}"
+            / "results.json"
         )
 
     def _ensure_directories(self) -> None:
-        self.config.results_output_dir.mkdir(parents=True, exist_ok=True)
-        self.config.dom_output_dir.mkdir(parents=True, exist_ok=True)
+        """Ensure that all required directories exist."""
+        # Note: data/ directory is assumed to exist and contain tasks.jsonl
+        # results/ will be created automatically when writing files
+        pass
 
-    def _load_tasks(self, data_dir: Path) -> List[Dict[str, Any]]:
-        tasks_file = data_dir / "tasks.jsonl"
+    def _load_tasks(self) -> List[Dict[str, Any]]:
         if not tasks_file.exists():
             raise FileNotFoundError(f"Tasks file not found at {tasks_file}")
 
         with open(tasks_file, "r", encoding="utf-8") as handle:
-            return [json.loads(line) for line in handle if line.strip()]
+            tasks = [json.loads(line) for line in handle if line.strip()]
+            if not tasks:
+                raise FileNotFoundError(f"Tasks file is empty: {tasks_file}")
+            return tasks
 
     async def _write_result(self, output_file: Path, payload: Dict[str, Any]) -> None:
         async with FILE_WRITE_LOCK:
-            with open(output_file, "a", encoding="utf-8") as handle:
-                handle.write(json.dumps(payload, default=str) + "\n")
+            # For JSON file, we need to read existing data and append to it
+            if output_file.exists():
+                try:
+                    with open(output_file, "r", encoding="utf-8") as handle:
+                        existing_data = json.load(handle)
+                        if not isinstance(existing_data, list):
+                            existing_data = [existing_data]
+                except (json.JSONDecodeError, FileNotFoundError):
+                    existing_data = []
+            else:
+                existing_data = []
+
+            existing_data.append(payload)
+
+            with open(output_file, "w", encoding="utf-8") as handle:
+                json.dump(existing_data, handle, default=str, indent=2)
 
     async def run_all_tasks(self, run_config: HarnessRunConfig) -> Path:
         self._ensure_directories()
-        tasks = self._load_tasks(run_config.data_dir)
+        tasks = self._load_tasks()
         output_file = self._output_file_for_model(run_config.model)
+
+        # Create the results directory structure
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        doms_dir = output_file.parent / "doms"
+        doms_dir.mkdir(exist_ok=True)
+        logs_dir = output_file.parent / "logs"
+        logs_dir.mkdir(exist_ok=True)
 
         completed = load_completed_tasks(output_file)
         pending_tasks = [t for t in tasks if t["task_id"] not in completed]
@@ -119,6 +149,8 @@ class EvaluationHarness:
                 task_index=index,
                 total_tasks=total_tasks,
                 sandbox_bundle=sandbox_bundle,
+                doms_dir=doms_dir,
+                logs_dir=logs_dir,
             )
 
         logger.info("All results saved to %s", output_file)
@@ -133,6 +165,8 @@ class EvaluationHarness:
         task_index: int,
         total_tasks: int,
         sandbox_bundle: Optional[Path],
+        doms_dir: Path,
+        logs_dir: Path,
     ) -> None:
         logger.info(
             "Processing task %s/%s: ID=%s, %.100s",
@@ -142,8 +176,6 @@ class EvaluationHarness:
             task["task_description"],
         )
 
-        dom_task_dir = self.config.dom_output_dir / f"task_{task['task_id']}"
-        dom_task_dir.mkdir(parents=True, exist_ok=True)
         step_dom_mapping: Dict[int, str] = {}
 
         def capture_dom(
@@ -151,7 +183,7 @@ class EvaluationHarness:
         ) -> None:
             self._capture_dom_snapshot(
                 browser_state=browser_state,
-                target_dir=dom_task_dir,
+                target_dir=doms_dir,
                 task_id=task["task_id"],
                 step_number=step_number,
                 mapping=step_dom_mapping,
@@ -159,6 +191,7 @@ class EvaluationHarness:
 
         resources: Optional[SessionResources] = None
         start_time = datetime.now()
+        task_logs_dir = logs_dir / f"task_{task['task_id']}"
 
         try:
             resources = await self.session_provider(
@@ -167,6 +200,7 @@ class EvaluationHarness:
                 viewport=CONTEXT_CONFIG["viewport"],
                 window_size=CONTEXT_CONFIG["viewport"],
                 sandbox_bundle=sandbox_bundle,
+                sandbox_log_dir=task_logs_dir,
             )
 
             context = AgentContext(
@@ -203,6 +237,11 @@ class EvaluationHarness:
                 "usage_summary": run_result.usage_summary or {},
                 "step_dom_mapping": {str(k): v for k, v in step_dom_mapping.items()},
                 "dump": history_dump,
+                "sandbox_logs": (
+                    str(Path("logs") / f"task_{task['task_id']}")
+                    if resources and resources.sandbox
+                    else None
+                ),
             }
 
             await self._write_result(output_file, result_payload)
@@ -226,6 +265,11 @@ class EvaluationHarness:
                 "usage_summary": {},
                 "step_dom_mapping": {},
                 "duration_seconds": duration,
+                "sandbox_logs": (
+                    str(Path("logs") / f"task_{task['task_id']}")
+                    if resources and resources.sandbox
+                    else None
+                ),
             }
             await self._write_result(output_file, error_payload)
         finally:
@@ -265,7 +309,9 @@ class EvaluationHarness:
             if not accessibility_content:
                 return
 
-            dom_file_path = target_dir / f"step_{step_number}.txt"
+            task_dir = target_dir / f"task_{task_id}"
+            task_dir.mkdir(exist_ok=True)
+            dom_file_path = task_dir / f"step_{step_number}.txt"
             dom_file_path.write_text(accessibility_content, encoding="utf-8")
             relative_path = Path("doms") / f"task_{task_id}" / dom_file_path.name
             mapping[step_number] = str(relative_path)

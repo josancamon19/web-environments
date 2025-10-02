@@ -29,6 +29,7 @@ class DefaultSessionProvider:
         viewport: Dict[str, int],
         window_size: Dict[str, int],
         sandbox_bundle: Optional[Path],
+        sandbox_log_dir: Optional[Path],
     ) -> SessionResources:
         sandbox_result = await self._start_sandbox(
             task=task,
@@ -36,6 +37,7 @@ class DefaultSessionProvider:
             viewport=viewport,
             window_size=window_size,
             sandbox_bundle=sandbox_bundle,
+            sandbox_log_dir=sandbox_log_dir,
         )
 
         if sandbox_result:
@@ -77,6 +79,7 @@ class DefaultSessionProvider:
         viewport: Dict[str, int],
         window_size: Dict[str, int],
         sandbox_bundle: Optional[Path],
+        sandbox_log_dir: Optional[Path],
     ) -> Optional[tuple[str, SandboxEnvironment, bool, bool]]:
         if not (run_config.use_sandbox and sandbox_bundle):
             return None
@@ -90,6 +93,7 @@ class DefaultSessionProvider:
                 allow_network_fallback=run_config.sandbox_allow_network,
                 headless=run_config.sandbox_headless if not safe_mode else True,
                 safe_mode=safe_mode,
+                log_dir=sandbox_log_dir,
             )
             try:
                 cdp_url = await sandbox.start()

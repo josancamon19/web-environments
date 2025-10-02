@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from pathlib import Path
@@ -17,13 +18,14 @@ from browser_use import (
 import typer
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+
 from src.eval.harness.definitions import (
     AgentContext,
     AgentRunResult,
     CaptureCallback,
-    HarnessConfig,
     HarnessRunConfig,
 )
+from src.eval.harness.harness import HarnessConfig
 from src.eval.harness.harness import EvaluationHarness
 
 load_dotenv()
@@ -233,14 +235,11 @@ async def main(
 ) -> None:
     sandbox_root: Optional[Path] = None
     if use_sandbox:
-        root_arg = Path("data") / "captures"
-        candidate_root = Path(root_arg).expanduser().resolve()
-        assert candidate_root.exists()
-        sandbox_root = candidate_root
+        sandbox_root = Path("data/captures").expanduser().resolve()
+        assert sandbox_root.exists()
 
     run_config = HarnessRunConfig(
         model=model,
-        data_dir=Path("data"),
         use_sandbox=use_sandbox,
         sandbox_root=sandbox_root,
         sandbox_allow_network=sandbox_allow_network,
@@ -255,21 +254,19 @@ async def main(
         )
         run_config.sandbox_headless = True
 
-    harness = EvaluationHarness(
-        HarnessConfig(
-            agent_name="browseruse",
-            agent_runner=BrowserUseAgentRunner(),
-            tool_extractor=extract_tool_calls,
-            answer_extractor=extract_final_answer,
-        )
+    harness_config = HarnessConfig(
+        agent_name="browseruse",
+        agent_runner=BrowserUseAgentRunner(),
+        tool_extractor=extract_tool_calls,
+        answer_extractor=extract_final_answer,
     )
-
+    harness = EvaluationHarness(harness_config)
     output_file = await harness.run_all_tasks(run_config)
     print(f"\nFull data saved to: {output_file}")
 
 
 def _main() -> None:
-    typer.run(main)
+    typer.run(asyncio.run(main()))
 
 
 if __name__ == "__main__":

@@ -88,7 +88,6 @@ class HarnessRunConfig:
     """Per-run configuration supplied by CLI wrappers."""
 
     model: str
-    data_dir: Path
     use_sandbox: bool = True
     sandbox_root: Optional[Path] = None
     sandbox_allow_network: bool = False
@@ -108,4 +107,5 @@ class SessionProvider(Protocol):
         viewport: Dict[str, int],
         window_size: Dict[str, int],
         sandbox_bundle: Optional[Path],
+        sandbox_log_dir: Optional[Path],
     ) -> SessionResources: ...
