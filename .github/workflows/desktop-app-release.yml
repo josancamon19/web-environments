@@ -91,6 +91,11 @@ jobs:
             Automated desktop builds for commit `${{ github.sha }}`.
             
             Version: ${{ needs.prepare.outputs.version }}
+            
+            ## Latest Commit
+            **${{ github.event.head_commit.message }}**
+            
+            Author: ${{ github.event.head_commit.author.name }}
           artifacts: release-assets/**/TaskCollector-*.zip
           allowUpdates: false
           token: ${{ secrets.GITHUB_TOKEN }}

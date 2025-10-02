@@ -547,7 +547,7 @@ class TasksViewDialog(tk.Toplevel):
             self.context_menu.post(event.x_root, event.y_root)
 
     def delete_selected_task(self):
-        """Delete the selected task after confirmation."""
+        """Delete the selected task and all related data after confirmation."""
         selected_items = self.tree.selection()
         if not selected_items:
             return
@@ -557,10 +557,9 @@ class TasksViewDialog(tk.Toplevel):
         values = self.tree.item(item, "values")
         task_id = values[0]
         description = values[1]
-        video_path = values[6]  # Video filename from the table
 
         # Show confirmation dialog
-        message = f"Are you sure you want to delete task {task_id}?\n\nDescription: {description}\n\nThis will also delete the associated video and DOM files."
+        message = f"Are you sure you want to delete task {task_id}?\n\nDescription: {description}\n\nThis will permanently delete:\n• Task record\n• All steps\n• All requests and responses\n• DOM files\n• Screenshots\n• Capture files"
         if not messagebox.askyesno("Confirm Delete", message, parent=self):
             return
 
@@ -570,20 +569,20 @@ class TasksViewDialog(tk.Toplevel):
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
 
-            # Delete task (CASCADE will handle related records)
+            # Delete steps (which will cascade to delete requests and responses if foreign keys are set up)
+            cursor.execute("DELETE FROM steps WHERE task_id = ?", (task_id,))
+
+            # Delete requests associated with this task
+            cursor.execute("DELETE FROM requests WHERE task_id = ?", (task_id,))
+
+            # Delete responses associated with this task
+            cursor.execute("DELETE FROM responses WHERE task_id = ?", (task_id,))
+
+            # Delete task (CASCADE will handle any remaining related records)
             cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+
             conn.commit()
             conn.close()
-
-            # Delete video file if it exists
-            if video_path:
-                video_full_path = Path(DATA_DIR) / "videos" / video_path
-                if video_full_path.exists():
-                    try:
-                        video_full_path.unlink()
-                        print(f"Deleted video: {video_full_path}")
-                    except Exception as e:
-                        print(f"Error deleting video {video_full_path}: {e}")
 
             # Delete DOM files directory
             dom_dir = Path(DATA_DIR) / "doms" / f"task_{task_id}"
@@ -593,6 +592,26 @@ class TasksViewDialog(tk.Toplevel):
                     print(f"Deleted DOM directory: {dom_dir}")
                 except Exception as e:
                     print(f"Error deleting DOM directory {dom_dir}: {e}")
+
+            # Delete screenshots directory
+            screenshots_dir = Path(DATA_DIR) / "screenshots" / f"task{task_id}"
+            if screenshots_dir.exists():
+                try:
+                    shutil.rmtree(screenshots_dir)
+                    print(f"Deleted screenshots directory: {screenshots_dir}")
+                except Exception as e:
+                    print(
+                        f"Error deleting screenshots directory {screenshots_dir}: {e}"
+                    )
+
+            # Delete captures directory
+            captures_dir = Path(DATA_DIR) / "captures" / f"task_{task_id}"
+            if captures_dir.exists():
+                try:
+                    shutil.rmtree(captures_dir)
+                    print(f"Deleted captures directory: {captures_dir}")
+                except Exception as e:
+                    print(f"Error deleting captures directory {captures_dir}: {e}")
 
             # Remove from tree view
             self.tree.delete(item)
@@ -604,7 +623,9 @@ class TasksViewDialog(tk.Toplevel):
             )
 
             messagebox.showinfo(
-                "Success", f"Task {task_id} has been deleted.", parent=self
+                "Success",
+                f"Task {task_id} and all related data have been deleted.",
+                parent=self,
             )
 
         except Exception as e:
@@ -652,8 +673,8 @@ SOURCE_CHOICES = [
 ]
 
 TASK_TYPE_CHOICES = {
-    "action": "Action: interact with pages (click, type, navigate)",
-    "information_retrieval": "Information Retrieval: gather answers",
+    "action": "Action: add to cart, book a flight.",
+    "information_retrieval": "Information Retrieval: find information, gather answers",
 }
 
 
@@ -664,6 +685,10 @@ class TaskCollectorApp:
         self.root = tk.Tk()
         self.root.title("Task Collector")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        # Set better default window size
+        self.root.geometry("800x750")
+        self.root.minsize(700, 650)
 
         self.log_queue = queue.Queue()
         self.task_running = False
@@ -680,13 +705,14 @@ class TaskCollectorApp:
         self.root.mainloop()
 
     def _build_ui(self) -> None:
-        container = tk.Frame(self.root, padx=16, pady=16)
+        # Main container with better padding
+        container = tk.Frame(self.root, padx=24, pady=20)
         container.pack(fill=tk.BOTH, expand=True)
 
         title = tk.Label(
-            container, text="Collect a New Task", font=("Helvetica", 16, "bold")
+            container, text="Collect a New Task", font=("Helvetica", 18, "bold")
         )
-        title.pack(anchor=tk.W)
+        title.pack(anchor=tk.W, pady=(0, 4))
 
         subtitle = tk.Label(
             container,
@@ -694,15 +720,19 @@ class TaskCollectorApp:
                 "Fill in the task details, then click 'Launch Task'. The browser will open "
                 "and recording will start automatically."
             ),
-            wraplength=480,
+            wraplength=700,
             justify=tk.LEFT,
+            font=("Helvetica", 11),
+            fg="#555555",
         )
-        subtitle.pack(anchor=tk.W, pady=(4, 12))
+        subtitle.pack(anchor=tk.W, pady=(0, 20))
 
         # Source dropdown
         source_frame = tk.Frame(container)
-        source_frame.pack(fill=tk.X, pady=4)
-        tk.Label(source_frame, text="Task Source:").pack(anchor=tk.W)
+        source_frame.pack(fill=tk.X, pady=(0, 12))
+        tk.Label(source_frame, text="Task Source:", font=("Helvetica", 12)).pack(
+            anchor=tk.W, pady=(0, 4)
+        )
         self.source_var = tk.StringVar(value=SOURCE_CHOICES[0][0])
         source_menu = tk.OptionMenu(
             source_frame,
@@ -711,13 +741,15 @@ class TaskCollectorApp:
         )
         # We need to map displayed label to code; track in dictionary
         self._source_label_to_value = {label: value for label, value in SOURCE_CHOICES}
-        source_menu.config(width=30)
-        source_menu.pack(anchor=tk.W, pady=(2, 0))
+        source_menu.config(width=35, font=("Helvetica", 11))
+        source_menu.pack(anchor=tk.W, pady=(0, 0))
 
         # Task type radio buttons
         type_frame = tk.Frame(container)
-        type_frame.pack(fill=tk.X, pady=4)
-        tk.Label(type_frame, text="Task Type:").pack(anchor=tk.W)
+        type_frame.pack(fill=tk.X, pady=(0, 12))
+        tk.Label(type_frame, text="Task Type:", font=("Helvetica", 12)).pack(
+            anchor=tk.W, pady=(0, 6)
+        )
         self.task_type_var = tk.StringVar(value="action")
         for value, label in TASK_TYPE_CHOICES.items():
             tk.Radiobutton(
@@ -727,23 +759,39 @@ class TaskCollectorApp:
                 value=value,
                 anchor=tk.W,
                 justify=tk.LEFT,
-                wraplength=480,
-            ).pack(anchor=tk.W)
+                wraplength=700,
+                font=("Helvetica", 11),
+            ).pack(anchor=tk.W, pady=2)
 
         # Task description
         description_frame = tk.Frame(container)
-        description_frame.pack(fill=tk.BOTH, expand=False, pady=6)
-        tk.Label(description_frame, text="Task Description:").pack(anchor=tk.W)
-        self.description_text = tk.Text(description_frame, height=4, width=60)
-        self.description_text.pack(fill=tk.BOTH, expand=True, pady=(2, 0))
+        description_frame.pack(fill=tk.BOTH, expand=False, pady=(0, 8))
+
+        tk.Label(
+            description_frame, text="Task Description:", font=("Helvetica", 12)
+        ).pack(anchor=tk.W, pady=(0, 6))
+
+        self.description_text = tk.Text(
+            description_frame,
+            height=5,
+            width=80,
+            font=("Helvetica", 11),
+            wrap=tk.WORD,
+            relief=tk.SOLID,
+            borderwidth=1,
+        )
+        self.description_text.pack(fill=tk.BOTH, expand=True, pady=(0, 0))
 
         button_frame = tk.Frame(container)
-        button_frame.pack(fill=tk.X, pady=(12, 6))
+        button_frame.pack(fill=tk.X, pady=(16, 0))
 
         self.open_data_button = tk.Button(
             button_frame,
             text="Open Data Folder",
             command=self.open_data_folder,
+            font=("Helvetica", 11),
+            padx=12,
+            pady=6,
         )
         self.open_data_button.pack(side=tk.RIGHT)
 
@@ -751,6 +799,9 @@ class TaskCollectorApp:
             button_frame,
             text="Upload Data",
             command=self.upload_data,
+            font=("Helvetica", 11),
+            padx=12,
+            pady=6,
         )
         self.upload_data_button.pack(side=tk.RIGHT, padx=(0, 8))
 
@@ -758,11 +809,22 @@ class TaskCollectorApp:
             button_frame,
             text="View Tasks",
             command=self.view_tasks,
+            font=("Helvetica", 11),
+            padx=12,
+            pady=6,
         )
         self.view_tasks_button.pack(side=tk.RIGHT, padx=(0, 8))
 
         self.launch_button = tk.Button(
-            button_frame, text="Launch Task", command=self.launch_task
+            button_frame,
+            text="Launch Task",
+            command=self.launch_task,
+            font=("Helvetica", 11, "bold"),
+            bg="#4CAF50",
+            fg="white",
+            padx=16,
+            pady=8,
+            cursor="hand2",
         )
         self.launch_button.pack(side=tk.LEFT)
 
@@ -771,16 +833,52 @@ class TaskCollectorApp:
             text="Complete Task",
             state=tk.DISABLED,
             command=self.complete_task,
+            font=("Helvetica", 11, "bold"),
+            bg="#2196F3",
+            fg="white",
+            padx=16,
+            pady=8,
+            cursor="hand2",
         )
-        self.complete_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.complete_button.pack(side=tk.LEFT, padx=(12, 0))
 
-        self.status_label = tk.Label(container, text="Ready", fg="green")
-        self.status_label.pack(anchor=tk.W, pady=(4, 8))
+        # Status bar with colored background
+        status_container = tk.Frame(
+            container, bg="#E8F5E9", relief=tk.SOLID, borderwidth=1
+        )
+        status_container.pack(fill=tk.X, pady=(16, 12))
 
-        log_label = tk.Label(container, text="Activity Log:")
-        log_label.pack(anchor=tk.W)
+        self.status_icon = tk.Label(
+            status_container,
+            text="●",
+            font=("Helvetica", 16),
+            fg="#4CAF50",
+            bg="#E8F5E9",
+        )
+        self.status_icon.pack(side=tk.LEFT, padx=(12, 8), pady=8)
+
+        self.status_label = tk.Label(
+            status_container,
+            text="Ready to collect tasks",
+            fg="#2E7D32",
+            bg="#E8F5E9",
+            font=("Helvetica", 11),
+        )
+        self.status_label.pack(side=tk.LEFT, anchor=tk.W, pady=8)
+
+        # Store status container for color changes
+        self.status_container = status_container
+
+        log_label = tk.Label(container, text="Activity Log:", font=("Helvetica", 12))
+        log_label.pack(anchor=tk.W, pady=(0, 6))
         self.log_output = ScrolledText(
-            container, height=12, width=70, state=tk.DISABLED
+            container,
+            height=12,
+            width=85,
+            state=tk.DISABLED,
+            font=("Courier", 10),
+            relief=tk.SOLID,
+            borderwidth=1,
         )
         self.log_output.pack(fill=tk.BOTH, expand=True)
 
@@ -797,9 +895,47 @@ class TaskCollectorApp:
         self.log_queue.put(message)
         logger.info(message)
 
-    def _set_status(self, text: str, *, is_error: bool = False) -> None:
-        color = "red" if is_error else "green"
-        self.status_label.config(text=text, fg=color)
+    def _set_status(self, text: str, *, status_type: str = "ready") -> None:
+        """Update status with appropriate colors.
+
+        Args:
+            text: Status message to display
+            status_type: One of 'ready', 'launching', 'active', 'error'
+        """
+        status_colors = {
+            "ready": {
+                "bg": "#E8F5E9",
+                "fg": "#2E7D32",
+                "icon": "#4CAF50",
+                "icon_text": "●",
+            },
+            "launching": {
+                "bg": "#FFF3E0",
+                "fg": "#E65100",
+                "icon": "#FF9800",
+                "icon_text": "◐",
+            },
+            "active": {
+                "bg": "#E3F2FD",
+                "fg": "#1565C0",
+                "icon": "#2196F3",
+                "icon_text": "◉",
+            },
+            "error": {
+                "bg": "#FFEBEE",
+                "fg": "#C62828",
+                "icon": "#F44336",
+                "icon_text": "✕",
+            },
+        }
+
+        colors = status_colors.get(status_type, status_colors["ready"])
+
+        self.status_container.config(bg=colors["bg"])
+        self.status_label.config(text=text, fg=colors["fg"], bg=colors["bg"])
+        self.status_icon.config(
+            text=colors["icon_text"], fg=colors["icon"], bg=colors["bg"]
+        )
 
     def open_data_folder(self) -> None:
         """Reveal the directory where recordings and logs are stored."""
@@ -1040,7 +1176,7 @@ class TaskCollectorApp:
             # Small delay to show 100%
             self.root.after(500, progress_dialog.destroy)
 
-            self._set_status("Upload completed successfully!", is_error=False)
+            self._set_status("Upload completed successfully!", status_type="ready")
             self._log(
                 f"✅ Successfully uploaded {zip_filename} to collection-reports bucket"
             )
@@ -1060,7 +1196,7 @@ class TaskCollectorApp:
 
             error_msg = f"Failed to upload data: {exc}"
             self._log(f"❌ {error_msg}")
-            self._set_status("Upload failed – see log for details.", is_error=True)
+            self._set_status("Upload failed – see log for details", status_type="error")
             messagebox.showerror("Upload Error", error_msg)
 
     def launch_task(self) -> None:
@@ -1075,18 +1211,31 @@ class TaskCollectorApp:
         task_type = self.task_type_var.get()
         description = self.description_text.get("1.0", tk.END).strip()
 
+        # Validate that description is provided and meaningful
         if not description:
-            description = "General browsing session"
-            messagebox.showinfo(
-                "Empty description",
-                "No description provided. Using 'General browsing session'.",
+            messagebox.showwarning(
+                "Task Description Required",
+                "Please enter a task description before launching.\n\nExample: 'Search for wireless headphones on Amazon and add the top-rated one to cart'",
+                parent=self.root,
             )
+            self.description_text.focus_set()
+            return
+
+        # Check for minimum length (at least 10 characters)
+        if len(description) < 10:
+            messagebox.showwarning(
+                "Description Too Short",
+                "Please provide a more detailed task description (at least 10 characters).\n\nBe specific about what you'll do in the browser.",
+                parent=self.root,
+            )
+            self.description_text.focus_set()
+            return
 
         self.task_running = True
         self._active_task_type = task_type
         self.launch_button.config(state=tk.DISABLED)
         self.complete_button.config(state=tk.DISABLED)  # enabled after browser launches
-        self._set_status("Launching browser…", is_error=False)
+        self._set_status("Launching browser…", status_type="launching")
         self._log("Preparing to launch a new task…")
 
         ctx = multiprocessing.get_context("spawn")
@@ -1106,7 +1255,8 @@ class TaskCollectorApp:
         if not self.task_running:
             return
         self._set_status(
-            "Browser ready – complete the task in the new window.", is_error=False
+            "🎬 RECORDING IN PROGRESS – Complete the task in the browser window",
+            status_type="active",
         )
         self.complete_button.config(state=tk.NORMAL)
 
@@ -1193,10 +1343,12 @@ class TaskCollectorApp:
         self._cleanup_worker()
 
         if success:
-            self._set_status("Ready for the next task.")
+            self._set_status("Ready for the next task", status_type="ready")
             self._log("✅ Task completed and saved.")
         else:
-            self._set_status("An error occurred – see log for details.", is_error=True)
+            self._set_status(
+                "An error occurred – see log for details", status_type="error"
+            )
             if error:
                 self._log(f"❌ {error}")
 
