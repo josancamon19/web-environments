@@ -100,6 +100,30 @@ def get_task_description_from_user() -> str:
     return task_description
 
 
+def get_website_from_user() -> str:
+    """Get optional website URL from user input"""
+    print("🌐 WEBSITE (Optional)")
+    print("=" * 60)
+    print("If this task is specific to a particular website, enter its URL:")
+    print("(e.g., 'https://www.google.com', 'https://github.com', etc.)")
+    print("Press Enter to skip if not applicable.")
+    print()
+
+    website = input("🔗 Website URL (optional): ").strip()
+
+    # Validate input
+    if not website:
+        print("⏭️  No website provided. Continuing without website.")
+        website = None
+    else:
+        print(f"✅ Website set: {website}")
+
+    print("=" * 60)
+    print()
+
+    return website
+
+
 def get_answer_from_user() -> str:
     """Get answer for information retrieval task from user"""
     print("💡 INFORMATION RETRIEVAL ANSWER")

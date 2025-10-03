@@ -461,6 +461,8 @@ class TasksViewDialog(tk.Toplevel):
             "ID",
             "Description",
             "Type",
+            "Source",
+            "Website",
             "Answer",
             "Created At",
             "Duration",
@@ -478,8 +480,11 @@ class TasksViewDialog(tk.Toplevel):
         vsb.config(command=self.tree.yview)
         hsb.config(command=self.tree.xview)
 
-        # Create context menu for delete option
+        # Create context menu for edit and delete options
         self.context_menu = tk.Menu(self, tearoff=0)
+        self.context_menu.add_command(label="Edit Website", command=self.edit_website)
+        self.context_menu.add_command(label="Edit Answer", command=self.edit_answer)
+        self.context_menu.add_separator()
         self.context_menu.add_command(
             label="Delete Task", command=self.delete_selected_task
         )
@@ -490,10 +495,15 @@ class TasksViewDialog(tk.Toplevel):
             "<Button-3>", self.show_context_menu
         )  # Windows/Linux right-click
 
+        # Bind double-click to edit
+        self.tree.bind("<Double-Button-1>", lambda e: self.edit_website())
+
         # Define column headings and widths
         self.tree.heading("ID", text="ID")
         self.tree.heading("Description", text="Description")
         self.tree.heading("Type", text="Type")
+        self.tree.heading("Source", text="Source")
+        self.tree.heading("Website", text="Website")
         self.tree.heading("Answer", text="Answer")
         self.tree.heading("Created At", text="Created At")
         self.tree.heading("Duration", text="Duration (s)")
@@ -501,12 +511,14 @@ class TasksViewDialog(tk.Toplevel):
 
         # Set column widths
         self.tree.column("ID", width=50)
-        self.tree.column("Description", width=300)
-        self.tree.column("Type", width=120)
-        self.tree.column("Answer", width=200)
+        self.tree.column("Description", width=250)
+        self.tree.column("Type", width=100)
+        self.tree.column("Source", width=100)
+        self.tree.column("Website", width=200)
+        self.tree.column("Answer", width=150)
         self.tree.column("Created At", width=150)
         self.tree.column("Duration", width=80)
-        self.tree.column("Video Path", width=250)
+        self.tree.column("Video Path", width=200)
 
         # Grid layout
         self.tree.grid(row=0, column=0, sticky="nsew")
@@ -583,7 +595,7 @@ class TasksViewDialog(tk.Toplevel):
 
             # Query to get tasks with the requested fields
             cursor.execute("""
-                SELECT id, description, task_type, answer, created_at, duration_seconds, video_path
+                SELECT id, description, task_type, source, website, answer, created_at, duration_seconds, video_path
                 FROM tasks
                 ORDER BY created_at DESC
             """)
@@ -601,6 +613,8 @@ class TasksViewDialog(tk.Toplevel):
                     task_id,
                     description,
                     task_type,
+                    source,
+                    website,
                     answer,
                     created_at,
                     duration,
@@ -613,6 +627,14 @@ class TasksViewDialog(tk.Toplevel):
                     if description and len(description) > 100
                     else description or ""
                 )
+
+                # Format website for display
+                website_display = (
+                    (website or "")[:50] + "..."
+                    if website and len(website) > 50
+                    else website or ""
+                )
+
                 answer = (
                     (answer or "")[:50] + "..."
                     if answer and len(answer) > 50
@@ -639,6 +661,8 @@ class TasksViewDialog(tk.Toplevel):
                         task_id or "",
                         description,
                         task_type or "",
+                        source or "",
+                        website_display,
                         answer,
                         created_at or "",
                         duration,
@@ -745,6 +769,132 @@ class TasksViewDialog(tk.Toplevel):
             error_msg = f"Error deleting task: {str(e)}"
             self.info_label.config(text=error_msg, fg="red")
             messagebox.showerror("Delete Error", error_msg, parent=self)
+
+    def edit_website(self):
+        """Edit the website field for the selected task."""
+        selected_items = self.tree.selection()
+        if not selected_items:
+            return
+
+        # Get task details from the selected row
+        item = selected_items[0]
+        values = self.tree.item(item, "values")
+        task_id = values[0]
+
+        # Get full website from database (not truncated display version)
+        db_path = Path(DATA_DIR) / "tasks.db"
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT website FROM tasks WHERE id = ?", (task_id,))
+            result = cursor.fetchone()
+            current_website = result[0] if result and result[0] else ""
+            conn.close()
+        except Exception as e:
+            messagebox.showerror(
+                "Database Error", f"Failed to load current website: {e}", parent=self
+            )
+            return
+
+        # Show dialog to edit website
+        dialog = TextAreaDialog(
+            self,
+            title="Edit Website URL",
+            prompt=f"Edit website URL for task {task_id}:",
+            initial_text=current_website,
+        )
+        new_website = dialog.show()
+
+        if new_website is None:
+            # User cancelled
+            return
+
+        # Update database
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE tasks SET website = ? WHERE id = ?",
+                (new_website if new_website else None, task_id),
+            )
+            conn.commit()
+            conn.close()
+
+            # Refresh the display
+            self.load_tasks()
+
+            messagebox.showinfo(
+                "Success",
+                f"Website updated for task {task_id}.",
+                parent=self,
+            )
+
+        except Exception as e:
+            error_msg = f"Error updating website: {str(e)}"
+            messagebox.showerror("Update Error", error_msg, parent=self)
+
+    def edit_answer(self):
+        """Edit the answer field for the selected task."""
+        selected_items = self.tree.selection()
+        if not selected_items:
+            return
+
+        # Get task details from the selected row
+        item = selected_items[0]
+        values = self.tree.item(item, "values")
+        task_id = values[0]
+
+        # Get full answer from database (not truncated display version)
+        db_path = Path(DATA_DIR) / "tasks.db"
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT answer FROM tasks WHERE id = ?", (task_id,))
+            result = cursor.fetchone()
+            current_answer = result[0] if result and result[0] else ""
+            conn.close()
+        except Exception as e:
+            messagebox.showerror(
+                "Database Error", f"Failed to load current answer: {e}", parent=self
+            )
+            return
+
+        # Show dialog to edit answer
+        dialog = TextAreaDialog(
+            self,
+            title="Edit Answer",
+            prompt=f"Edit answer for task {task_id}:",
+            initial_text=current_answer,
+        )
+        new_answer = dialog.show()
+
+        if new_answer is None:
+            # User cancelled
+            return
+
+        # Update database
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE tasks SET answer = ? WHERE id = ?",
+                (new_answer if new_answer else None, task_id),
+            )
+            conn.commit()
+            conn.close()
+
+            # Refresh the display
+            self.load_tasks()
+
+            messagebox.showinfo(
+                "Success",
+                f"Answer updated for task {task_id}.",
+                parent=self,
+            )
+
+        except Exception as e:
+            error_msg = f"Error updating answer: {str(e)}"
+            messagebox.showerror("Update Error", error_msg, parent=self)
 
 
 if getattr(sys, "frozen", False):  # Frozen executable (PyInstaller)
@@ -937,6 +1087,26 @@ class TaskCollectorApp:
             borderwidth=1,
         )
         self.description_text.pack(fill=tk.BOTH, expand=True, pady=(0, 0))
+
+        # Website URL (optional)
+        website_frame = tk.Frame(container)
+        website_frame.pack(fill=tk.X, pady=(0, 12))
+        tk.Label(
+            website_frame, text="Website URL (Optional):", font=("Helvetica", 12)
+        ).pack(anchor=tk.W, pady=(0, 4))
+        tk.Label(
+            website_frame,
+            text="Enter the website URL if this task is specific to a particular site (e.g., https://www.google.com)",
+            font=("Helvetica", 9),
+            fg="#777777",
+        ).pack(anchor=tk.W, pady=(0, 4))
+        self.website_entry = tk.Entry(
+            website_frame,
+            font=("Helvetica", 11),
+            relief=tk.SOLID,
+            borderwidth=1,
+        )
+        self.website_entry.pack(fill=tk.X, pady=(0, 0))
 
         button_frame = tk.Frame(container)
         button_frame.pack(fill=tk.X, pady=(16, 0))
@@ -1448,6 +1618,7 @@ class TaskCollectorApp:
         source_value = self._source_label_to_value.get(displayed_source, "none")
         task_type = self.task_type_var.get()
         description = self.description_text.get("1.0", tk.END).strip()
+        website = self.website_entry.get().strip() or None
 
         # Validate that description is provided and meaningful
         if not description:
@@ -1481,7 +1652,7 @@ class TaskCollectorApp:
         self._worker_conn = parent_conn
         self._worker_process = ctx.Process(
             target=run_task_worker,
-            args=(child_conn, description, task_type, source_value),
+            args=(child_conn, description, task_type, source_value, website),
             daemon=False,
         )
         self._worker_process.start()

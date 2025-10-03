@@ -9,6 +9,7 @@ from utils.get_task_description import (
     get_task_type_from_user,
     get_answer_from_user,
     get_source_from_user,
+    get_website_from_user,
 )
 
 logging.basicConfig(
@@ -30,18 +31,19 @@ async def main():
     initial_tasks.run()
     print("Initial tasks completed")
 
-    # Get task source, type and description from user
+    # Get task source, type, description and website from user
     source = get_source_from_user()
     task_type = get_task_type_from_user()
     task_description = get_task_description_from_user()
+    website = get_website_from_user()
 
     try:
         # Get TaskManager singleton instance
         task_manager = TaskManager.get_instance()
 
-        new_task = CreateTaskDto(task_description, task_type, source)
+        new_task = CreateTaskDto(task_description, task_type, source, website)
         task_id = task_manager.save_task(new_task)
-        task_manager.set_actual_task(Task(task_id, task_description, task_type, source))
+        task_manager.set_actual_task(Task(task_id, task_description, task_type, source, website))
 
         logger.info(f"Task saved: {task_id}")
 

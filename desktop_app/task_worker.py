@@ -32,7 +32,11 @@ async def _wait_for_command(pipe: Connection) -> Dict[str, Any]:
 
 
 def run_task_worker(
-    pipe: Connection, description: str, task_type: str, source: str
+    pipe: Connection,
+    description: str,
+    task_type: str,
+    source: str,
+    website: Optional[str] = None,
 ) -> None:
     """Entry point executed inside a separate process to run Playwright safely."""
 
@@ -47,9 +51,9 @@ def run_task_worker(
             _send_safe(pipe, {"type": "log", "message": "✔️ Initial setup complete."})
 
             task_manager = TaskManager.get_instance()
-            new_task = CreateTaskDto(description, task_type, source)
+            new_task = CreateTaskDto(description, task_type, source, website)
             task_id = task_manager.save_task(new_task)
-            task = Task(task_id, description, task_type, source)
+            task = Task(task_id, description, task_type, source, website)
             task_manager.set_actual_task(task)
             _send_safe(pipe, {"type": "task_started", "task_id": task_id})
             _send_safe(

@@ -8,21 +8,23 @@ logger = logging.getLogger(__name__)
 
 class Task:
     def __init__(
-        self, id: int, description: str, task_type: str = "action", source: str = "none"
+        self, id: int, description: str, task_type: str = "action", source: str = "none", website: Optional[str] = None
     ):
         self.id = id
         self.description = description
         self.task_type = task_type
         self.source = source
+        self.website = website
 
 
 class CreateTaskDto:
     def __init__(
-        self, description: str, task_type: str = "action", source: str = "none"
+        self, description: str, task_type: str = "action", source: str = "none", website: Optional[str] = None
     ):
         self.description = description
         self.task_type = task_type
         self.source = source
+        self.website = website
 
 
 class TaskManager:
@@ -98,6 +100,7 @@ class TaskRepository:
             task.description,
             task.task_type,
             task.source,
+            task.website,
             fingerprint,
         )
         return task_id

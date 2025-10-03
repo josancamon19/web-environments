@@ -47,6 +47,21 @@ class Database:
         cur = self.conn.cursor()
         cur.executescript(SCHEMA_SQL)
         self.conn.commit()
+        # Run migrations
+        self._migrate_add_website_column()
+
+    def _migrate_add_website_column(self):
+        """Add website column to tasks table if it doesn't exist"""
+        cur = self.conn.cursor()
+        # Check if website column exists
+        cur.execute("PRAGMA table_info(tasks)")
+        columns = [row[1] for row in cur.fetchall()]
+
+        if "website" not in columns:
+            logger.info("Migrating database: adding 'website' column to tasks table")
+            cur.execute("ALTER TABLE tasks ADD COLUMN website TEXT")
+            self.conn.commit()
+            logger.info("Migration completed successfully")
 
     def close(self):
         """Close database connection"""
@@ -73,6 +88,7 @@ class Database:
         description: str,
         task_type: str = "action",
         source: str = "none",
+        website: Optional[str] = None,
         environment_fingerprint: Optional[str] = None,
     ) -> int:
         created_at = get_iso_datetime()
@@ -83,14 +99,25 @@ class Database:
                 description,
                 task_type,
                 source,
+                website,
                 created_at,
                 environment_fingerprint
-            ) VALUES (?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (description, task_type, source, created_at, environment_fingerprint),
+            (
+                description,
+                task_type,
+                source,
+                website,
+                created_at,
+                environment_fingerprint,
+            ),
         )
         self.conn.commit()
-        print(f"Task started: {cur.lastrowid} (Type: {task_type}, Source: {source})")
+        website_info = f", Website: {website}" if website else ""
+        print(
+            f"Task started: {cur.lastrowid} (Type: {task_type}, Source: {source}{website_info})"
+        )
         return cur.lastrowid
 
     def end_task(self, task_id: int):

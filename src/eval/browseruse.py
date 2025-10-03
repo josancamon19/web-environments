@@ -637,7 +637,6 @@ def _main() -> None:
     # - honestly they seem to make sense, like I don't see any obvious issues, search click, very simple
     # - - better judged once longer horizon tasks are tested. (will check next batch of tasks regardless)
 
-
     # Evaluation analysis
     # TODO: run browseruse results using website field
     # TODO: run evaluation on tasks, certainity and accuracy, improve depending.
@@ -645,7 +644,6 @@ def _main() -> None:
     # =====
     # TODO: db to jsonl include num human steps, and duration
     # TODO: store results in results/$task_id.json instead.
-
 
 
 if __name__ == "__main__":

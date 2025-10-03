@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     description TEXT NOT NULL,
     task_type TEXT NOT NULL,
     source TEXT NOT NULL,
+    website TEXT,
     answer TEXT,
     video_path TEXT,
     created_at TEXT NOT NULL,
