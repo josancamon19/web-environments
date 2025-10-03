@@ -11,8 +11,6 @@ from dotenv import load_dotenv
 from browser_use import Agent, Browser, ChatOpenAI
 from kernel import Kernel
 
-from itertools import islice
-
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -346,11 +344,10 @@ async def run_task_with_agent(
             task=task["task_description"],
             llm=llm,
             verbose=True,
-            max_steps=20,
             register_new_step_callback=capture_accessibility_tree,
         )
 
-        history = await agent.run()
+        history = await agent.run(max_steps=30)
         duration = (datetime.now() - start_time).total_seconds()
 
     finally:
@@ -395,29 +392,26 @@ async def run_task_with_agent(
 
 
 def load_completed_tasks(output_file: Path) -> set:
-    """Load task IDs that have already been processed from the output file"""
+    """Load task IDs that have already been processed from the JSONL output file"""
     completed_task_ids = set()
     if output_file.exists():
         try:
             with open(output_file, "r") as f:
-                results = json.load(f)
-                if isinstance(results, list):
-                    for result in results:
-                        if isinstance(result, dict) and "task_id" in result:
-                            completed_task_ids.add(result["task_id"])
-        except (json.JSONDecodeError, FileNotFoundError):
+                for line in f:
+                    line = line.strip()
+                    if line:  # Skip empty lines
+                        try:
+                            result = json.loads(line)
+                            if isinstance(result, dict) and "task_id" in result:
+                                completed_task_ids.add(result["task_id"])
+                        except json.JSONDecodeError:
+                            logger.warning(
+                                f"Failed to parse line in {output_file}: {line[:100]}"
+                            )
+                            continue
+        except FileNotFoundError:
             pass
     return completed_task_ids
-
-
-def chunked(iterable, n):
-    """Yield chunks of n items from iterable"""
-    iterator = iter(iterable)
-    while True:
-        chunk = list(islice(iterator, n))
-        if not chunk:
-            break
-        yield chunk
 
 
 async def process_single_task(
@@ -432,89 +426,66 @@ async def process_single_task(
     sandbox_headless: bool,
     sandbox_safe_mode: bool,
     results_dir: Path,
+    semaphore: Optional[asyncio.Semaphore] = None,
 ):
     """Process a single task and write results to file"""
-    logger.info(
-        f"Processing task {task_idx}/{total_tasks}: "
-        f"ID={task['task_id']}, {task['task_description'][:100]}..."
-    )
+    # Use semaphore to limit concurrency if provided
+    async with semaphore if semaphore else asyncio.Lock():
+        logger.info(
+            f"Processing task {task_idx}/{total_tasks}: "
+            f"ID={task['task_id']}, {task['task_description'][:100]}..."
+        )
 
-    sandbox_bundle: Optional[Path] = None
-    if sandbox_root:
-        sandbox_bundle = resolve_recorded_bundle(sandbox_root, task["task_id"])
-        if not sandbox_bundle:
-            logger.warning(
-                "No sandbox bundle found for task %s under %s; falling back to Kernel",
-                task["task_id"],
-                sandbox_root,
+        sandbox_bundle: Optional[Path] = None
+        if sandbox_root:
+            sandbox_bundle = resolve_recorded_bundle(sandbox_root, task["task_id"])
+            if not sandbox_bundle:
+                logger.warning(
+                    "No sandbox bundle found for task %s under %s; falling back to Kernel",
+                    task["task_id"],
+                    sandbox_root,
+                )
+
+        try:
+            result = await run_task_with_agent(
+                task,
+                results_dir,
+                model,
+                sandbox_bundle=sandbox_bundle,
+                sandbox_allow_network=sandbox_allow_network,
+                sandbox_headless=sandbox_headless,
+                sandbox_safe_mode=sandbox_safe_mode,
             )
 
-    try:
-        result = await run_task_with_agent(
-            task,
-            results_dir,
-            model,
-            sandbox_bundle=sandbox_bundle,
-            sandbox_allow_network=sandbox_allow_network,
-            sandbox_headless=sandbox_headless,
-            sandbox_safe_mode=sandbox_safe_mode,
-        )
+            # Write result with thread-safe lock (append JSONL)
+            async with file_write_lock:
+                with open(output_file, "a") as f:
+                    f.write(json.dumps(result, default=str) + "\n")
 
-        # Write result with thread-safe lock
-        async with file_write_lock:
-            # Load existing results
-            results_list = []
-            if output_file.exists():
-                try:
-                    with open(output_file, "r") as f:
-                        results_list = json.load(f)
-                except (json.JSONDecodeError, FileNotFoundError):
-                    results_list = []
+            logger.info(
+                f"Task {task['task_id']} - Success: {result['success']}, "
+                f"Actions: {result['action_count']}, "
+                f"Duration: {result['duration_seconds']:.2f}s"
+            )
+        except Exception as e:
+            logger.error(f"Failed to process task {task['task_id']}: {e}")
+            # Save error result
+            error_result = {
+                "task_id": task["task_id"],
+                "task_description": task["task_description"],
+                "task_type": task.get("task_type"),
+                "success": False,
+                "error": str(e),
+                "tool_calls": [],
+                "answer": None,
+                "usage_summary": {},
+                "step_dom_mapping": {},
+            }
 
-            # Append new result
-            results_list.append(result)
-
-            # Write back to file
-            with open(output_file, "w") as f:
-                json.dump(results_list, f, indent=2, default=str)
-
-        logger.info(
-            f"Task {task['task_id']} - Success: {result['success']}, "
-            f"Actions: {result['action_count']}, "
-            f"Duration: {result['duration_seconds']:.2f}s"
-        )
-    except Exception as e:
-        logger.error(f"Failed to process task {task['task_id']}: {e}")
-        # Save error result
-        error_result = {
-            "task_id": task["task_id"],
-            "task_description": task["task_description"],
-            "task_type": task.get("task_type"),
-            "success": False,
-            "error": str(e),
-            "tool_calls": [],
-            "answer": None,
-            "usage_summary": {},
-            "step_dom_mapping": {},
-        }
-
-        # Write error result with thread-safe lock
-        async with file_write_lock:
-            # Load existing results
-            results_list = []
-            if output_file.exists():
-                try:
-                    with open(output_file, "r") as f:
-                        results_list = json.load(f)
-                except (json.JSONDecodeError, FileNotFoundError):
-                    results_list = []
-
-            # Append error result
-            results_list.append(error_result)
-
-            # Write back to file
-            with open(output_file, "w") as f:
-                json.dump(results_list, f, indent=2, default=str)
+            # Write error result with thread-safe lock (append JSONL)
+            async with file_write_lock:
+                with open(output_file, "a") as f:
+                    f.write(json.dumps(error_result, default=str) + "\n")
 
 
 async def process_all_tasks(
@@ -525,7 +496,7 @@ async def process_all_tasks(
     sandbox_headless: bool,
     sandbox_safe_mode: bool,
 ):
-    """Process all tasks and save to JSON, skipping already completed ones"""
+    """Process all tasks and save to JSONL, skipping already completed ones"""
     # Load tasks from input file
     tasks_path = DATA_DIR / "tasks.jsonl"
     if not tasks_path.exists():
@@ -535,14 +506,16 @@ async def process_all_tasks(
         tasks = [json.loads(line) for line in f if line.strip()]
 
     # Setup output directory with timestamp
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    # timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    timestamp = "2025-10-02_19-58-56"
     model_safe = model.replace("/", "-")
     results_dir = Path("results") / f"browseruse-{model_safe}-{timestamp}"
     results_dir.mkdir(parents=True, exist_ok=True)
-    output_file = results_dir / "results.json"
+    output_file = results_dir / "results.jsonl"
 
     # Load already completed tasks
     completed_task_ids = load_completed_tasks(output_file)
+    # completed_task_ids = set()
 
     # Filter out already completed tasks
     tasks_to_process = [t for t in tasks if t["task_id"] not in completed_task_ids]
@@ -555,36 +528,38 @@ async def process_all_tasks(
         logger.info("All tasks already processed!")
         return output_file
 
-    # Process remaining tasks in chunks of 2
-    task_index = 0
+    # Set up concurrency limit based on whether we're using sandbox
     total_tasks = len(tasks_to_process)
+    max_concurrent = 1 if sandbox_root else 4
+    semaphore = asyncio.Semaphore(max_concurrent)
 
-    chunk_size = 1 if sandbox_root else 2
+    logger.info(
+        f"Processing {total_tasks} tasks with max {max_concurrent} concurrent workers"
+    )
 
-    for chunk in chunked(tasks_to_process, chunk_size):
-        logger.info(f"Processing chunk of {len(chunk)} tasks in parallel")
-
-        # Create tasks for concurrent execution
-        chunk_tasks = []
-        for task in chunk:
-            task_index += 1
-            chunk_tasks.append(
-                process_single_task(
-                    task,
-                    model,
-                    output_file,
-                    task_index,
-                    total_tasks,
-                    sandbox_root=sandbox_root,
-                    sandbox_allow_network=sandbox_allow_network,
-                    sandbox_headless=sandbox_headless,
-                    sandbox_safe_mode=sandbox_safe_mode,
-                    results_dir=results_dir,
-                )
+    # Create all tasks upfront - semaphore will control concurrency
+    # As soon as one task finishes, the next one will start automatically
+    all_tasks = []
+    for task_index, task in enumerate(tasks_to_process, start=1):
+        all_tasks.append(
+            process_single_task(
+                task,
+                model,
+                output_file,
+                task_index,
+                total_tasks,
+                sandbox_root=sandbox_root,
+                sandbox_allow_network=sandbox_allow_network,
+                sandbox_headless=sandbox_headless,
+                sandbox_safe_mode=sandbox_safe_mode,
+                results_dir=results_dir,
+                semaphore=semaphore,
             )
+        )
 
-        # Execute tasks in chunk concurrently
-        await asyncio.gather(*chunk_tasks)
+    # Execute all tasks - semaphore ensures only max_concurrent run at once
+    # As tasks complete, new ones start immediately without waiting for chunks
+    await asyncio.gather(*all_tasks)
 
     logger.info(f"All results saved to {output_file}")
     return output_file
@@ -628,9 +603,6 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--model", default="gpt-5-nano", help="LLM model name to use")
     parser.add_argument(
-        "--prod", action="store_true", help="Use production data directory"
-    )
-    parser.add_argument(
         "--no-sandbox",
         action="store_true",
         help="Disable sandbox replay and use the Kernel browser",
@@ -656,6 +628,21 @@ def parse_args() -> argparse.Namespace:
 def _main() -> None:
     cli_args = parse_args()
     asyncio.run(main(cli_args))
+    # TODO: download latest collection
+    # TODO: explore data collected, steps
+    # - parse to jsonl
+    # - extract checkpoints
+    # - analyze checkpoints adn steps in a big screen
+    # - run browseruse on the data, use kernel, not local envs, to parallelize more
+    # - run eval.py, and log judge results not only scores somewhere, to check certainity, and failures were actually failures
+    # - if so improve until eval.py is accurate. 95%
+
+    # data issues,
+    # - megabus has a single step recorded, https://boardgamegeek.com/ as well single step
+    # - some tasks have things before go_to tool call
+    # - some typing tasks have Euro, but loaded Europe instead, might have gotten overwhelmed?
+    # - should probably collect if the human was able to collect the task or not (page didn't load, no information found options)
+    # -
 
 
 if __name__ == "__main__":
