@@ -417,8 +417,11 @@ class TasksViewDialog(tk.Toplevel):
         self.title("View Collected Tasks")
         self.transient(parent)
 
-        # Make dialog large enough for table
-        self.geometry("1200x600")
+        # Set dark background for dialog
+        self.configure(bg="#2b2b2b")
+
+        # Make dialog large enough for table with new columns
+        self.geometry("1400x700")
 
         # Create and pack widgets
         self.create_widgets()
@@ -430,33 +433,84 @@ class TasksViewDialog(tk.Toplevel):
         self.load_tasks()
 
     def create_widgets(self):
-        # Main frame with padding
-        main_frame = tk.Frame(self, padx=10, pady=10)
+        # Main frame with dark background
+        main_frame = tk.Frame(self, padx=15, pady=15, bg="#2b2b2b")
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Title
+        # Header frame with dark accent
+        header_frame = tk.Frame(main_frame, bg="#1e1e1e", relief=tk.FLAT)
+        header_frame.pack(fill=tk.X, pady=(0, 15))
+
+        # Title with icon
         title_label = tk.Label(
-            main_frame, text="Collected Tasks", font=("Helvetica", 14, "bold")
+            header_frame,
+            text="📋 Collected Tasks",
+            font=("Helvetica", 16, "bold"),
+            bg="#1e1e1e",
+            fg="#e0e0e0",
+            pady=12,
+            padx=15,
         )
-        title_label.pack(anchor=tk.W, pady=(0, 10))
+        title_label.pack(anchor=tk.W)
 
-        # Instructions
+        # Instructions with dark styling
+        instructions_frame = tk.Frame(
+            main_frame, bg="#3a3a3a", relief=tk.FLAT, borderwidth=1
+        )
+        instructions_frame.pack(fill=tk.X, pady=(0, 10))
+
         instructions = tk.Label(
-            main_frame,
-            text="Select a task and click 'Delete Selected' or right-click for options",
-            fg="gray",
+            instructions_frame,
+            text="💡 Tip: Double-click to edit website | Right-click for more options | Select and delete tasks",
+            fg="#b0bec5",
+            bg="#3a3a3a",
+            font=("Helvetica", 10),
+            pady=8,
+            padx=10,
         )
-        instructions.pack(anchor=tk.W, pady=(0, 5))
+        instructions.pack(anchor=tk.W)
 
-        # Create frame for treeview and scrollbars
-        tree_frame = tk.Frame(main_frame)
-        tree_frame.pack(fill=tk.BOTH, expand=True)
+        # Create frame for treeview and scrollbars with dark border
+        tree_container = tk.Frame(
+            main_frame, relief=tk.SOLID, borderwidth=1, bg="#1e1e1e"
+        )
+        tree_container.pack(fill=tk.BOTH, expand=True)
+
+        tree_frame = tk.Frame(tree_container, bg="#1e1e1e")
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
 
         # Create scrollbars
-        vsb = tk.Scrollbar(tree_frame, orient="vertical")
-        hsb = tk.Scrollbar(tree_frame, orient="horizontal")
+        vsb = tk.Scrollbar(tree_frame, orient="vertical", bg="#2b2b2b")
+        hsb = tk.Scrollbar(tree_frame, orient="horizontal", bg="#2b2b2b")
 
-        # Create treeview
+        # Create treeview with dark theme style
+        style = ttk.Style()
+        style.theme_use("default")
+
+        # Configure treeview style for dark mode
+        style.configure(
+            "Treeview",
+            background="#1e1e1e",
+            foreground="#e0e0e0",
+            rowheight=28,
+            fieldbackground="#1e1e1e",
+            font=("Helvetica", 10),
+            borderwidth=0,
+        )
+        style.configure(
+            "Treeview.Heading",
+            background="#2b2b2b",
+            foreground="#e0e0e0",
+            font=("Helvetica", 10, "bold"),
+            padding=5,
+            relief=tk.FLAT,
+        )
+        style.map(
+            "Treeview",
+            background=[("selected", "#0d47a1")],
+            foreground=[("selected", "white")],
+        )
+
         columns = (
             "ID",
             "Description",
@@ -498,27 +552,27 @@ class TasksViewDialog(tk.Toplevel):
         # Bind double-click to edit
         self.tree.bind("<Double-Button-1>", lambda e: self.edit_website())
 
-        # Define column headings and widths
-        self.tree.heading("ID", text="ID")
-        self.tree.heading("Description", text="Description")
-        self.tree.heading("Type", text="Type")
-        self.tree.heading("Source", text="Source")
-        self.tree.heading("Website", text="Website")
-        self.tree.heading("Answer", text="Answer")
-        self.tree.heading("Created At", text="Created At")
-        self.tree.heading("Duration", text="Duration (s)")
-        self.tree.heading("Video Path", text="Video Path")
+        # Define column headings with icons and better labels
+        self.tree.heading("ID", text="🔢 ID")
+        self.tree.heading("Description", text="📝 Description")
+        self.tree.heading("Type", text="🏷️ Type")
+        self.tree.heading("Source", text="📚 Source")
+        self.tree.heading("Website", text="🌐 Website")
+        self.tree.heading("Answer", text="💡 Answer")
+        self.tree.heading("Created At", text="📅 Created At")
+        self.tree.heading("Duration", text="⏱️ Duration")
+        self.tree.heading("Video Path", text="🎥 Video")
 
-        # Set column widths
-        self.tree.column("ID", width=50)
-        self.tree.column("Description", width=250)
-        self.tree.column("Type", width=100)
-        self.tree.column("Source", width=100)
-        self.tree.column("Website", width=200)
-        self.tree.column("Answer", width=150)
-        self.tree.column("Created At", width=150)
-        self.tree.column("Duration", width=80)
-        self.tree.column("Video Path", width=200)
+        # Set column widths optimized for content
+        self.tree.column("ID", width=60, anchor=tk.CENTER)
+        self.tree.column("Description", width=280)
+        self.tree.column("Type", width=130)
+        self.tree.column("Source", width=110)
+        self.tree.column("Website", width=220)
+        self.tree.column("Answer", width=180)
+        self.tree.column("Created At", width=160)
+        self.tree.column("Duration", width=90, anchor=tk.CENTER)
+        self.tree.column("Video Path", width=180)
 
         # Grid layout
         self.tree.grid(row=0, column=0, sticky="nsew")
@@ -529,34 +583,120 @@ class TasksViewDialog(tk.Toplevel):
         tree_frame.grid_rowconfigure(0, weight=1)
         tree_frame.grid_columnconfigure(0, weight=1)
 
-        # Add info label
-        self.info_label = tk.Label(main_frame, text="", fg="gray")
-        self.info_label.pack(anchor=tk.W, pady=(5, 0))
+        # Style the treeview with tags for alternating colors in dark mode
+        self.tree.tag_configure("evenrow", background="#252525", foreground="#e0e0e0")
+        self.tree.tag_configure("oddrow", background="#1e1e1e", foreground="#e0e0e0")
 
-        # Close button
-        button_frame = tk.Frame(main_frame)
-        button_frame.pack(fill=tk.X, pady=(10, 0))
+        # Add info label with dark styling
+        info_container = tk.Frame(main_frame, bg="#2b2b2b")
+        info_container.pack(fill=tk.X, pady=(10, 0))
 
+        self.info_label = tk.Label(
+            info_container,
+            text="",
+            fg="#b0bec5",
+            bg="#2b2b2b",
+            font=("Helvetica", 10),
+        )
+        self.info_label.pack(anchor=tk.W)
+
+        # Button frame with dark styling
+        button_frame = tk.Frame(main_frame, bg="#2b2b2b")
+        button_frame.pack(fill=tk.X, pady=(15, 0))
+
+        # Close button - light gray for visibility
         close_button = tk.Button(
-            button_frame, text="Close", command=self.destroy, width=10
+            button_frame,
+            text="✕ Close",
+            command=self.destroy,
+            width=12,
+            font=("Helvetica", 10, "bold"),
+            bg="#616161",
+            fg="white",
+            activebackground="#757575",
+            activeforeground="white",
+            relief=tk.RAISED,
+            borderwidth=1,
+            cursor="hand2",
+            padx=10,
+            pady=6,
         )
         close_button.pack(side=tk.RIGHT)
 
-        # Refresh button
+        # Refresh button - bright green
         refresh_button = tk.Button(
-            button_frame, text="Refresh", command=self.load_tasks, width=10
+            button_frame,
+            text="🔄 Refresh",
+            command=self.load_tasks,
+            width=12,
+            font=("Helvetica", 10, "bold"),
+            bg="#43a047",
+            fg="white",
+            activebackground="#4caf50",
+            activeforeground="white",
+            relief=tk.RAISED,
+            borderwidth=1,
+            cursor="hand2",
+            padx=10,
+            pady=6,
         )
-        refresh_button.pack(side=tk.RIGHT, padx=(0, 5))
+        refresh_button.pack(side=tk.RIGHT, padx=(0, 8))
 
-        # Delete button
+        # Edit buttons - bright blue
+        edit_answer_button = tk.Button(
+            button_frame,
+            text="✏️ Edit Answer",
+            command=self.edit_answer,
+            width=14,
+            font=("Helvetica", 10, "bold"),
+            bg="#1e88e5",
+            fg="white",
+            activebackground="#2196f3",
+            activeforeground="white",
+            relief=tk.RAISED,
+            borderwidth=1,
+            cursor="hand2",
+            padx=10,
+            pady=6,
+        )
+        edit_answer_button.pack(side=tk.RIGHT, padx=(0, 8))
+
+        edit_website_button = tk.Button(
+            button_frame,
+            text="🌐 Edit Website",
+            command=self.edit_website,
+            width=14,
+            font=("Helvetica", 10, "bold"),
+            bg="#1e88e5",
+            fg="white",
+            activebackground="#2196f3",
+            activeforeground="white",
+            relief=tk.RAISED,
+            borderwidth=1,
+            cursor="hand2",
+            padx=10,
+            pady=6,
+        )
+        edit_website_button.pack(side=tk.RIGHT, padx=(0, 8))
+
+        # Delete button - bright red
         delete_button = tk.Button(
             button_frame,
-            text="Delete Selected",
+            text="🗑️ Delete Selected",
             command=self.delete_selected_task,
-            width=15,
-            fg="red",
+            width=16,
+            font=("Helvetica", 10, "bold"),
+            bg="#e53935",
+            fg="white",
+            activebackground="#f44336",
+            activeforeground="white",
+            relief=tk.RAISED,
+            borderwidth=1,
+            cursor="hand2",
+            padx=10,
+            pady=6,
         )
-        delete_button.pack(side=tk.RIGHT, padx=(0, 5))
+        delete_button.pack(side=tk.LEFT)
 
     def center_window(self):
         self.update_idletasks()
@@ -607,8 +747,8 @@ class TasksViewDialog(tk.Toplevel):
                 self.info_label.config(text="No tasks found in the database.")
                 return
 
-            # Populate treeview
-            for task in tasks:
+            # Populate treeview with alternating colors
+            for idx, task in enumerate(tasks):
                 (
                     task_id,
                     description,
@@ -643,15 +783,18 @@ class TasksViewDialog(tk.Toplevel):
 
                 # Format duration to 2 decimal places if it exists
                 if duration is not None:
-                    duration = f"{duration:.2f}"
+                    duration = f"{duration:.2f}s"
                 else:
-                    duration = ""
+                    duration = "—"
 
                 # Show just the filename for video path
                 if video_path:
                     video_path = Path(video_path).name
                 else:
-                    video_path = ""
+                    video_path = "—"
+
+                # Alternate row colors
+                tag = "evenrow" if idx % 2 == 0 else "oddrow"
 
                 # Insert into treeview
                 self.tree.insert(
@@ -662,18 +805,23 @@ class TasksViewDialog(tk.Toplevel):
                         description,
                         task_type or "",
                         source or "",
-                        website_display,
-                        answer,
+                        website_display or "—",
+                        answer or "—",
                         created_at or "",
                         duration,
                         video_path,
                     ),
+                    tags=(tag,),
                 )
 
-            self.info_label.config(text=f"Showing {len(tasks)} task(s)")
+            # Update info label with styled count
+            count_text = f"📊 Showing {len(tasks)} task(s)"
+            self.info_label.config(text=count_text, fg="#66bb6a")
 
         except Exception as e:
-            self.info_label.config(text=f"Error loading tasks: {str(e)}", fg="red")
+            self.info_label.config(
+                text=f"❌ Error loading tasks: {str(e)}", fg="#ef5350"
+            )
 
     def show_context_menu(self, event):
         """Show the context menu at the clicked position."""
@@ -962,10 +1110,13 @@ class TaskCollectorApp:
         self.root = tk.Tk()
         self.root.title("Task Collector")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        
+        # Set dark theme background
+        self.root.configure(bg="#2b2b2b")
 
         # Set better default window size
-        self.root.geometry("800x750")
-        self.root.minsize(700, 650)
+        self.root.geometry("850x800")
+        self.root.minsize(750, 700)
 
         self.log_queue = queue.Queue()
         self.task_running = False
