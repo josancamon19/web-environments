@@ -182,15 +182,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    # TODO: improve db to jsonl format code, is shit.
-    # TODO: ask for website for the task (?)
-    # TODO: would bounding boxes help?
-    # TODO: GUI is kinda trash
-
-    # ----
-
-    # 1. harness + browseruse works
-    # 2. openai cua setup agent eval
-    # 3. quick mvp claude cua + issue
-    # 4. data directories refactor
-    # 5. checkpoint based evaluation if task completion failed. Agent based.

@@ -6,7 +6,7 @@ from tasks.db_to_jsonl_format import BaseToolCallData
 
 
 lm = dspy.LM(
-    "openai/o3-2025-04-16",
+    "openai/gpt-5",
     reasoning_effort="high",
     temperature=1.0,
     max_tokens=24000,
@@ -68,11 +68,11 @@ def extract_checkpoints(task_description: str, steps_taken: List[BaseToolCallDat
 
 
 def update_parsed_tasks_with_checkpoints():
-    with open("data/dev/tasks.jsonl", "r") as f:
+    with open("data/tasks.jsonl", "r") as f:
         tasks = [json.loads(line) for line in f if line.strip()]
 
     # Use ThreadPoolExecutor to handle concurrent execution with proper result handling
-    with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
+    with ThreadPoolExecutor(max_workers=2) as executor:
         # Submit all tasks to the executor
         futures = []
         for task in tasks:
@@ -89,7 +89,7 @@ def update_parsed_tasks_with_checkpoints():
             task["checkpoints"] = result.checkpoints_idx
             task["checkpoints_reasoning"] = result.checkpoints_reasoning
 
-    with open("data/dev/tasks.jsonl", "w") as f:
+    with open("data/tasks.jsonl", "w") as f:
         for task in tasks:
             f.write(json.dumps(task) + "\n")
 

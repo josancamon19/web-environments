@@ -628,21 +628,24 @@ def parse_args() -> argparse.Namespace:
 def _main() -> None:
     cli_args = parse_args()
     asyncio.run(main(cli_args))
-    # TODO: download latest collection
-    # TODO: explore data collected, steps
-    # - parse to jsonl
-    # - extract checkpoints
-    # - analyze checkpoints adn steps in a big screen
-    # - run browseruse on the data, use kernel, not local envs, to parallelize more
-    # - run eval.py, and log judge results not only scores somewhere, to check certainity, and failures were actually failures
-    # - if so improve until eval.py is accurate. 95%
+    # - then work on checkpoint based eval, num checkpoints? depending on task complexity or later?
 
-    # data issues,
-    # - megabus has a single step recorded, https://boardgamegeek.com/ as well single step
-    # - some tasks have things before go_to tool call
-    # - some typing tasks have Euro, but loaded Europe instead, might have gotten overwhelmed?
-    # - should probably collect if the human was able to collect the task or not (page didn't load, no information found options)
-    # -
+    # Checkpoints analysis
+    # - "Executes the search for 'metformin 1000 mg tablet', bringing up relevant results."
+    # - some tasks like apple are very brief, that it kinda doesn't make sense.
+    # - what if human didn't even complete it?
+    # - honestly they seem to make sense, like I don't see any obvious issues, search click, very simple
+    # - - better judged once longer horizon tasks are tested. (will check next batch of tasks regardless)
+
+
+    # Evaluation analysis
+    # TODO: run browseruse results using website field
+    # TODO: run evaluation on tasks, certainity and accuracy, improve depending.
+
+    # =====
+    # TODO: db to jsonl include num human steps, and duration
+    # TODO: store results in results/$task_id.json instead.
+
 
 
 if __name__ == "__main__":
