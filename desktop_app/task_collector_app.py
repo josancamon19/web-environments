@@ -1110,7 +1110,7 @@ class TaskCollectorApp:
         self.root = tk.Tk()
         self.root.title("Task Collector")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
-        
+
         # Set dark theme background
         self.root.configure(bg="#2b2b2b")
 
@@ -1133,15 +1133,54 @@ class TaskCollectorApp:
         """Start the Tkinter main loop."""
         self.root.mainloop()
 
+    def _create_tooltip(self, widget, text):
+        """Create a tooltip for a widget."""
+
+        def on_enter(event):
+            tooltip = tk.Toplevel()
+            tooltip.wm_overrideredirect(True)
+            tooltip.wm_geometry(f"+{event.x_root + 10}+{event.y_root + 10}")
+            label = tk.Label(
+                tooltip,
+                text=text,
+                background="#3a3a3a",
+                foreground="#e0e0e0",
+                relief=tk.SOLID,
+                borderwidth=1,
+                font=("Helvetica", 9),
+                padx=8,
+                pady=4,
+            )
+            label.pack()
+            widget._tooltip = tooltip
+
+        def on_leave(event):
+            if hasattr(widget, "_tooltip"):
+                widget._tooltip.destroy()
+                del widget._tooltip
+
+        widget.bind("<Enter>", on_enter)
+        widget.bind("<Leave>", on_leave)
+
     def _build_ui(self) -> None:
-        # Main container with better padding
-        container = tk.Frame(self.root, padx=24, pady=20)
+        # Main container with dark theme
+        container = tk.Frame(self.root, padx=24, pady=20, bg="#2b2b2b")
         container.pack(fill=tk.BOTH, expand=True)
 
+        # Header section with dark styling
+        header_frame = tk.Frame(container, bg="#1e1e1e", relief=tk.FLAT)
+        header_frame.pack(fill=tk.X, pady=(0, 10))
+
         title = tk.Label(
-            container, text="Collect a New Task", font=("Helvetica", 18, "bold")
+            header_frame,
+            text="🎬 Task Collector",
+            font=("Helvetica", 20, "bold"),
+            bg="#1e1e1e",
+            fg="#e0e0e0",
+            pady=12,
+            padx=15,
         )
-        title.pack(anchor=tk.W, pady=(0, 4))
+        title.pack(anchor=tk.W)
 
         subtitle = tk.Label(
             container,
@@ -1149,35 +1188,44 @@ class TaskCollectorApp:
                 "Fill in the task details, then click 'Launch Task'. The browser will open "
                 "and recording will start automatically."
             ),
-            wraplength=700,
+            wraplength=750,
             justify=tk.LEFT,
             font=("Helvetica", 11),
-            fg="#555555",
+            fg="#b0bec5",
+            bg="#2b2b2b",
         )
-        subtitle.pack(anchor=tk.W, pady=(0, 20))
+        subtitle.pack(anchor=tk.W, pady=(10, 20))
 
-        # Google Cloud credentials input
-        creds_frame = tk.Frame(container)
+        # Google Cloud credentials input with dark theme
+        creds_frame = tk.Frame(container, bg="#2b2b2b")
         creds_frame.pack(fill=tk.X, pady=(0, 12))
         tk.Label(
             creds_frame,
-            text="Google Cloud Credentials:",
-            font=("Helvetica", 12),
+            text="☁️ Google Cloud Credentials:",
+            font=("Helvetica", 12, "bold"),
+            bg="#2b2b2b",
+            fg="#e0e0e0",
         ).pack(anchor=tk.W, pady=(0, 4))
         tk.Label(
             creds_frame,
             text="Paste your base64-encoded Google Cloud service account JSON here",
             font=("Helvetica", 9),
-            fg="#777777",
+            fg="#b0bec5",
+            bg="#2b2b2b",
         ).pack(anchor=tk.W, pady=(0, 4))
         self.credentials_text = tk.Text(
             creds_frame,
-            height=6,
+            height=2,
             width=80,
             font=("Courier", 9),
             wrap=tk.WORD,
             relief=tk.SOLID,
             borderwidth=1,
+            bg="#1e1e1e",
+            fg="#e0e0e0",
+            insertbackground="#e0e0e0",
+            selectbackground="#0d47a1",
+            selectforeground="white",
         )
         self.credentials_text.pack(fill=tk.X, pady=(0, 0))
 
@@ -1201,12 +1249,16 @@ class TaskCollectorApp:
         source_menu.config(width=35, font=("Helvetica", 11))
         source_menu.pack(anchor=tk.W, pady=(0, 0))
 
-        # Task type radio buttons
-        type_frame = tk.Frame(container)
+        # Task type radio buttons with dark theme
+        type_frame = tk.Frame(container, bg="#2b2b2b")
         type_frame.pack(fill=tk.X, pady=(0, 12))
-        tk.Label(type_frame, text="Task Type:", font=("Helvetica", 12)).pack(
-            anchor=tk.W, pady=(0, 6)
-        )
+        tk.Label(
+            type_frame,
+            text="🏷️ Task Type:",
+            font=("Helvetica", 12, "bold"),
+            bg="#2b2b2b",
+            fg="#e0e0e0",
+        ).pack(anchor=tk.W, pady=(0, 6))
         self.task_type_var = tk.StringVar(value="action")
         for value, label in TASK_TYPE_CHOICES.items():
             tk.Radiobutton(
@@ -1216,16 +1268,26 @@ class TaskCollectorApp:
                 value=value,
                 anchor=tk.W,
                 justify=tk.LEFT,
-                wraplength=700,
+                wraplength=750,
                 font=("Helvetica", 11),
+                bg="#2b2b2b",
+                fg="#e0e0e0",
+                activebackground="#2b2b2b",
+                activeforeground="white",
+                selectcolor="#3a3a3a",
+                highlightthickness=0,
             ).pack(anchor=tk.W, pady=2)
 
-        # Task description
-        description_frame = tk.Frame(container)
+        # Task description with dark theme
+        description_frame = tk.Frame(container, bg="#2b2b2b")
         description_frame.pack(fill=tk.BOTH, expand=False, pady=(0, 8))
 
         tk.Label(
-            description_frame, text="Task Description:", font=("Helvetica", 12)
+            description_frame,
+            text="📝 Task Description:",
+            font=("Helvetica", 12, "bold"),
+            bg="#2b2b2b",
+            fg="#e0e0e0",
         ).pack(anchor=tk.W, pady=(0, 6))
 
         self.description_text = tk.Text(
@@ -1236,92 +1298,142 @@ class TaskCollectorApp:
             wrap=tk.WORD,
             relief=tk.SOLID,
             borderwidth=1,
+            bg="#1e1e1e",
+            fg="#e0e0e0",
+            insertbackground="#e0e0e0",
+            selectbackground="#0d47a1",
+            selectforeground="white",
         )
         self.description_text.pack(fill=tk.BOTH, expand=True, pady=(0, 0))
 
-        # Website URL (optional)
-        website_frame = tk.Frame(container)
+        # Website URL (optional) with dark theme
+        website_frame = tk.Frame(container, bg="#2b2b2b")
         website_frame.pack(fill=tk.X, pady=(0, 12))
         tk.Label(
-            website_frame, text="Website URL (Optional):", font=("Helvetica", 12)
+            website_frame,
+            text="🌐 Website URL (Optional):",
+            font=("Helvetica", 12, "bold"),
+            bg="#2b2b2b",
+            fg="#e0e0e0",
         ).pack(anchor=tk.W, pady=(0, 4))
         tk.Label(
             website_frame,
             text="Enter the website URL if this task is specific to a particular site (e.g., https://www.google.com)",
             font=("Helvetica", 9),
-            fg="#777777",
+            fg="#b0bec5",
+            bg="#2b2b2b",
         ).pack(anchor=tk.W, pady=(0, 4))
         self.website_entry = tk.Entry(
             website_frame,
             font=("Helvetica", 11),
             relief=tk.SOLID,
             borderwidth=1,
+            bg="#1e1e1e",
+            fg="#e0e0e0",
+            insertbackground="#e0e0e0",
+            selectbackground="#0d47a1",
+            selectforeground="white",
         )
         self.website_entry.pack(fill=tk.X, pady=(0, 0))
 
-        button_frame = tk.Frame(container)
+        button_frame = tk.Frame(container, bg="#2b2b2b")
         button_frame.pack(fill=tk.X, pady=(16, 0))
 
+        # Utility buttons on the right (smaller, vibrant colors)
         self.open_data_button = tk.Button(
             button_frame,
-            text="Open Data Folder",
+            text="📂",
             command=self.open_data_folder,
-            font=("Helvetica", 11),
-            padx=12,
-            pady=6,
+            font=("Helvetica", 14),
+            bg="#fb8c00",
+            fg="white",
+            activebackground="#ff9800",
+            activeforeground="white",
+            relief=tk.RAISED,
+            borderwidth=1,
+            cursor="hand2",
+            padx=10,
+            pady=5,
         )
         self.open_data_button.pack(side=tk.RIGHT)
+        self._create_tooltip(self.open_data_button, "Open Data Folder")
 
         self.upload_data_button = tk.Button(
             button_frame,
-            text="Upload Data",
+            text="☁️",
             command=self.upload_data,
-            font=("Helvetica", 11),
-            padx=12,
-            pady=6,
+            font=("Helvetica", 14),
+            bg="#ab47bc",
+            fg="white",
+            activebackground="#ba68c8",
+            activeforeground="white",
+            relief=tk.RAISED,
+            borderwidth=1,
+            cursor="hand2",
+            padx=10,
+            pady=5,
         )
         self.upload_data_button.pack(side=tk.RIGHT, padx=(0, 8))
+        self._create_tooltip(self.upload_data_button, "Upload Data to Cloud")
 
         self.view_tasks_button = tk.Button(
             button_frame,
-            text="View Tasks",
+            text="📋",
             command=self.view_tasks,
-            font=("Helvetica", 11),
-            padx=12,
-            pady=6,
+            font=("Helvetica", 14),
+            bg="#42a5f5",
+            fg="white",
+            activebackground="#64b5f6",
+            activeforeground="white",
+            relief=tk.RAISED,
+            borderwidth=1,
+            cursor="hand2",
+            padx=10,
+            pady=5,
         )
         self.view_tasks_button.pack(side=tk.RIGHT, padx=(0, 8))
+        self._create_tooltip(self.view_tasks_button, "View Collected Tasks")
 
+        # Main action buttons on the left (larger)
         self.launch_button = tk.Button(
             button_frame,
-            text="Launch Task",
+            text="🚀 Launch Task",
             command=self.launch_task,
             font=("Helvetica", 11, "bold"),
-            bg="#4CAF50",
+            bg="#43a047",
             fg="white",
+            activebackground="#4caf50",
+            activeforeground="white",
+            relief=tk.RAISED,
+            borderwidth=1,
+            cursor="hand2",
             padx=16,
             pady=8,
-            cursor="hand2",
         )
         self.launch_button.pack(side=tk.LEFT)
 
         self.complete_button = tk.Button(
             button_frame,
-            text="Complete Task",
+            text="✅ Complete Task",
             state=tk.DISABLED,
             command=self.complete_task,
             font=("Helvetica", 11, "bold"),
-            bg="#2196F3",
+            bg="#1e88e5",
             fg="white",
+            activebackground="#2196f3",
+            activeforeground="white",
+            disabledforeground="#666666",
+            relief=tk.RAISED,
+            borderwidth=1,
+            cursor="hand2",
             padx=16,
             pady=8,
-            cursor="hand2",
         )
-        self.complete_button.pack(side=tk.LEFT, padx=(12, 0))
+        self.complete_button.pack(side=tk.LEFT, padx=(10, 0))
 
-        # Status bar with colored background
+        # Status bar with dark theme
         status_container = tk.Frame(
-            container, bg="#E8F5E9", relief=tk.SOLID, borderwidth=1
+            container, bg="#1e1e1e", relief=tk.SOLID, borderwidth=1
         )
         status_container.pack(fill=tk.X, pady=(16, 12))
 
@@ -1329,24 +1441,30 @@ class TaskCollectorApp:
             status_container,
             text="●",
             font=("Helvetica", 16),
-            fg="#4CAF50",
-            bg="#E8F5E9",
+            fg="#66bb6a",
+            bg="#1e1e1e",
         )
-        self.status_icon.pack(side=tk.LEFT, padx=(12, 8), pady=8)
+        self.status_icon.pack(side=tk.LEFT, padx=(12, 8), pady=10)
 
         self.status_label = tk.Label(
             status_container,
             text="Ready to collect tasks",
-            fg="#2E7D32",
-            bg="#E8F5E9",
-            font=("Helvetica", 11),
+            fg="#e0e0e0",
+            bg="#1e1e1e",
+            font=("Helvetica", 11, "bold"),
         )
-        self.status_label.pack(side=tk.LEFT, anchor=tk.W, pady=8)
+        self.status_label.pack(side=tk.LEFT, anchor=tk.W, pady=10)
 
         # Store status container for color changes
         self.status_container = status_container
 
-        log_label = tk.Label(container, text="Activity Log:", font=("Helvetica", 12))
+        log_label = tk.Label(
+            container,
+            text="📄 Activity Log:",
+            font=("Helvetica", 12, "bold"),
+            bg="#2b2b2b",
+            fg="#e0e0e0",
+        )
         log_label.pack(anchor=tk.W, pady=(0, 6))
         self.log_output = ScrolledText(
             container,
@@ -1356,6 +1474,10 @@ class TaskCollectorApp:
             font=("Courier", 10),
             relief=tk.SOLID,
             borderwidth=1,
+            bg="#1e1e1e",
+            fg="#e0e0e0",
+            selectbackground="#0d47a1",
+            selectforeground="white",
         )
         self.log_output.pack(fill=tk.BOTH, expand=True)
 
@@ -1441,27 +1563,27 @@ class TaskCollectorApp:
         """
         status_colors = {
             "ready": {
-                "bg": "#E8F5E9",
-                "fg": "#2E7D32",
-                "icon": "#4CAF50",
+                "bg": "#1e1e1e",
+                "fg": "#e0e0e0",
+                "icon": "#66bb6a",
                 "icon_text": "●",
             },
             "launching": {
-                "bg": "#FFF3E0",
-                "fg": "#E65100",
-                "icon": "#FF9800",
+                "bg": "#2d2416",
+                "fg": "#ffb74d",
+                "icon": "#ffa726",
                 "icon_text": "◐",
             },
             "active": {
-                "bg": "#E3F2FD",
-                "fg": "#1565C0",
-                "icon": "#2196F3",
+                "bg": "#0d1f2d",
+                "fg": "#64b5f6",
+                "icon": "#42a5f5",
                 "icon_text": "◉",
             },
             "error": {
-                "bg": "#FFEBEE",
-                "fg": "#C62828",
-                "icon": "#F44336",
+                "bg": "#2d1518",
+                "fg": "#ef5350",
+                "icon": "#e53935",
                 "icon_text": "✕",
             },
         }
