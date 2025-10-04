@@ -18,3 +18,4 @@ data/
 *.egg-info
 google-credentials.json
 desktop_app/embedded_credentials.py
+tmp/
