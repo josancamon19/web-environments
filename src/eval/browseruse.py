@@ -341,7 +341,7 @@ async def run_task_with_agent(
 
         agent = Agent(
             browser_session=browser,
-            task=task["task_description"],
+            task=f"Open {task['website_url']} and {task['task_description'].lower()}",
             llm=llm,
             verbose=True,
             register_new_step_callback=capture_accessibility_tree,
@@ -638,11 +638,7 @@ def _main() -> None:
     # - - better judged once longer horizon tasks are tested. (will check next batch of tasks regardless)
 
     # Evaluation analysis
-    # TODO: run browseruse results using website field
     # TODO: run evaluation on tasks, certainity and accuracy, improve depending.
-
-    # =====
-    # TODO: db to jsonl include num human steps, and duration
     # TODO: store results in results/$task_id.json instead.
 
 

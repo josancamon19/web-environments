@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 from html.parser import HTMLParser
+from datetime import datetime
 from config.storage_config import DATA_DIR
 
 
@@ -188,6 +189,10 @@ def process_single_task(
     task_description: str,
     task_type: str = None,
     answer: str = None,
+    website: str = None,
+    created_at: str = None,
+    ended_at: str = None,
+    duration_seconds: float = None,
 ) -> Dict[str, Any]:
     """
     Process a single task and convert it to tool calls.
@@ -198,6 +203,10 @@ def process_single_task(
         task_description: Description of the task
         task_type: Type of the task (e.g., "information_retrieval", "action")
         answer: Answer for information retrieval tasks
+        website: Website URL associated with the task
+        created_at: Task creation timestamp
+        ended_at: Task end timestamp
+        duration_seconds: Task duration in seconds (if available)
 
     Returns:
         Dictionary with task data and tool calls
@@ -533,11 +542,44 @@ def process_single_task(
                     click_buffer.params["navigates_to"] = nav_url
         tool_calls.append(click_buffer)
 
+    # Calculate duration from timestamps, fall back to database value if unavailable
+    calculated_duration = None
+    if created_at and ended_at:
+        try:
+            # Handle non-standard format: 2025-10-02T20-19-29.021Z (dashes in time)
+            # Convert to standard ISO format by replacing dashes with colons in time portion
+            def normalize_timestamp(ts: str) -> str:
+                # Split at 'T' to separate date and time
+                if 'T' in ts:
+                    parts = ts.split('T')
+                    date_part = parts[0]
+                    time_part = parts[1]
+                    # Replace dashes with colons in time part (only first 2 occurrences)
+                    time_normalized = time_part.replace('-', ':', 2)
+                    return f"{date_part}T{time_normalized}"
+                return ts
+            
+            created_normalized = normalize_timestamp(created_at).replace("Z", "+00:00")
+            ended_normalized = normalize_timestamp(ended_at).replace("Z", "+00:00")
+            
+            start_dt = datetime.fromisoformat(created_normalized)
+            end_dt = datetime.fromisoformat(ended_normalized)
+            calculated_duration = round((end_dt - start_dt).total_seconds(), 3)
+        except (ValueError, AttributeError):
+            # Fall back to database value if timestamp parsing fails
+            calculated_duration = duration_seconds
+    else:
+        # Use database value if timestamps are missing
+        calculated_duration = duration_seconds
+
     # Return output data
     result = {
         "task_id": task_id,
         "task_description": task_description,
         "task_type": task_type,  # Include task type
+        "website_url": website,
+        "num_steps": len(tool_calls),
+        "duration_seconds": calculated_duration,
         "tool_calls": [tc.to_dict() for tc in tool_calls],
     }
 
@@ -564,8 +606,13 @@ def parse(
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # Get all tasks with task_type and answer
-    cursor.execute("SELECT id, description, task_type, answer FROM tasks ORDER BY id")
+    # Get all tasks with task_type, answer, website, and timing info
+    cursor.execute("""
+        SELECT id, description, task_type, answer, website, 
+               created_at, ended_at, duration_seconds 
+        FROM tasks 
+        ORDER BY id
+    """)
     tasks = cursor.fetchall()
 
     if not tasks:
@@ -574,10 +621,27 @@ def parse(
 
     all_results = []
 
-    for task_id, task_description, task_type, answer in tasks:
+    for (
+        task_id,
+        task_description,
+        task_type,
+        answer,
+        website,
+        created_at,
+        ended_at,
+        duration_seconds,
+    ) in tasks:
         print(f"Processing task {task_id}: {task_description}")
         result = process_single_task(
-            cursor, task_id, task_description, task_type, answer
+            cursor,
+            task_id,
+            task_description,
+            task_type,
+            answer,
+            website,
+            created_at,
+            ended_at,
+            duration_seconds,
         )
         all_results.append(result)
         print(f"  Found {len(result['tool_calls'])} tool calls")
