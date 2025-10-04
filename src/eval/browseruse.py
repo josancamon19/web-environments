@@ -23,8 +23,6 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-file_write_lock = asyncio.Lock()
-
 _kernel_client: Optional[Kernel] = None
 
 
@@ -391,33 +389,30 @@ async def run_task_with_agent(
     }
 
 
-def load_completed_tasks(output_file: Path) -> set:
-    """Load task IDs that have already been processed from the JSONL output file"""
+def load_completed_tasks(results_dir: Path) -> set:
+    """Load task IDs that have already been processed from individual JSON files"""
     completed_task_ids = set()
-    if output_file.exists():
+    if results_dir.exists():
         try:
-            with open(output_file, "r") as f:
-                for line in f:
-                    line = line.strip()
-                    if line:  # Skip empty lines
-                        try:
-                            result = json.loads(line)
-                            if isinstance(result, dict) and "task_id" in result:
-                                completed_task_ids.add(result["task_id"])
-                        except json.JSONDecodeError:
-                            logger.warning(
-                                f"Failed to parse line in {output_file}: {line[:100]}"
-                            )
-                            continue
-        except FileNotFoundError:
-            pass
+            # Look for all task JSON files in the results directory
+            for json_file in results_dir.glob("*.json"):
+                try:
+                    with open(json_file, "r") as f:
+                        result = json.load(f)
+                        if isinstance(result, dict) and "task_id" in result:
+                            completed_task_ids.add(result["task_id"])
+                except (json.JSONDecodeError, IOError) as e:
+                    logger.warning(f"Failed to parse file {json_file}: {e}")
+                    continue
+        except Exception as e:
+            logger.warning(f"Error scanning results directory: {e}")
     return completed_task_ids
 
 
 async def process_single_task(
     task: Dict[str, Any],
     model: str,
-    output_file: Path,
+    results_dir: Path,
     task_idx: int,
     total_tasks: int,
     *,
@@ -425,10 +420,9 @@ async def process_single_task(
     sandbox_allow_network: bool,
     sandbox_headless: bool,
     sandbox_safe_mode: bool,
-    results_dir: Path,
     semaphore: Optional[asyncio.Semaphore] = None,
 ):
-    """Process a single task and write results to file"""
+    """Process a single task and write results to individual JSON file"""
     # Use semaphore to limit concurrency if provided
     async with semaphore if semaphore else asyncio.Lock():
         logger.info(
@@ -446,6 +440,9 @@ async def process_single_task(
                     sandbox_root,
                 )
 
+        # Create output file path for this specific task
+        output_file = results_dir / f"{task['task_id']}.json"
+
         try:
             result = await run_task_with_agent(
                 task,
@@ -457,10 +454,9 @@ async def process_single_task(
                 sandbox_safe_mode=sandbox_safe_mode,
             )
 
-            # Write result with thread-safe lock (append JSONL)
-            async with file_write_lock:
-                with open(output_file, "a") as f:
-                    f.write(json.dumps(result, default=str) + "\n")
+            # Write result to individual JSON file
+            with open(output_file, "w") as f:
+                json.dump(result, f, indent=2, default=str)
 
             logger.info(
                 f"Task {task['task_id']} - Success: {result['success']}, "
@@ -482,10 +478,9 @@ async def process_single_task(
                 "step_dom_mapping": {},
             }
 
-            # Write error result with thread-safe lock (append JSONL)
-            async with file_write_lock:
-                with open(output_file, "a") as f:
-                    f.write(json.dumps(error_result, default=str) + "\n")
+            # Write error result to individual JSON file
+            with open(output_file, "w") as f:
+                json.dump(error_result, f, indent=2, default=str)
 
 
 async def process_all_tasks(
@@ -496,7 +491,7 @@ async def process_all_tasks(
     sandbox_headless: bool,
     sandbox_safe_mode: bool,
 ):
-    """Process all tasks and save to JSONL, skipping already completed ones"""
+    """Process all tasks and save to individual JSON files, skipping already completed ones"""
     # Load tasks from input file
     tasks_path = DATA_DIR / "tasks.jsonl"
     if not tasks_path.exists():
@@ -506,15 +501,14 @@ async def process_all_tasks(
         tasks = [json.loads(line) for line in f if line.strip()]
 
     # Setup output directory with timestamp
-    # timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    timestamp = "2025-10-02_19-58-56"
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    # timestamp = "2025-10-02_19-58-56"
     model_safe = model.replace("/", "-")
     results_dir = Path("results") / f"browseruse-{model_safe}-{timestamp}"
     results_dir.mkdir(parents=True, exist_ok=True)
-    output_file = results_dir / "results.jsonl"
 
     # Load already completed tasks
-    completed_task_ids = load_completed_tasks(output_file)
+    completed_task_ids = load_completed_tasks(results_dir)
     # completed_task_ids = set()
 
     # Filter out already completed tasks
@@ -526,7 +520,7 @@ async def process_all_tasks(
 
     if not tasks_to_process:
         logger.info("All tasks already processed!")
-        return output_file
+        return results_dir
 
     # Set up concurrency limit based on whether we're using sandbox
     total_tasks = len(tasks_to_process)
@@ -545,14 +539,13 @@ async def process_all_tasks(
             process_single_task(
                 task,
                 model,
-                output_file,
+                results_dir,
                 task_index,
                 total_tasks,
                 sandbox_root=sandbox_root,
                 sandbox_allow_network=sandbox_allow_network,
                 sandbox_headless=sandbox_headless,
                 sandbox_safe_mode=sandbox_safe_mode,
-                results_dir=results_dir,
                 semaphore=semaphore,
             )
         )
@@ -561,8 +554,8 @@ async def process_all_tasks(
     # As tasks complete, new ones start immediately without waiting for chunks
     await asyncio.gather(*all_tasks)
 
-    logger.info(f"All results saved to {output_file}")
-    return output_file
+    logger.info(f"All results saved to {results_dir}")
+    return results_dir
 
 
 async def main(args: argparse.Namespace) -> None:
@@ -586,14 +579,14 @@ async def main(args: argparse.Namespace) -> None:
         )
         sandbox_headless = True
 
-    output_file = await process_all_tasks(
+    results_dir = await process_all_tasks(
         args.model,
         sandbox_root=sandbox_root,
         sandbox_allow_network=args.sandbox_allow_network,
         sandbox_headless=sandbox_headless,
         sandbox_safe_mode=sandbox_safe_mode,
     )
-    print(f"\nFull data saved to: {output_file}")
+    print(f"\nAll results saved to: {results_dir}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -639,7 +632,6 @@ def _main() -> None:
 
     # Evaluation analysis
     # TODO: run evaluation on tasks, certainity and accuracy, improve depending.
-    # TODO: store results in results/$task_id.json instead.
 
 
 if __name__ == "__main__":
