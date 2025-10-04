@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""
-Streamlit app to view tasks from tasks.db
-"""
-
 import sqlite3
 import pandas as pd
 import streamlit as st
@@ -22,20 +17,21 @@ def load_tasks(db_path: Path):
     return df
 
 
-def update_task(
-    db_path: Path, task_id: int, description: str, answer: str, website: str
-):
-    """Update a task in the database."""
+def update_tasks_batch(db_path: Path, updates: list):
+    """Update multiple tasks in the database in a batch."""
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        UPDATE tasks
-        SET description = ?, answer = ?, website = ?
-        WHERE id = ?
-        """,
-        (description, answer, website, task_id),
-    )
+
+    for task_id, description, answer, website in updates:
+        cursor.execute(
+            """
+            UPDATE tasks
+            SET description = ?, answer = ?, website = ?
+            WHERE id = ?
+            """,
+            (description, answer, website, task_id),
+        )
+
     conn.commit()
     conn.close()
 
@@ -78,26 +74,16 @@ def main():
         # Use st.data_editor to allow editing
         edited_df = st.data_editor(
             display_df,
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             disabled=["id"],  # ID is not editable
             column_config={
-                "id": st.column_config.NumberColumn(
-                    "ID",
-                    width="small",
-                ),
+                "id": st.column_config.NumberColumn("ID", width=10),
                 "description": st.column_config.TextColumn(
-                    "Description",
-                    width="large",
+                    "Description", width="large"
                 ),
-                "answer": st.column_config.TextColumn(
-                    "Answer",
-                    width="medium",
-                ),
-                "website": st.column_config.TextColumn(
-                    "Website",
-                    width="medium",
-                ),
+                "answer": st.column_config.TextColumn("Answer", width="medium"),
+                "website": st.column_config.TextColumn("Website", width="medium"),
             },
             key="tasks_editor",
         )
@@ -106,24 +92,36 @@ def main():
         if not edited_df.equals(display_df):
             if st.button("💾 Save Changes", type="primary"):
                 try:
-                    # Find modified rows
-                    changes_made = 0
+                    # Find all modified rows and collect updates
+                    updates = []
+
                     for idx in edited_df.index:
-                        if not edited_df.loc[idx].equals(display_df.loc[idx]):
-                            task_id = int(edited_df.loc[idx, "id"])
-                            description = edited_df.loc[idx, "description"]
-                            answer = edited_df.loc[idx, "answer"]
-                            website = edited_df.loc[idx, "website"]
+                        # Compare each field individually for more reliable detection
+                        orig_row = display_df.loc[idx]
+                        edit_row = edited_df.loc[idx]
 
-                            # Convert empty strings to None for database
-                            answer = answer if answer else None
-                            website = website if website else None
+                        if (
+                            orig_row["description"] != edit_row["description"]
+                            or orig_row["answer"] != edit_row["answer"]
+                            or orig_row["website"] != edit_row["website"]
+                        ):
+                            task_id = int(edit_row["id"])
+                            description = edit_row["description"]
+                            answer = edit_row["answer"] if edit_row["answer"] else None
+                            website = (
+                                edit_row["website"] if edit_row["website"] else None
+                            )
 
-                            update_task(db_path, task_id, description, answer, website)
-                            changes_made += 1
+                            updates.append((task_id, description, answer, website))
 
-                    st.success(f"✅ Successfully saved {changes_made} task(s)!")
-                    st.rerun()
+                    # Batch update all changes
+                    if updates:
+                        update_tasks_batch(db_path, updates)
+                        st.success(f"✅ Successfully saved {len(updates)} task(s)!")
+                        st.rerun()
+                    else:
+                        st.info("No changes detected")
+
                 except Exception as e:
                     st.error(f"Error saving changes: {str(e)}")
                     st.exception(e)
