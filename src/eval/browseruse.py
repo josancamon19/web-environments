@@ -214,7 +214,7 @@ def extract_final_answer(history: list[dict], task_type: str) -> Optional[str]:
 async def run_task_with_agent(
     task: Dict[str, Any],
     results_dir: Path,
-    model: str = "gpt-5-nano",
+    model: str,
     *,
     sandbox_bundle: Optional[Path] = None,
     sandbox_allow_network: bool = False,
@@ -392,10 +392,11 @@ async def run_task_with_agent(
 def load_completed_tasks(results_dir: Path) -> set:
     """Load task IDs that have already been processed from individual JSON files"""
     completed_task_ids = set()
-    if results_dir.exists():
+    results_subdir = results_dir / "results"
+    if results_subdir.exists():
         try:
-            # Look for all task JSON files in the results directory
-            for json_file in results_dir.glob("*.json"):
+            # Look for all task JSON files in the results subdirectory
+            for json_file in results_subdir.glob("*.json"):
                 try:
                     with open(json_file, "r") as f:
                         result = json.load(f)
@@ -441,7 +442,9 @@ async def process_single_task(
                 )
 
         # Create output file path for this specific task
-        output_file = results_dir / f"{task['task_id']}.json"
+        results_subdir = results_dir / "results"
+        results_subdir.mkdir(parents=True, exist_ok=True)
+        output_file = results_subdir / f"{task['task_id']}.json"
 
         try:
             result = await run_task_with_agent(
@@ -594,7 +597,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run browser-use agent over recorded tasks"
     )
-    parser.add_argument("--model", default="gpt-5-nano", help="LLM model name to use")
+    parser.add_argument("--model", default="gpt-5-mini", help="LLM model name to use")
     parser.add_argument(
         "--no-sandbox",
         action="store_true",
