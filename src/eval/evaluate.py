@@ -1,23 +1,18 @@
-import sys
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import dspy
+import typer
 from tasks.db_to_jsonl_format import BaseToolCallData
 
+import sys
+import os
 
-# Add src to path
-sys.path.insert(0, ".")
-
-lm = dspy.LM(
-    "openai/o3-2025-04-16",
-    reasoning_effort="high",
-    temperature=1.0,
-    max_tokens=64000,
-)
-dspy.configure(lm=lm)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+from src.config.storage_config import DATA_DIR
 
 
 class JudgeCompletion(dspy.Signature):
@@ -68,29 +63,42 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def evaluate_model_outputs(model: str, judge_model: str = "gpt-4.1-2025-04-14"):
-    output_file = Path("results") / f"browseruse-{model.replace('/', '-')}.jsonl"
-    print(output_file)
-    if not output_file.exists():
-        logger.error(f"Output file not found: {output_file}")
+def evaluate_model_outputs(results_dir: str, judge_model: str):
+    lm = dspy.LM(
+        f"openai/{judge_model}",
+        reasoning_effort="high",
+        temperature=1.0,
+        max_tokens=64000,
+    )
+    dspy.configure(lm=lm)
+
+    results_dir = Path(results_dir)
+    results_json_dir = results_dir / "results"
+    print(f"Reading results from: {results_json_dir}")
+
+    if not results_json_dir.exists():
+        logger.error(f"Results directory not found: {results_json_dir}")
         return None
 
     # Load the original tasks to get correct answers
     human_tasks_by_id = {}
-    with open(Path("data/tasks.jsonl"), "r") as f:
+    with open(DATA_DIR / "tasks.jsonl", "r") as f:
         for line in f:
             if not line.strip():
                 continue
             task = json.loads(line)
             human_tasks_by_id[task["task_id"]] = task
 
-    # Evaluate each result
+    # Evaluate each result - read individual JSON files
     model_tasks = []
-    with open(output_file, "r") as f:
-        for line in f:
-            if not line.strip():
-                continue
-            model_tasks.append(json.loads(line))
+    for json_file in sorted(results_json_dir.glob("*.json")):
+        try:
+            with open(json_file, "r") as f:
+                model_task = json.load(f)
+                model_tasks.append(model_task)
+        except Exception as e:
+            logger.warning(f"Failed to read {json_file}: {e}")
+            continue
 
     def _get_model_completion_step(model_task: Dict[str, Any]) -> Dict[str, Any]:
         for step in model_task["dump"]:
@@ -99,34 +107,49 @@ def evaluate_model_outputs(model: str, judge_model: str = "gpt-4.1-2025-04-14"):
                 del step["result"]
                 return step
 
-    evaluations = {}
-    for model_task in model_tasks:
+    def evaluate_single_task(model_task):
+        """Evaluate a single task - used for parallel processing"""
         task_id = model_task["task_id"]
 
         if model_task.get("task_type") != "information_retrieval":
             logger.info(f"Skipping task {task_id} (not information retrieval)")
-            continue
+            return task_id, None
 
         model_completion_step = _get_model_completion_step(model_task)
         if not model_completion_step:
             logger.warning(f"No final step found for task {task_id}")
-            evaluations[task_id] = {
+            return task_id, {
                 "correct": False,
                 "reasoning": "No final step found",
                 "confidence": 0,
             }
-            continue
 
         model_trajectory = model_task["tool_calls"]
         model_last_dom = model_task["step_dom_mapping"][str(len(model_trajectory))]
-        model_last_dom = open(Path("results") / model_last_dom, "r").read()
+        model_last_dom = open(results_dir / model_last_dom, "r").read()
         # ===
         human_task = human_tasks_by_id[task_id]
         human_trajectory = human_task["tool_calls"]
-        human_last_dom = human_trajectory[-1]["params"]["dom_state"]
-        human_last_dom = open(Path("data/dev") / human_last_dom, "r").read()
+
+        # Find the last tool call with a dom_state
+        human_last_dom_path = None
+        for tool_call in reversed(human_trajectory):
+            if "dom_state" in tool_call.get("params", {}):
+                human_last_dom_path = tool_call["params"]["dom_state"]
+                break
+
+        if not human_last_dom_path:
+            logger.warning(f"No dom_state found in human trajectory for task {task_id}")
+            return task_id, {
+                "correct": False,
+                "reasoning": "No dom_state found in human trajectory",
+                "confidence": 0,
+            }
+
+        human_last_dom = open(DATA_DIR / human_last_dom_path, "r").read()
         human_answer = human_task["answer"]
         # ===
+        logger.info(f"Evaluating task {task_id}...")
         judge = dspy.Predict(JudgeCompletion)
         result = judge(
             task=human_task["task_description"],
@@ -137,32 +160,62 @@ def evaluate_model_outputs(model: str, judge_model: str = "gpt-4.1-2025-04-14"):
             human_dom=human_last_dom,
             human_answer=human_answer,
         )
-        evaluations[task_id] = {
+        logger.info(f"Task {task_id} evaluated: {result.correct}")
+        return task_id, {
             "correct": result.correct,
             "reasoning": result.reasoning,
             "confidence": result.confidence,
         }
 
+    # Run evaluations in parallel
+    evaluations = {}
+
+    with ThreadPoolExecutor(max_workers=32) as executor:
+        # Submit all tasks
+        future_to_task = {
+            executor.submit(evaluate_single_task, task): task for task in model_tasks
+        }
+
+        # Process results as they complete
+        for future in as_completed(future_to_task):
+            task_id, result = future.result()
+            if result is not None:
+                evaluations[task_id] = result
+
+    # Save evaluations to file
+    output_path = results_dir / "grade.json"
+    with open(output_path, "w") as f:
+        json.dump(evaluations, f, indent=2)
+    logger.info(f"Saved evaluations to {output_path}")
+
     print(json.dumps(evaluations, indent=2))
     return evaluations
 
 
-def main():
-    model = sys.argv[1] if len(sys.argv) > 1 else "o3-2025-04-16"
-    judge_model = sys.argv[2] if len(sys.argv) > 2 else "gpt-4.1-2025-04-14"
+app = typer.Typer()
 
-    print(f"Evaluating outputs for model: {model}")
+
+@app.command()
+def main(
+    judge_model: str = typer.Option("gpt-5", help="Judge model for evaluation"),
+    results_dir: Optional[str] = typer.Option(
+        None, help="Specific results directory path"
+    ),
+):
+    """Evaluate model outputs on browser tasks."""
+    print(f"Evaluating outputs for model: {results_dir}")
     print(f"Using judge model: {judge_model}")
+    if results_dir:
+        print(f"Results directory: {results_dir}")
     print("-" * 50)
 
     # Run evaluation
-    evaluation = evaluate_model_outputs(model, judge_model)
+    evaluation = evaluate_model_outputs(results_dir, judge_model)
 
     if evaluation:
         print("\n" + "=" * 50)
         print("EVALUATION SUMMARY")
         print("=" * 50)
-        print(f"Model: {model}")
         print(f"Judge: {judge_model}")
         print(f"Tasks evaluated: {len(evaluation)}")
         print(f"Correct: {sum(result['correct'] for result in evaluation.values())}")
@@ -177,8 +230,8 @@ def main():
             print(f"   Status: {status} Reason: {result['reasoning'][:100]}...")
     else:
         print("Evaluation failed or no results found")
-        sys.exit(1)
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":
-    main()
+    app()

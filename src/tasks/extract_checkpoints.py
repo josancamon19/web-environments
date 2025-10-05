@@ -1,8 +1,14 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
+from pathlib import Path
 import dspy
 from tasks.db_to_jsonl_format import BaseToolCallData
+
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+from src.config.storage_config import DATA_DIR
 
 
 lm = dspy.LM(
@@ -68,7 +74,7 @@ def extract_checkpoints(task_description: str, steps_taken: List[BaseToolCallDat
 
 
 def update_parsed_tasks_with_checkpoints():
-    with open("data/tasks.jsonl", "r") as f:
+    with open(DATA_DIR / "tasks.jsonl", "r") as f:
         tasks = [json.loads(line) for line in f if line.strip()]
 
     # Use ThreadPoolExecutor to handle concurrent execution with proper result handling
@@ -89,7 +95,7 @@ def update_parsed_tasks_with_checkpoints():
             task["checkpoints"] = result.checkpoints_idx
             task["checkpoints_reasoning"] = result.checkpoints_reasoning
 
-    with open("data/tasks.jsonl", "w") as f:
+    with open(DATA_DIR / "tasks.jsonl", "w") as f:
         for task in tasks:
             f.write(json.dumps(task) + "\n")
 

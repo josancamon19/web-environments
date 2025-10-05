@@ -38,6 +38,29 @@ def get_kernel_client() -> Kernel:
     return _kernel_client
 
 
+async def cleanup_all_kernel_sessions() -> None:
+    """Delete all active Kernel browser sessions before starting a new run."""
+    try:
+        kernel_client = get_kernel_client()
+        sessions = kernel_client.browsers.list()
+        
+        if not sessions:
+            logger.info("No active Kernel browser sessions to cleanup")
+            return
+        
+        logger.info(f"Cleaning up {len(sessions)} active Kernel browser sessions")
+        for session in sessions:
+            try:
+                kernel_client.browsers.delete_by_id(session.session_id)
+                logger.info(f"Deleted session {session.session_id}")
+            except Exception as e:
+                logger.warning(f"Failed to delete session {session.session_id}: {e}")
+        
+        logger.info("Completed cleanup of all Kernel browser sessions")
+    except Exception as e:
+        logger.error(f"Error during Kernel session cleanup: {e}")
+
+
 def extract_tool_calls(history: list[dict]) -> List[Dict[str, Any]]:
     """Extract tool calls from browser-use history"""
     tool_calls = []
@@ -349,10 +372,20 @@ async def run_task_with_agent(
         duration = (datetime.now() - start_time).total_seconds()
 
     finally:
+        # Cleanup Kernel browser session
         if kernel_browser and kernel_client:
-            kernel_client.browsers.delete_by_id(kernel_browser.session_id)
+            try:
+                kernel_client.browsers.delete_by_id(kernel_browser.session_id)
+                logger.info(f"Cleaned up Kernel browser session {kernel_browser.session_id}")
+            except Exception as e:
+                logger.error(f"Failed to cleanup Kernel browser session: {e}")
+        
+        # Cleanup sandbox
         if sandbox:
-            await sandbox.close()
+            try:
+                await sandbox.close()
+            except Exception as e:
+                logger.error(f"Failed to close sandbox: {e}")
 
     # Extract tool calls instead of full history
     history_dump = history.model_dump()["history"]
@@ -495,6 +528,9 @@ async def process_all_tasks(
     sandbox_safe_mode: bool,
 ):
     """Process all tasks and save to individual JSON files, skipping already completed ones"""
+    # Cleanup all active Kernel browser sessions before starting
+    await cleanup_all_kernel_sessions()
+    
     # Load tasks from input file
     tasks_path = DATA_DIR / "tasks.jsonl"
     if not tasks_path.exists():
@@ -504,8 +540,8 @@ async def process_all_tasks(
         tasks = [json.loads(line) for line in f if line.strip()]
 
     # Setup output directory with timestamp
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    # timestamp = "2025-10-02_19-58-56"
+    # timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    timestamp = "2025-10-04_16-39-06"
     model_safe = model.replace("/", "-")
     results_dir = Path("results") / f"browseruse-{model_safe}-{timestamp}"
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -597,7 +633,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run browser-use agent over recorded tasks"
     )
-    parser.add_argument("--model", default="gpt-5-mini", help="LLM model name to use")
+    parser.add_argument("--model", default="gpt-5-nano", help="LLM model name to use")
     parser.add_argument(
         "--no-sandbox",
         action="store_true",
