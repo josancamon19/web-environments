@@ -2,22 +2,16 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
 from pathlib import Path
+from datetime import datetime
 import dspy
+import mlflow
 from tasks.db_to_jsonl_format import BaseToolCallData
 
 import sys
 import os
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.config.storage_config import DATA_DIR
-
-
-lm = dspy.LM(
-    "openai/gpt-5",
-    reasoning_effort="high",
-    temperature=1.0,
-    max_tokens=24000,
-)
-dspy.configure(lm=lm)
 
 
 def get_checkpoint_extractor(checkpoints: int = 2):
@@ -62,24 +56,31 @@ def get_checkpoint_extractor(checkpoints: int = 2):
 
 def extract_checkpoints(task_description: str, steps_taken: List[BaseToolCallData]):
     print(f"Extracting checkpoints for task: {task_description}")
-
-    # Create a dspy predictor with the signature
     CheckpointExtractor = get_checkpoint_extractor()
     predictor = dspy.Predict(CheckpointExtractor)
-
-    # Execute the predictor
     result = predictor(task_description=task_description, steps_taken=steps_taken)
     print(f"Extracted checkpoints: {result.checkpoints_idx}")
     return result
 
 
-def update_parsed_tasks_with_checkpoints():
+def main():
+    lm = dspy.LM(
+        "openai/gpt-5",
+        reasoning_effort="high",
+        temperature=1.0,
+        max_tokens=24000,
+    )
+    mlflow.set_tracking_uri("http://127.0.0.1:5000")
+    mlflow.set_experiment(
+        f"extract-checkpoints-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+    )
+    mlflow.dspy.autolog()
+    dspy.configure(lm=lm)
+
     with open(DATA_DIR / "tasks.jsonl", "r") as f:
         tasks = [json.loads(line) for line in f if line.strip()]
 
-    # Use ThreadPoolExecutor to handle concurrent execution with proper result handling
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        # Submit all tasks to the executor
+    with ThreadPoolExecutor(max_workers=32) as executor:
         futures = []
         for task in tasks:
             future = executor.submit(
@@ -89,7 +90,6 @@ def update_parsed_tasks_with_checkpoints():
             )
             futures.append(future)
 
-        # Collect results as they complete
         for future, task in zip(futures, tasks):
             result = future.result()
             task["checkpoints"] = result.checkpoints_idx
@@ -101,4 +101,4 @@ def update_parsed_tasks_with_checkpoints():
 
 
 if __name__ == "__main__":
-    update_parsed_tasks_with_checkpoints()
+    main()

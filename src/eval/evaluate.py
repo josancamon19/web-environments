@@ -5,11 +5,13 @@ from typing import Dict, Any, List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import dspy
+from dspy.teleprompt.utils import shutil
 import typer
 from tasks.db_to_jsonl_format import BaseToolCallData
 
 import sys
 import os
+import mlflow
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.config.storage_config import DATA_DIR
@@ -70,6 +72,9 @@ def evaluate_model_outputs(results_dir: str, judge_model: str):
         temperature=1.0,
         max_tokens=64000,
     )
+    mlflow.set_tracking_uri("http://127.0.0.1:5000")
+    mlflow.set_experiment(f"eval-{results_dir.split("/")[-1]}")
+    mlflow.dspy.autolog()
     dspy.configure(lm=lm)
 
     results_dir = Path(results_dir)
@@ -125,8 +130,11 @@ def evaluate_model_outputs(results_dir: str, judge_model: str):
             }
 
         model_trajectory = model_task["tool_calls"]
-        model_last_dom = model_task["step_dom_mapping"][str(len(model_trajectory))]
-        model_last_dom = open(results_dir / model_last_dom, "r").read()
+        # Find the last available DOM step (may not match trajectory length)
+        step_dom_mapping = model_task["step_dom_mapping"]
+        last_step = max(int(k) for k in step_dom_mapping.keys())
+        model_last_dom_path = step_dom_mapping[str(last_step)]
+        model_last_dom = open(results_dir / model_last_dom_path, "r").read()
         # ===
         human_task = human_tasks_by_id[task_id]
         human_trajectory = human_task["tool_calls"]
@@ -148,6 +156,7 @@ def evaluate_model_outputs(results_dir: str, judge_model: str):
 
         human_last_dom = open(DATA_DIR / human_last_dom_path, "r").read()
         human_answer = human_task["answer"]
+        # breakpoint()
         # ===
         logger.info(f"Evaluating task {task_id}...")
         judge = dspy.Predict(JudgeCompletion)
@@ -202,6 +211,14 @@ def main(
         None, help="Specific results directory path"
     ),
 ):
+    # TODO: did for 15 tasks, and all seem accurately evaluated.
+    # - determine false positives
+    # - how many browser/navigation issues rather than skill issue?
+    # - consider asking the judge model for this values
+    # - what happens when lists differ fully?
+    # - TODO: are dom's correctly used for grounding?
+
+
     """Evaluate model outputs on browser tasks."""
     print(f"Evaluating outputs for model: {results_dir}")
     print(f"Using judge model: {judge_model}")

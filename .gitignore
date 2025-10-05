@@ -19,3 +19,5 @@ data/
 google-credentials.json
 desktop_app/embedded_credentials.py
 tmp/
+mlartifacts
+mlruns

@@ -34,6 +34,7 @@ ignore = ["F722"]
 
 [dependency-groups]
 dev = [
+    "mlflow>=3.4.0",
     "pyinstaller>=6.16.0",
     "streamlit>=1.50.0",
     "watchdog>=6.0.0",
