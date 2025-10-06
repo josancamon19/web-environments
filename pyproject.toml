@@ -11,7 +11,9 @@ dependencies = [
     "google-cloud-storage>=3.4.0",
     "kernel>=0.12.0",
     "litellm>=1.77.5",
+    "pandas>=2.2.0",
     "playwright>=1.55.0",
+    "pyarrow>=18.0.0",
     "python-dotenv>=1.1.1",
     "ruff>=0.13.3",
     "ty>=0.0.1a21",
@@ -38,4 +40,5 @@ dev = [
     "pyinstaller>=6.16.0",
     "streamlit>=1.50.0",
     "watchdog>=6.0.0",
+    "huggingface-hub>=0.26.0",
 ]
