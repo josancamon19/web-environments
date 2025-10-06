@@ -108,7 +108,7 @@ def process_tasks(jsonl_path: Path, db_path: Path, bucket_name: str) -> pd.DataF
                 "website_url": task.get("website_url"),
                 "num_steps": task.get("num_steps"),
                 "duration_seconds": task.get("duration_seconds"),
-                "trajectory": task.get("tool_calls", []),  # Renamed from tool_calls
+                "golden_trajectory": task.get("tool_calls", []),  # Human-performed trajectory
                 "answer": task.get("answer"),
                 "checkpoints": task.get("checkpoints", []),
                 "checkpoints_reasoning": task.get("checkpoints_reasoning", []),
