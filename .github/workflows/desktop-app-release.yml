@@ -62,8 +62,8 @@ jobs:
         shell: bash
         env:
           APP_VERSION: ${{ needs.prepare.outputs.version }}
-          GOOGLE_APPLICATION_CREDENTIALS_BASE64: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_BASE64 }}
         run: |
+          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}" > google-credentials.json
           uv run python desktop_app/build_release.py --target ${{ matrix.target }}
 
       - name: Upload bundle artifact

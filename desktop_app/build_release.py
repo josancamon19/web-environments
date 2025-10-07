@@ -102,6 +102,9 @@ def build_with_pyinstaller(
         # Add entire src package
         "--add-data",
         f"{repo_root / 'src'}:src",
+        # Add google-credentials.json
+        "--add-data",
+        f"{repo_root / 'google-credentials.json'}:.",
         # Hidden imports for dependencies
         "--hidden-import",
         "google.cloud",
