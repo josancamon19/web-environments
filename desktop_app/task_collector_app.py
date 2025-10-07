@@ -1045,6 +1045,7 @@ if str(BASE_PATH) not in sys.path:
     sys.path.insert(0, str(BASE_PATH))
 
 # pylint: disable=wrong-import-position
+from desktop_app.task_worker import run_task_worker
 
 logging.basicConfig(
     level=logging.INFO,
