@@ -81,9 +81,7 @@ def _load_env_files() -> None:
             load_dotenv(dotenv_path=dotenv_path, override=False)
 
 
-def ensure_google_credentials(
-    creds_base64: Optional[str] = None,
-) -> tuple[bool, Optional[str]]:
+def ensure_google_credentials() -> tuple[bool, Optional[str]]:
     """Ensure Google credentials file exists for storage uploads.
 
     Expects base64-encoded Google Cloud service account JSON credentials.
@@ -97,64 +95,28 @@ def ensure_google_credentials(
         logger.debug("Google credentials already ready")
         return True, None
 
-    if not creds_base64:
-        message = (
-            "Google Cloud Storage credentials are required to upload collected data.\n\n"
-            "Please paste your base64-encoded credentials in the Settings field above."
-        )
-        _GOOGLE_CREDS_ERROR = message
-        return False, message
-
-    creds_str = creds_base64.strip()
-    logger.debug(f"Processing credentials input (length: {len(creds_str)})")
-
-    if getattr(sys, "frozen", False):
-        creds_path = Path(tempfile.gettempdir()) / "google-credentials.json"
-    else:
-        creds_path = Path("google-credentials.json")
-
-    try:
-        # Decode base64 credentials
-        creds_bytes = base64.b64decode(creds_str)
-        creds_json_str = creds_bytes.decode("utf-8")
-
-        # Clean the JSON string - ensure it starts with { and ends with }
-        creds_json_str = creds_json_str.strip()
-
-        # Find the first { and last }
-        start_idx = creds_json_str.find("{")
-        end_idx = creds_json_str.rfind("}")
-
-        if start_idx == -1 or end_idx == -1 or start_idx >= end_idx:
-            raise ValueError("Invalid JSON structure - missing braces")
-
-        # Extract clean JSON
-        clean_json = creds_json_str[start_idx : end_idx + 1]
-
-        # Validate it's proper JSON
-        json.loads(clean_json)
-
-        # Write the clean JSON to file (overwrite, not append)
-        creds_path.parent.mkdir(parents=True, exist_ok=True)
-        creds_path.write_text(clean_json, encoding="utf-8")
-        logger.debug(
-            f"Credentials written to {creds_path} (size: {len(clean_json)} chars)"
-        )
-
+    # Look for google-credentials.json in the same directory as the script or the parent directory
+    #  - Current directory match on the bundle
+    #  - Parent directory match running directly from the script
+    creds_path = Path(__file__).resolve().with_name("google-credentials.json")
+    if not creds_path.exists():
+        creds_path = Path(__file__).resolve().parent.with_name("google-credentials.json")
+    
+    if creds_path.exists():
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(creds_path)
         _GOOGLE_CREDS_READY = True
         _GOOGLE_CREDS_ERROR = None
         _GOOGLE_CREDS_PATH = creds_path
         return True, None
-    except Exception as exc:  # pragma: no cover - defensive
-        message = (
-            f"Failed to setup Google Cloud credentials: {exc}\n\n"
-            "The credentials must be base64-encoded Google Cloud service account JSON.\n"
-            "Contact your administrator for assistance."
-        )
-        _GOOGLE_CREDS_ERROR = message
-        logger.error(f"Credential setup failed: {exc}")
-        return False, message
+
+    message = (
+        f"Failed to setup Google Cloud credentials.\n"
+        f"Contact your administrator for assistance. {creds_path}"
+    )
+    _GOOGLE_CREDS_ERROR = message
+    logger.error(
+        "Credential setup failed. Please contact your administrator for assistance.")
+    return False, message
 
 
 # Config file to store user settings
@@ -201,7 +163,8 @@ class UsernameDialog(tk.Toplevel):
         button_frame = tk.Frame(main_frame)
         button_frame.pack(fill=tk.X)
 
-        ok_button = tk.Button(button_frame, text="OK", command=self.ok, width=10)
+        ok_button = tk.Button(button_frame, text="OK",
+                              command=self.ok, width=10)
         ok_button.pack(side=tk.RIGHT, padx=(5, 0))
 
         cancel_button = tk.Button(
@@ -366,7 +329,8 @@ class TextAreaDialog(tk.Toplevel):
         button_frame.pack(fill=tk.X, pady=(10, 0))
 
         # OK and Cancel buttons
-        ok_button = tk.Button(button_frame, text="OK", command=self.ok, width=10)
+        ok_button = tk.Button(button_frame, text="OK",
+                              command=self.ok, width=10)
         ok_button.pack(side=tk.RIGHT, padx=(5, 0))
 
         cancel_button = tk.Button(
@@ -536,8 +500,10 @@ class TasksViewDialog(tk.Toplevel):
 
         # Create context menu for edit and delete options
         self.context_menu = tk.Menu(self, tearoff=0)
-        self.context_menu.add_command(label="Edit Website", command=self.edit_website)
-        self.context_menu.add_command(label="Edit Answer", command=self.edit_answer)
+        self.context_menu.add_command(
+            label="Edit Website", command=self.edit_website)
+        self.context_menu.add_command(
+            label="Edit Answer", command=self.edit_answer)
         self.context_menu.add_separator()
         self.context_menu.add_command(
             label="Delete Task", command=self.delete_selected_task
@@ -584,8 +550,10 @@ class TasksViewDialog(tk.Toplevel):
         tree_frame.grid_columnconfigure(0, weight=1)
 
         # Style the treeview with tags for alternating colors in dark mode
-        self.tree.tag_configure("evenrow", background="#252525", foreground="#e0e0e0")
-        self.tree.tag_configure("oddrow", background="#1e1e1e", foreground="#e0e0e0")
+        self.tree.tag_configure(
+            "evenrow", background="#252525", foreground="#e0e0e0")
+        self.tree.tag_configure(
+            "oddrow", background="#1e1e1e", foreground="#e0e0e0")
 
         # Add info label with dark styling
         info_container = tk.Frame(main_frame, bg="#2b2b2b")
@@ -858,10 +826,12 @@ class TasksViewDialog(tk.Toplevel):
             cursor.execute("DELETE FROM steps WHERE task_id = ?", (task_id,))
 
             # Delete requests associated with this task
-            cursor.execute("DELETE FROM requests WHERE task_id = ?", (task_id,))
+            cursor.execute(
+                "DELETE FROM requests WHERE task_id = ?", (task_id,))
 
             # Delete responses associated with this task
-            cursor.execute("DELETE FROM responses WHERE task_id = ?", (task_id,))
+            cursor.execute(
+                "DELETE FROM responses WHERE task_id = ?", (task_id,))
 
             # Delete task (CASCADE will handle any remaining related records)
             cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
@@ -896,7 +866,8 @@ class TasksViewDialog(tk.Toplevel):
                     shutil.rmtree(captures_dir)
                     print(f"Deleted captures directory: {captures_dir}")
                 except Exception as e:
-                    print(f"Error deleting captures directory {captures_dir}: {e}")
+                    print(
+                        f"Error deleting captures directory {captures_dir}: {e}")
 
             # Remove from tree view
             self.tree.delete(item)
@@ -934,7 +905,8 @@ class TasksViewDialog(tk.Toplevel):
         try:
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
-            cursor.execute("SELECT website FROM tasks WHERE id = ?", (task_id,))
+            cursor.execute(
+                "SELECT website FROM tasks WHERE id = ?", (task_id,))
             result = cursor.fetchone()
             current_website = result[0] if result and result[0] else ""
             conn.close()
@@ -1073,7 +1045,6 @@ if str(BASE_PATH) not in sys.path:
     sys.path.insert(0, str(BASE_PATH))
 
 # pylint: disable=wrong-import-position
-from desktop_app.task_worker import run_task_worker
 
 logging.basicConfig(
     level=logging.INFO,
@@ -1196,42 +1167,6 @@ class TaskCollectorApp:
         )
         subtitle.pack(anchor=tk.W, pady=(10, 20))
 
-        # Google Cloud credentials input with dark theme
-        creds_frame = tk.Frame(container, bg="#2b2b2b")
-        creds_frame.pack(fill=tk.X, pady=(0, 12))
-        tk.Label(
-            creds_frame,
-            text="☁️ Google Cloud Credentials:",
-            font=("Helvetica", 12, "bold"),
-            bg="#2b2b2b",
-            fg="#e0e0e0",
-        ).pack(anchor=tk.W, pady=(0, 4))
-        tk.Label(
-            creds_frame,
-            text="Paste your base64-encoded Google Cloud service account JSON here",
-            font=("Helvetica", 9),
-            fg="#b0bec5",
-            bg="#2b2b2b",
-        ).pack(anchor=tk.W, pady=(0, 4))
-        self.credentials_text = tk.Text(
-            creds_frame,
-            height=2,
-            width=80,
-            font=("Courier", 9),
-            wrap=tk.WORD,
-            relief=tk.SOLID,
-            borderwidth=1,
-            bg="#1e1e1e",
-            fg="#e0e0e0",
-            insertbackground="#e0e0e0",
-            selectbackground="#0d47a1",
-            selectforeground="white",
-        )
-        self.credentials_text.pack(fill=tk.X, pady=(0, 0))
-
-        # Try to load saved credentials
-        self._load_credentials()
-
         # Source dropdown
         source_frame = tk.Frame(container)
         source_frame.pack(fill=tk.X, pady=(0, 12))
@@ -1245,7 +1180,8 @@ class TaskCollectorApp:
             *[label for label, _ in SOURCE_CHOICES],
         )
         # We need to map displayed label to code; track in dictionary
-        self._source_label_to_value = {label: value for label, value in SOURCE_CHOICES}
+        self._source_label_to_value = {
+            label: value for label, value in SOURCE_CHOICES}
         source_menu.config(width=35, font=("Helvetica", 11))
         source_menu.pack(anchor=tk.W, pady=(0, 0))
 
@@ -1490,41 +1426,6 @@ class TaskCollectorApp:
             self.log_output.config(state=tk.DISABLED)
         self.root.after(150, self._process_log_queue)
 
-    def _load_credentials(self) -> None:
-        """Load saved credentials from config file."""
-        if CONFIG_FILE.exists():
-            try:
-                with open(CONFIG_FILE, "r") as f:
-                    config = json.load(f)
-                    creds = config.get("google_credentials_base64", "")
-                    if creds:
-                        # Only load if text widget is empty to avoid concatenating
-                        current_content = self.credentials_text.get(
-                            "1.0", tk.END
-                        ).strip()
-                        if not current_content:
-                            self.credentials_text.delete(
-                                "1.0", tk.END
-                            )  # Clear any content
-                            self.credentials_text.insert("1.0", creds)
-            except Exception as exc:
-                logger.warning(f"Failed to load credentials from config: {exc}")
-
-    def _save_credentials(self) -> None:
-        """Save credentials to config file."""
-        creds = self.credentials_text.get("1.0", tk.END).strip()
-        try:
-            CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-            config = {}
-            if CONFIG_FILE.exists():
-                with open(CONFIG_FILE, "r") as f:
-                    config = json.load(f)
-            config["google_credentials_base64"] = creds
-            with open(CONFIG_FILE, "w") as f:
-                json.dump(config, f, indent=2)
-        except Exception as exc:
-            logger.warning(f"Failed to save credentials: {exc}")
-
     def _warn_if_credentials_missing(self) -> None:
         if storage is None:
             warning = (
@@ -1532,23 +1433,17 @@ class TaskCollectorApp:
                 "be disabled until the dependency is available."
             )
             self._log(f"⚠️ {warning}")
-            messagebox.showwarning("Upload Unavailable", warning, parent=self.root)
+            messagebox.showwarning("Upload Unavailable",
+                                   warning, parent=self.root)
             return
 
-        creds = self.credentials_text.get("1.0", tk.END).strip()
-        if not creds:
+        creds_ready, error_message = ensure_google_credentials()
+        if creds_ready:
+            self._log("✅ Google Cloud credentials loaded successfully.")
+        elif error_message:
             self._log(
-                "⚠️ Upload requires Google Cloud credentials in the Settings field."
+                f"❌ {error_message}"
             )
-        else:
-            # Test credentials
-            creds_ready, error_message = ensure_google_credentials(creds)
-            if creds_ready:
-                self._log("✅ Google Cloud credentials loaded successfully.")
-            elif error_message:
-                self._log(
-                    "⚠️ There's an issue with your credentials - please check the format."
-                )
 
     def _log(self, message: str) -> None:
         self.log_queue.put(message)
@@ -1711,19 +1606,7 @@ class TaskCollectorApp:
             self._log("Upload cancelled - no username provided")
             return
 
-        # Get and save credentials
-        creds = self.credentials_text.get("1.0", tk.END).strip()
-        if not creds:
-            error_msg = "Please paste your Google Cloud credentials in the Settings field above."
-            self._log(f"❌ {error_msg}")
-            messagebox.showerror("Upload Error", error_msg, parent=self.root)
-            self.credentials_text.focus_set()
-            return
-
-        # Save credentials for next time
-        self._save_credentials()
-
-        creds_ready, error_message = ensure_google_credentials(creds)
+        creds_ready, error_message = ensure_google_credentials()
         if not creds_ready:
             error_text = (
                 error_message
@@ -1797,7 +1680,8 @@ class TaskCollectorApp:
             zip_size = os.path.getsize(temp_zip_path)
             zip_size_mb = zip_size / (1024 * 1024)
 
-            self._log(f"Created zip file: {zip_filename} ({zip_size_mb:.1f} MB)")
+            self._log(
+                f"Created zip file: {zip_filename} ({zip_size_mb:.1f} MB)")
             progress_dialog.update_progress(
                 "Uploading to Google Cloud...", 55, f"{zip_size_mb:.1f} MB"
             )
@@ -1857,7 +1741,8 @@ class TaskCollectorApp:
             # Small delay to show 100%
             self.root.after(500, progress_dialog.destroy)
 
-            self._set_status("Upload completed successfully!", status_type="ready")
+            self._set_status("Upload completed successfully!",
+                             status_type="ready")
             self._log(
                 f"✅ Successfully uploaded {zip_filename} to collection-reports bucket"
             )
@@ -1877,7 +1762,8 @@ class TaskCollectorApp:
 
             error_msg = f"Failed to upload data: {exc}"
             self._log(f"❌ {error_msg}")
-            self._set_status("Upload failed – see log for details", status_type="error")
+            self._set_status(
+                "Upload failed – see log for details", status_type="error")
             messagebox.showerror("Upload Error", error_msg)
 
     def launch_task(self) -> None:
@@ -1888,7 +1774,8 @@ class TaskCollectorApp:
             return
 
         displayed_source = self.source_var.get()
-        source_value = self._source_label_to_value.get(displayed_source, "none")
+        source_value = self._source_label_to_value.get(
+            displayed_source, "none")
         task_type = self.task_type_var.get()
         description = self.description_text.get("1.0", tk.END).strip()
         website = self.website_entry.get().strip() or None
@@ -1916,7 +1803,8 @@ class TaskCollectorApp:
         self.task_running = True
         self._active_task_type = task_type
         self.launch_button.config(state=tk.DISABLED)
-        self.complete_button.config(state=tk.DISABLED)  # enabled after browser launches
+        # enabled after browser launches
+        self.complete_button.config(state=tk.DISABLED)
         self._set_status("Launching browser…", status_type="launching")
         self._log("Preparing to launch a new task…")
 
@@ -1944,7 +1832,8 @@ class TaskCollectorApp:
 
     def complete_task(self) -> None:
         if not self.task_running:
-            messagebox.showinfo("No active task", "Launch a task before completing it.")
+            messagebox.showinfo(
+                "No active task", "Launch a task before completing it.")
             return
 
         answer: Optional[str] = ""
