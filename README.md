@@ -1,108 +1,146 @@
-Playwright Task Recorder
+# Web Environments: Browser Agent Data Collection
 
-Requirements
-- Python 3.11+ recommended
+> **Browser agents are hill climbing in the wrong direction.**
 
-Setup
-1) Create venv and install deps:
-```
+Existing browser agents aren't production-ready, and benchmarks either focus on academic tasks or lack real economic value. Most progress happens closed-source because data collection is prohibitively expensive.
+
+## Goals
+
+1. **Largest dataset:** Collect 10k+ browser interactions—2 orders of magnitude bigger than existing datasets
+2. **Economic value:** Focus on long-horizon tasks tied to real work that people are paid to do
+3. **Granular evaluation:** Identify real bottlenecks in existing agents with detailed checkpoints
+4. **Open source recipe:** Develop an OSS approach for data collection and RL fine-tuning on any website
+
+### Why This Tool?
+
+Existing collection approaches are inadequate:
+- **Mind2Web's tool** isn't open-sourced, requires extensive training, and doesn't create reproducible environments
+- **WebArena/TheAgentCompany** spent hundreds of hours building website clones for just ~10 environments
+- **Binary evaluations** provide sparse feedback without understanding failure modes
+
+This tool collects everything needed for reproducible browser environments with zero training required after setup.
+
+## Quick Start
+
+**Requirements:** Python 3.11+
+
+**Setup:**
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Run data collection
-```
+**Run data collection:**
+```bash
 source .venv/bin/activate
 RECORDER_BROWSER_CHANNEL=chrome python main.py
 ```
-- Provide the task source, type, and description when prompted; Ctrl+C ends a capture.
-- Each session lands in `data/<env>/captures/task_<id>/<timestamp>/`; the manifest records the Playwright context config plus capture timestamps, while sibling folders store storage snapshots, network bodies, request logs, and SQLite/asset exports so the entire environment can be replayed offline.
-- The active task index lives at `data/<env>/tasks.db` along with useful artifacts under `data/<env>/screenshots/`, `data/<env>/videos/`, and `data/<env>/doms/`.
 
-Launch a sandbox browser
-```
-python -m src.capture.sandbox --task-id <id> [--root data/dev/captures] [--allow-network-fallback] [--headed] [--safe-mode]
-```
-- Spins up a Playwright instance pointed at the recorded bundle and prints the CDP endpoint; press Ctrl+C when finished. Pass `--bundle <path>` to target a specific folder.
-- Add `--safe-mode` to launch a headless Chromium with a minimal argument set if the default profile crashes; add `--headed` to force a visible window.
+Provide task details when prompted; press Ctrl+C to end capture.
 
-Replay a capture
+### What Gets Collected
+
+Every browser interaction is captured for full reproducibility:
+- **Human trajectories:** Screenshots, videos, DOMs, tool calls (click, type, navigation)
+- **Network layer:** HAR files, API requests/responses, storage snapshots
+- **Reproducible environments:** Complete browser state (cookies, localStorage, IndexedDB) to replay offline
+
+Data structure:
+- Captures: `data/<env>/captures/task_<id>/<timestamp>/`
+- Task index: `data/<env>/tasks.db`
+- Artifacts: `data/<env>/screenshots/`, `data/<env>/videos/`, `data/<env>/doms/`
+
+## Usage
+
+### Sandbox & Replay
+
+**Launch a sandbox browser:**
+```bash
+python -m src.capture.sandbox --task-id <id> [--headed] [--allow-network-fallback]
 ```
+Spins up a Playwright instance with the recorded environment. Use `--headed` for visible window, `--safe-mode` for minimal args if crashes occur.
+
+**Replay a capture:**
+```bash
 python -m src.capture.replay <bundle_dir> [--headless] [--allow-network-fallback]
 ```
-- Launches Chromium against a recorded bundle, honoring the stored environment config and storage state; missing resources optionally fall back to the live network.
+Replays the recorded environment offline; network fallback available if needed.
 
-Export tasks to JSONL
-```
+### Export & Process
+
+**Export to JSONL:**
+```bash
 python src/tasks/db_to_jsonl_format.py [--prod]
 ```
-- Reads `data/<env>/tasks.db`, emits tool-call trajectories to `data/<env>/tasks.jsonl`, and saves DOM snapshots to `data/<env>/doms/`.
+Converts `tasks.db` into tool-call trajectories at `tasks.jsonl` with DOM snapshots.
 
-Generate checkpoints
-```
+**Generate checkpoints:**
+```bash
 export OPENAI_API_KEY=...
 python src/tasks/extract_checkpoints.py
 ```
-- Uses the configured OpenAI model via `dspy` to enrich `data/dev/tasks.jsonl` with `checkpoints` and `checkpoints_reasoning`; adjust the hard-coded paths in the script if you need to target prod data.
+Uses LLM via `dspy` to create semantic checkpoints from human trajectories for granular evaluation.
 
-Run Browser-Use agent
-```
-python src/eval/browseruse.py --model gpt-5-nano [--prod] [--no-sandbox] [--sandbox-root <captures_dir>] [--sandbox-allow-network] [--sandbox-channel <channel>] [--sandbox-headed] [--sandbox-safe-mode]
-```
-- Uses `data/<env>/captures` by default, auto-selecting the newest bundle per task; pass `--no-sandbox` to fall back to the Kernel browser.
-- Requires Playwright browsers installed via `setup.sh` and an `OPENAI_API_KEY`. A `KERNEL_API_KEY` is only needed when the sandbox is disabled or no bundle is found for a task.
-- Default behaviour launches a headless Chromium; use `--sandbox-headed` for a visible window or `--sandbox-safe-mode` to retry with a reduced argument set if Chromium crashes.
-- Replays each task with the Browser-Use agent, saving traces, DOM dumps, and completions under `src/eval/results/browseruse-<model>.jsonl` and `src/eval/results/doms/`.
+### Evaluation
 
-Evaluate completions
+**Run Browser-Use agent:**
+```bash
+python src/eval/browseruse.py --model gpt-5-nano [--prod] [--sandbox-headed]
 ```
-python src/eval/evaluate.py <model_name> [judge_model]
-```
-- Loads the Browser-Use outputs, compares them against human trajectories, and prints per-task and aggregate verdicts; run as `python src/eval/evaluate.py <model> [judge_model] [--prod]` so the script still finds `src/eval/results/browseruse-<model>.jsonl` and `data/<env>/tasks.jsonl`.
+Evaluates agents in sandboxed environments. Outputs saved to `src/eval/results/`.
 
-Storage
-- SQLite DB at `data/<env>/tasks.db`
-- Screenshots at `data/<env>/screenshots/`
-- Video Tasks at `data/<env>/videos`
+**Evaluate completions:**
+```bash
+python src/eval/evaluate.py <model_name> [judge_model] [--prod]
+```
+Compares agent trajectories against human baselines using checkpoint-based evaluation.
+
+## Evaluation Approach
+
+### Granular Checkpoints vs Binary Evals
+
+Unlike existing benchmarks that only check final outcomes, this tool enables:
+- **Semantic checkpoints:** LLM-generated intermediate goals from human trajectories
+- **Partial rewards:** Credit for progress even on incomplete tasks
+- **Failure analysis:** Identify where agents commonly fail
+
+### Comparison to Existing Benchmarks
+
+| Benchmark | Focus | Environment | Limitation |
+|-----------|-------|-------------|------------|
+| GAIA, BrowserComp | Deep research | Live web | Academic tasks, marginal economic value |
+| Mind2Web | Information seeking | Snapshots | Mostly information retrieval |
+| WebArena, WebVoyager | Execution | Clones (~10 sites) | 1+ years to build, not scalable |
+| Real, TheAgentCompany | Action-based | Custom clones | Hundreds of hours per environment |
+
+**This tool:** Automated collection of reproducible environments for any website at scale.
+
+### Resources
+- Benchmark analysis: https://web-evals.streamlit.app/
+- Data collection tool: https://github.com/josancamon19/web-envs  
+- Mind2Web subset: https://huggingface.co/datasets/josancamon/mind2web-subset-human
 
 ## GCP Data Upload
 
-Upload collected data to Google Cloud Storage:
-
-### Setup Authentication
-If your organization has disabled service account key creation, use the recommended authentication method:
-
-**Option 1: Using the Desktop App**
-- Launch the Task Collector app (`python desktop_app/task_collector_app.py`)
-- Click "Setup GCP Auth" button
-- Follow the browser authentication flow
-
-**Option 2: Using the Setup Script**
+**Authenticate:**
 ```bash
-./setup_gcp_auth.sh
-```
-
-**Option 3: Manual Setup**
-```bash
-# Install Google Cloud SDK if not already installed
-# Then authenticate:
 gcloud auth application-default login
+# Or use the desktop app: python desktop_app/task_collector_app.py
 ```
 
-### Upload Data
-- Launch the Task Collector app
-- Click "Upload Data" button
-- The app will zip all data and upload to the `collection-reports` bucket
-- Uploaded files are timestamped: `web-envs-data-YYYY-MM-DD_HH-MM-SS.zip`
+**Upload data:**
+- Launch Task Collector app → "Upload Data"
+- Uploads to `collection-reports` bucket with timestamp: `web-envs-data-YYYY-MM-DD_HH-MM-SS.zip`
 
-### Troubleshooting
-- **Service account key creation disabled**: Use `gcloud auth application-default login` instead
-- **Bucket access denied**: Ensure you have write access to the `collection-reports` bucket
-- **Authentication expired**: Re-run the authentication setup
+## Configuration
 
-Notes
-- This is an MVP and will capture response bodies which can be large. For production, consider size limits and redaction.
-- To reduce CAPTCHA/detections, the recorder prefers launching a persistent Chrome profile and disables some automation flags. You can customize:
-  - `RECORDER_BROWSER_CHANNEL` (default `chrome`)
-  - `RECORDER_USER_DATA_DIR` (default `data/user-data`)
+**Environment variables:**
+- `RECORDER_BROWSER_CHANNEL`: Browser to use (default: `chrome`)
+- `RECORDER_USER_DATA_DIR`: Profile directory (default: `data/user-data`)
+- `OPENAI_API_KEY`: Required for checkpoint generation and evaluation
+- `KERNEL_API_KEY`: Optional, for non-sandboxed evaluation
+
+**Notes:**
+- Response bodies can be large; consider size limits/redaction for production
+- Persistent Chrome profile reduces CAPTCHA/bot detection
