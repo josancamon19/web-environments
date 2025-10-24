@@ -9,6 +9,9 @@ from typing import Any, Dict, Optional, Tuple
 
 from playwright.async_api import Browser, BrowserContext, Route
 
+from source_data.database import Database
+from capture.replay_task import StepEntry, TaskStepExecutor
+
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +41,8 @@ class ReplayBundle:
         self.manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
         self.resources = self.manifest.get("resources", [])
         self.environment = self.manifest.get("environment", {})
+        self.task_info: Dict[str, Any] = self.manifest.get("task") or {}
+        self.task_id: Optional[int] = self.task_info.get("id")
         self._payloads: Dict[Tuple[str, str, str], list[Dict[str, Any]]] = defaultdict(
             list
         )
@@ -57,6 +62,44 @@ class ReplayBundle:
             bundle_path,
             len(self.resources),
         )
+
+    def load_steps(self) -> list[StepEntry]:
+        if not self.task_id:
+            logger.warning("Bundle manifest does not include a task id; skipping step replay")
+            return []
+
+        db = Database.get_instance()
+        conn = db.get_connection()
+        if conn is None:
+            logger.error("Database connection unavailable; cannot load steps for task %s", self.task_id)
+            return []
+
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, event_type, event_data, timestamp FROM steps WHERE task_id = ? ORDER BY id",
+            (self.task_id,),
+        )
+
+        steps: list[StepEntry] = []
+        for row in cursor.fetchall():
+            raw_event_data = row[2]
+            parsed_event: Dict[str, Any] = {}
+            if raw_event_data:
+                try:
+                    parsed_event = json.loads(raw_event_data)
+                except json.JSONDecodeError:
+                    logger.debug("Failed to decode event data for step %s", row[0])
+            steps.append(
+                StepEntry(
+                    id=row[0],
+                    event_type=row[1] or "",
+                    event_data=parsed_event,
+                    timestamp=row[3],
+                )
+            )
+
+        logger.info("Loaded %d steps from database for task %s", len(steps), self.task_id)
+        return steps
 
     def guess_start_url(self) -> Optional[str]:
         for resource in self.resources:
@@ -245,12 +288,19 @@ class ReplayBundle:
         return manifest  # fall back to initial attempt for error reporting
 
 
-async def _cli(bundle_path: Path, *, headless: bool, allow_fallback: bool) -> None:
+async def _cli(
+    bundle_path: Path,
+    *,
+    headless: bool,
+    allow_fallback: bool,
+    is_human_trajectory: bool,
+) -> None:
     from playwright.async_api import async_playwright
 
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
     bundle = ReplayBundle(bundle_path)
+    steps = bundle.load_steps() if is_human_trajectory else []
 
     async with async_playwright() as pw:
         launch_kwargs: Dict[str, Any] = {"headless": headless}
@@ -268,6 +318,9 @@ async def _cli(bundle_path: Path, *, headless: bool, allow_fallback: bool) -> No
         start_url = bundle.guess_start_url() or "about:blank"
         logger.info("Opening %s", start_url)
         await page.goto(start_url)
+        if steps:
+            executor = TaskStepExecutor(steps, is_human_trajectory=is_human_trajectory)
+            await executor.run(page)
         await asyncio.Event().wait()
 
 
@@ -283,8 +336,14 @@ def main():
     )
     parser.add_argument(
         "--allow-network-fallback",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Allow requests missing from the bundle to hit the live network",
+    )
+    parser.add_argument(
+        "--is-human-trajectory",
         action="store_true",
-        help="If set, allow requests missing from the bundle to hit the live network",
+        help="Replay timing with human-like pacing",
     )
 
     args = parser.parse_args()
@@ -293,6 +352,7 @@ def main():
             args.bundle.expanduser().resolve(),
             headless=args.headless,
             allow_fallback=args.allow_network_fallback,
+            is_human_trajectory=args.is_human_trajectory,
         )
     )
     json.dumps(args, indent=2, ensure_ascii=False)
