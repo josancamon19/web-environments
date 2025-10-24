@@ -295,6 +295,7 @@ def main():
             allow_fallback=args.allow_network_fallback,
         )
     )
+    json.dumps(args, indent=2, ensure_ascii=False)
 
 
 if __name__ == "__main__":
