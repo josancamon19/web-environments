@@ -11,12 +11,9 @@ from dotenv import load_dotenv
 from browser_use import Agent, Browser, ChatOpenAI
 from kernel import Kernel
 
-import sys
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-from environments.environment import SandboxEnvironment, resolve_recorded_bundle  # noqa: E402
-from config.browser_config import CONTEXT_CONFIG  # noqa: E402
-from config.storage_config import DATA_DIR  # noqa: E402
+from environments.environment import SandboxEnvironment, resolve_recorded_bundle
+from config.browser_config import CONTEXT_CONFIG
+from config.storage_config import DATA_DIR
 
 load_dotenv()
 

@@ -1,7 +1,5 @@
 import json
 import logging
-import os
-import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List
@@ -10,7 +8,6 @@ import dspy
 import mlflow
 import typer
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.config.storage_config import DATA_DIR
 from src.eval.judges import get_lm_judge
 
@@ -340,9 +337,9 @@ def evaluate_checkpoints(results_dir: str, judge_model: str):
     # Update grade data with results
     for task_id, checkpoint_result in checkpoint_evaluations.items():
         if task_id in grade_data["task_results"]:
-            grade_data["task_results"][task_id]["checkpoint_evaluation"] = (
-                checkpoint_result
-            )
+            grade_data["task_results"][task_id][
+                "checkpoint_evaluation"
+            ] = checkpoint_result
 
     # Compute and add statistics
     checkpoint_stats = _compute_checkpoint_stats(checkpoint_evaluations)

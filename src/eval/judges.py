@@ -9,10 +9,7 @@ from typing import Dict, Any, List
 import dspy
 import mlflow
 
-import sys
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-from src.scripts.postprocessing.db_to_jsonl_format import BaseToolCallData  # noqa: E402
+from src.models import BaseToolCallData
 
 
 # Disable MLflow logging to avoid spam warnings

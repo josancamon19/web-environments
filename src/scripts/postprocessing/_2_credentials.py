@@ -1,7 +1,5 @@
 from dataclasses import dataclass, field, asdict
 import json
-import os
-import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import List, Dict
@@ -9,9 +7,8 @@ from typing import List, Dict
 import dspy
 import mlflow
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-from src.config.storage_config import DATA_DIR  # noqa: E402
-from src.scripts.postprocessing._1_tool_calls_format import BaseToolCallData  # noqa: E402
+from src.config.storage_config import DATA_DIR
+from src.models import BaseToolCallData
 
 
 @dataclass

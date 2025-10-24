@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from pathlib import Path
-import sys
 from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
@@ -17,16 +15,14 @@ from browser_use import (
 )
 import typer
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-
-from eval.harness.definitions import (
+from src.eval.harness.definitions import (
     AgentContext,
     AgentRunResult,
     CaptureCallback,
     HarnessRunConfig,
 )
-from eval.harness.harness import HarnessConfig
-from eval.harness.harness import EvaluationHarness
+from src.eval.harness.harness import HarnessConfig
+from src.eval.harness.harness import EvaluationHarness
 
 load_dotenv()
 

@@ -7,13 +7,10 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 from openai import OpenAI
 from dotenv import load_dotenv
-import sys
-import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-from src.config.browser_config import CONTEXT_CONFIG  # noqa: E402
-from src.eval.harness.definitions import AgentContext, AgentRunResult, HarnessRunConfig  # noqa: E402
-from src.eval.harness.harness import EvaluationHarness, HarnessConfig  # noqa: E402
+from src.config.browser_config import CONTEXT_CONFIG
+from src.eval.harness.definitions import AgentContext, AgentRunResult, HarnessRunConfig
+from src.eval.harness.harness import EvaluationHarness, HarnessConfig
 
 load_dotenv()
 

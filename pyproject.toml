@@ -6,11 +6,11 @@ authors = [{ name = "Joan Cabezas", email = "joan.santiago.cabezas@gmail.com" }]
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "browser-use>=0.7.10",
+    "browser-use>=0.9.1",
     "dspy>=3.0.3",
     "google-cloud-storage>=3.4.0",
-    "kernel>=0.12.0",
-    "litellm>=1.77.5",
+    "kernel>=0.15.0",
+    "litellm>=1.78.7",
     "openai>=1.109.1",
     "pandas>=2.2.0",
     "playwright>=1.55.0",
@@ -25,10 +25,6 @@ dependencies = [
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
-
-[project.scripts]
-data-collector = "main:cli"
-evaluate-browseruse = "eval.browseruse:_main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
