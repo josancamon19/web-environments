@@ -2,7 +2,7 @@ import os
 
 from utils.get_iso_datetime import get_iso_datetime
 from config.storage_config import VIDEOS_DIR
-from tasks.task import TaskManager
+from db.task import TaskManager
 import logging
 
 logger = logging.getLogger(__name__)

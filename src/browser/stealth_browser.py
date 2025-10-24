@@ -5,13 +5,13 @@ from config.stealth_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
 from steps.step_record import StepRecord
 from browser.page import ActualPage, NewPageEvent
 from utils.get_tasks_video_path import get_tasks_video_path
-from tasks.task import TaskManager
+from db.task import TaskManager
 import sys
 from browser.request_event import Request_Event
 from browser.response_event import Response_Event
 import os
 from config.storage_config import DATA_DIR
-from capture.offline_capture import OfflineCaptureManager
+from environments.capture import OfflineCaptureManager
 
 logger = logging.getLogger(__name__)
 

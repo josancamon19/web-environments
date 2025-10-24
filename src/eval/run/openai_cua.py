@@ -11,10 +11,9 @@ import sys
 import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-from config.browser_config import CONTEXT_CONFIG
-from eval.harness.definitions import AgentContext, AgentRunResult, HarnessRunConfig
-from eval.harness.harness import EvaluationHarness, HarnessConfig
-
+from src.config.browser_config import CONTEXT_CONFIG  # noqa: E402
+from src.eval.harness.definitions import AgentContext, AgentRunResult, HarnessRunConfig  # noqa: E402
+from src.eval.harness.harness import EvaluationHarness, HarnessConfig  # noqa: E402
 
 load_dotenv()
 

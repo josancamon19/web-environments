@@ -1,5 +1,4 @@
 import logging
-from steps.step_record import StepRecord
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +36,8 @@ class ActualPage:
 
 class NewPageEvent:
     def __init__(self):
+        from steps.step_record import StepRecord
+
         self._page_event_handlers = {}
         self.step_record = StepRecord()
 

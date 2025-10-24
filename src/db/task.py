@@ -1,6 +1,6 @@
 from typing import Optional
 import logging
-from source_data.database import Database
+from db.database import Database
 from utils.environment_fingerprint import get_environment_fingerprint_json
 
 logger = logging.getLogger(__name__)
