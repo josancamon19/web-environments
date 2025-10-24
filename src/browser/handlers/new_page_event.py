@@ -1,5 +1,5 @@
 import logging
-from browser.recorder import StepRecord
+from browser.recorder import Recorder
 
 logger = logging.getLogger(__name__)
 
@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 class NewPageEvent:
     def __init__(self):
         self._page_event_handlers = {}
-        self.step_record = StepRecord()
+        self.recorder = Recorder()
 
     async def attach_page(self, page):
         #  Guarantee that all resources of the page have been loaded
@@ -22,7 +22,7 @@ class NewPageEvent:
             # Bind page at definition time to avoid late-binding issues
             async def on_domcontentloaded(p=page):
                 # logger.info(f"[PAGE_EVENT] DOM content loaded for {p.url}")
-                await self.step_record.record_step(
+                await self.recorder.record_step(
                     {
                         "event_info": {
                             "event_type": "domcontentloaded",
@@ -39,7 +39,7 @@ class NewPageEvent:
                 # Scripts are already injected by context.add_init_script
 
                 # Record page load as a high-level event
-                await self.step_record.record_step(
+                await self.recorder.record_step(
                     {
                         "event_info": {
                             "event_type": "loaded",
@@ -55,7 +55,7 @@ class NewPageEvent:
                 if frame == p.main_frame:  # Only track main frame navigation
                     # logger.info(f"[PAGE_EVENT] Main frame navigated to {frame.url}")
                     # Scripts are already injected by context.add_init_script
-                    await self.step_record.record_step(
+                    await self.recorder.record_step(
                         {
                             "event_info": {
                                 "event_type": "navigated",
@@ -70,7 +70,7 @@ class NewPageEvent:
 
             async def on_close(p=page):
                 # logger.info(f"[PAGE_EVENT] Tab/page closed: {p.url}")
-                await self.step_record.record_step(
+                await self.recorder.record_step(
                     {
                         "event_info": {
                             "event_type": "tab_closed",

@@ -14,7 +14,7 @@ from db.step import Step
 logger = logging.getLogger(__name__)
 
 
-class StepRecord:
+class Recorder:
     _SNAPSHOT_TRIGGERS = {
         ("state:page", "load"),
         ("state:page", "domcontentloaded"),

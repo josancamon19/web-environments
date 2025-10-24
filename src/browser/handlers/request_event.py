@@ -19,8 +19,8 @@ class RequestEvent:
 
     def __init__(self):
         if not self._initialized:
-            self.stepManager = StepManager()
-            self.taskManager = TaskManager()
+            self.step_manager = StepManager()
+            self.task_manager = TaskManager()
             self.request_step_counter = 0
             self.request_map = {}
             self.db = Database.get_instance()
@@ -64,11 +64,11 @@ class RequestEvent:
 
         # Don't create a step - just insert into requests table
         # Get the current step if it exists, otherwise use None
-        current_step = self.stepManager.get_actual_step()
+        current_step = self.step_manager.get_actual_step()
         step_id = current_step.id if current_step else None
 
         # Get the current task
-        current_task = self.taskManager.get_actual_task()
+        current_task = self.task_manager.get_actual_task()
         if not current_task:
             logger.warning("[REQUEST] No active task found, skipping request recording")
             return

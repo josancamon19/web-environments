@@ -19,7 +19,7 @@ class ResponseEvent:
 
     def __init__(self):
         if not self._initialized:
-            self.taskManager = TaskManager()
+            self.task_manager = TaskManager()
             self.request_event = RequestEvent()
             self.db = Database.get_instance()
             ResponseEvent._initialized = True
@@ -60,7 +60,7 @@ class ResponseEvent:
 
         # Don't create a step - just insert into responses table
         # Get the current task
-        current_task = self.taskManager.get_actual_task()
+        current_task = self.task_manager.get_actual_task()
         if not current_task:
             logger.warning(
                 "[RESPONSE] No active task found, skipping response recording"
