@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, Optional, Sequence, Set, Tuple
 
 
 logger = logging.getLogger(__name__)
@@ -17,11 +17,14 @@ class StepEntry:
 
 class TaskStepExecutor:
     def __init__(
-        self, steps: Sequence[StepEntry], *, is_human_trajectory: bool = False
+        self, steps: Sequence[StepEntry], *, run_human_trajectory: bool = False,  recorded_documents: Optional[Set[str]] = None
     ):
         self.steps = list(steps)
-        self.is_human_trajectory = is_human_trajectory
+        self.run_human_trajectory = run_human_trajectory
         self._initial_navigation_done = False
+        self.recorded_documents = {url.rstrip("/") for url in recorded_documents or set()}
+
+
 
     async def run(self, page) -> None:
         if page.url and page.url != "about:blank":
@@ -38,12 +41,12 @@ class TaskStepExecutor:
                     exc,
                     exc_info=True,
                 )
-            await asyncio.sleep(0.2 if self.is_human_trajectory else 0.1)
+            await asyncio.sleep(0.2 if self.run_human_trajectory else 0.1)
 
     async def _run_step(self, page, step: StepEntry) -> None:
         category, subject, action = self._split_event_type(step.event_type)
 
-        if category == "state":
+        if category == "state" and subject == "browser" and action == "navigated":
             await self._handle_state_step(page, subject, action, step.event_data)
             return
 
@@ -58,7 +61,11 @@ class TaskStepExecutor:
             if not url or url == "about:blank":
                 return
             if not self._initial_navigation_done or self._urls_differ(page.url, url):
-                await self._safe_goto(page, url)
+                normalized = url.rstrip("/")
+                if normalized in self.recorded_documents:
+                    await self._safe_goto(page, url)
+                else:
+                    await self._ensure_location(page, url)
                 self._initial_navigation_done = True
             return
 
@@ -201,6 +208,43 @@ class TaskStepExecutor:
                 prefix = (tag or "*").lower() if tag else "*"
                 return f"{prefix}{''.join('.' + cls for cls in classes)}"
         return None
+    
+    async def _ensure_location(self, page, url: str) -> None:
+        normalized = url.rstrip("/")
+        try:
+            await page.wait_for_function(
+                "expected => window.location.href.replace(/\\/+$/, '') === expected",
+                normalized,
+                timeout=3000,
+            )
+            return
+        except Exception:
+            pass
+
+        await page.evaluate(
+            (
+                "expected => {"
+                "  const current = window.location.href.replace(/\\/+$/, '');"
+                "  if (current === expected) return true;"
+                "  const currentBase = current.split('#', 1)[0];"
+                "  const expectedParts = expected.split('#', 2);"
+                "  const expectedBase = expectedParts[0];"
+                "  const expectedHash = expectedParts.length > 1 ? expectedParts[1] : null;"
+                "  if (expectedHash !== null && currentBase === expectedBase) {"
+                "    const targetHash = '#' + expectedHash;"
+                "    if (window.location.hash === targetHash) return true;"
+                "    window.location.hash = expectedHash;"
+                "    window.dispatchEvent(new HashChangeEvent('hashchange', { newURL: window.location.href, oldURL: current }));"
+                "    return true;"
+                "  }"
+                "  window.history.replaceState(null, document.title, expected);"
+                "  window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));"
+                "  return true;"
+                " }"
+            ),
+            normalized,
+        )
+        await page.wait_for_timeout(200)
 
     @staticmethod
     def _is_valid_point(point: Any) -> bool:
