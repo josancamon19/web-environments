@@ -22,6 +22,14 @@ dependencies = [
     "typer>=0.19.2",
 ]
 
+[project.scripts]
+web-envs = "main:cli"
+postprocess-toolcalls = "scripts.postprocessing._1_tool_calls_format:parse"
+postprocess-credentials = "scripts.postprocessing._2_credentials:main"
+postprocess-set-checkpoints = "scripts.postprocessing._3_determine_checkpoints:main"
+launch-environment = "environments.launch:main"
+evaluate-browseruse = "eval.run.browseruse:_main"
+
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
