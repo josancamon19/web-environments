@@ -63,6 +63,30 @@ class Database:
             self.conn.commit()
             logger.info("Migration completed successfully")
 
+    @staticmethod
+    def _parse_iso_datetime(timestamp_str: str) -> datetime:
+        """Parse ISO datetime string, handling both old (with hyphens) and new (proper ISO) formats"""
+        # Normalize the timestamp string
+        normalized = timestamp_str.replace("Z", "+00:00")
+
+        # Try parsing as-is first (proper ISO format)
+        try:
+            return datetime.fromisoformat(normalized)
+        except ValueError:
+            pass
+
+        # If that fails, it might be the old format with hyphens in the time part
+        # Format: 2025-10-24T06-28-30.794+00:00 should become 2025-10-24T06:28:30.794+00:00
+        # Only replace hyphens in the time part (after the 'T')
+        if "T" in normalized:
+            date_part, time_part = normalized.split("T", 1)
+            # Replace first two hyphens in time part with colons (HH-MM-SS -> HH:MM:SS)
+            time_part = time_part.replace("-", ":", 2)
+            normalized = f"{date_part}T{time_part}"
+            return datetime.fromisoformat(normalized)
+
+        raise ValueError(f"Cannot parse timestamp: {timestamp_str}")
+
     def close(self):
         """Close database connection"""
         try:
@@ -130,8 +154,8 @@ class Database:
             row = cur.fetchone()
             if row and row[0]:
                 start_raw = row[0]
-                end_dt = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
-                start_dt = datetime.fromisoformat(start_raw.replace("Z", "+00:00"))
+                end_dt = self._parse_iso_datetime(ended_at)
+                start_dt = self._parse_iso_datetime(start_raw)
                 duration_seconds = round((end_dt - start_dt).total_seconds(), 3)
         except Exception as exc:
             logger.warning("Failed to compute duration for task %s: %s", task_id, exc)
