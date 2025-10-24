@@ -20,6 +20,7 @@ def find_navigation_after_step(steps_list, current_idx, max_lookahead=10):
         _, event_type, event_data_str, _, _ = steps_list[i]
         if event_type in [
             "state:browser:navigated",
+            "state:browser:route_change",
             "state:page:navigate_start",
             "state:page:load",
             "state:page:loaded",
@@ -70,7 +71,7 @@ def handle_domain_navigation(
             last_url = tc.params.get("url", "")
             break
 
-    # Extract domain from URLs
+    # TODO: consider SPA's as change of go_to? not sure
     if last_url:
         last_domain = urllib.parse.urlparse(last_url).netloc
         new_domain = urllib.parse.urlparse(url).netloc
