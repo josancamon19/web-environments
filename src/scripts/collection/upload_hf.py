@@ -108,7 +108,9 @@ def process_tasks(jsonl_path: Path, db_path: Path, bucket_name: str) -> pd.DataF
                 "website_url": task.get("website_url"),
                 "num_steps": task.get("num_steps"),
                 "duration_seconds": task.get("duration_seconds"),
-                "golden_trajectory": task.get("tool_calls", []),  # Human-performed trajectory
+                "golden_trajectory": task.get(
+                    "tool_calls", []
+                ),  # Human-performed trajectory
                 "answer": task.get("answer"),
                 "checkpoints": task.get("checkpoints", []),
                 "checkpoints_reasoning": task.get("checkpoints_reasoning", []),
@@ -159,14 +161,14 @@ def upload_to_huggingface(file_path: Path, repo_id: str) -> None:
     try:
         console.print(f"[cyan]Checking repository: {repo_id}...[/cyan]")
         api.repo_info(repo_id=repo_id, repo_type="dataset", token=token)
-        console.print(f"[green]✓ Repository exists[/green]")
+        console.print("[green]✓ Repository exists[/green]")
     except Exception:
         console.print(f"[yellow]Repository not found. Creating: {repo_id}...[/yellow]")
         try:
             api.create_repo(
                 repo_id=repo_id, repo_type="dataset", token=token, private=False
             )
-            console.print(f"[green]✓ Repository created[/green]")
+            console.print("[green]✓ Repository created[/green]")
         except Exception as e:
             console.print(f"[red]✗ Failed to create repository: {e}[/red]")
             raise
@@ -182,7 +184,7 @@ def upload_to_huggingface(file_path: Path, repo_id: str) -> None:
             repo_type="dataset",
             token=token,
         )
-        console.print(f"[green]✓ Successfully uploaded parquet file[/green]")
+        console.print("[green]✓ Successfully uploaded parquet file[/green]")
 
         # Upload README.md if it exists in the same directory
         readme_path = file_path.parent / "README.md"
@@ -194,7 +196,7 @@ def upload_to_huggingface(file_path: Path, repo_id: str) -> None:
                 repo_type="dataset",
                 token=token,
             )
-            console.print(f"[green]✓ Successfully uploaded README.md[/green]")
+            console.print("[green]✓ Successfully uploaded README.md[/green]")
 
         console.print(
             f"[green]✓ View dataset at: https://huggingface.co/datasets/{repo_id}[/green]"

@@ -7,9 +7,9 @@ from db.database import Database
 from utils.get_iso_datetime import get_iso_datetime
 from db.task import TaskManager
 from browser.page import ActualPage
-from steps.step import StepManager
+from db.step import StepManager
 from utils.get_screenshot_path import get_screenshot_path
-from steps.step import Step
+from db.step import Step
 
 logger = logging.getLogger(__name__)
 

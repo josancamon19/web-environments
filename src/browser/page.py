@@ -36,7 +36,7 @@ class ActualPage:
 
 class NewPageEvent:
     def __init__(self):
-        from steps.step_record import StepRecord
+        from browser.step_record import StepRecord
 
         self._page_event_handlers = {}
         self.step_record = StepRecord()

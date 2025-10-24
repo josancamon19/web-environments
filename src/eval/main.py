@@ -1,22 +1,18 @@
 import json
 import logging
+import os
+import sys
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import dspy
-from dspy.teleprompt.utils import shutil
-import typer
-from tasks.db_to_jsonl_format import BaseToolCallData
-
-import sys
-import os
 import mlflow
+import typer
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-from src.config.storage_config import DATA_DIR
-
-from src.eval.judges import JudgeCompletion
+from src.config.storage_config import DATA_DIR  # noqa: E402
+from src.eval.judges import JudgeCompletion  # noqa: E402
 
 # Disable MLflow logging to avoid spam warnings
 os.environ["MLFLOW_TRACKING_URI"] = ""

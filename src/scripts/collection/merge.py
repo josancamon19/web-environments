@@ -48,7 +48,7 @@ class DataMerger:
             new_id = start_id + idx + 1
             self.task_id_map[old_id] = new_id
 
-        print(f"\n📋 Task ID Mapping:")
+        print("\n📋 Task ID Mapping:")
         for old_id, new_id in self.task_id_map.items():
             print(f"   task_{old_id} → task_{new_id}")
 
@@ -381,7 +381,7 @@ class DataMerger:
             print(f"   ❌ Found {orphaned_steps} orphaned steps in new tasks!")
             all_good = False
         else:
-            print(f"   ✓ All new steps have valid task_id references")
+            print("   ✓ All new steps have valid task_id references")
 
         cursor.execute(
             f"""
@@ -396,7 +396,7 @@ class DataMerger:
             print(f"   ❌ Found {orphaned_requests} orphaned requests in new tasks!")
             all_good = False
         else:
-            print(f"   ✓ All new requests have valid task_id references")
+            print("   ✓ All new requests have valid task_id references")
 
         cursor.execute(
             f"""
@@ -411,7 +411,7 @@ class DataMerger:
             print(f"   ❌ Found {orphaned_responses} orphaned responses in new tasks!")
             all_good = False
         else:
-            print(f"   ✓ All new responses have valid task_id references")
+            print("   ✓ All new responses have valid task_id references")
 
         return all_good
 
@@ -425,7 +425,7 @@ class DataMerger:
         max_task_id = self.get_max_task_id()
         source_task_ids = self.get_source_task_ids()
 
-        print(f"\n📊 Current state:")
+        print("\n📊 Current state:")
         print(f"   Target DB max task ID: {max_task_id}")
         print(f"   Source tasks to merge: {source_task_ids}")
         print(f"   New IDs will start from: {max_task_id + 1}")
@@ -464,7 +464,7 @@ class DataMerger:
             print("\n" + "=" * 70)
             print("✅ MERGE COMPLETED SUCCESSFULLY!")
             print("=" * 70)
-            print(f"📈 Summary:")
+            print("📈 Summary:")
             print(f"   Tasks copied: {tasks_copied}")
             print(f"   Steps copied: {steps_copied}")
             print(f"   Requests copied: {requests_copied}")

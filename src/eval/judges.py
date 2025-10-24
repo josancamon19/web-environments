@@ -1,17 +1,18 @@
 from dspy.predict.react import ReAct
 
 import json
+import logging
+import os
 from pathlib import Path
-from typing import List
+from typing import Dict, Any, List
 
 import dspy
-from tasks.db_to_jsonl_format import BaseToolCallData
-
-import logging
-from typing import Dict, Any
-
-import os
 import mlflow
+
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+from src.scripts.postprocessing.db_to_jsonl_format import BaseToolCallData  # noqa: E402
 
 
 # Disable MLflow logging to avoid spam warnings
