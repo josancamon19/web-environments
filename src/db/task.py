@@ -8,7 +8,12 @@ logger = logging.getLogger(__name__)
 
 class Task:
     def __init__(
-        self, id: int, description: str, task_type: str = "action", source: str = "none", website: Optional[str] = None
+        self,
+        id: int,
+        description: str,
+        task_type: str = "action",
+        source: str = "none",
+        website: Optional[str] = None,
     ):
         self.id = id
         self.description = description
@@ -19,7 +24,11 @@ class Task:
 
 class CreateTaskDto:
     def __init__(
-        self, description: str, task_type: str = "action", source: str = "none", website: Optional[str] = None
+        self,
+        description: str,
+        task_type: str = "action",
+        source: str = "none",
+        website: Optional[str] = None,
     ):
         self.description = description
         self.task_type = task_type

@@ -3,7 +3,7 @@ import sqlite3
 from datetime import datetime
 from typing import Optional
 from utils.get_iso_datetime import get_iso_datetime
-from source_data.schema import SCHEMA_SQL
+from db.schema import SCHEMA_SQL
 from config.storage_config import DB_PATH
 import logging
 

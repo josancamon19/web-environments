@@ -11,9 +11,9 @@ from playwright.async_api import BrowserContext, Request, Response
 
 from config.browser_config import CONTEXT_CONFIG
 from config.storage_config import DATA_DIR
-from tasks.task import TaskManager, Task
+from db.task import TaskManager, Task
 from utils.get_iso_datetime import get_iso_datetime
-from source_data.database import Database
+from db.database import Database
 
 
 logger = logging.getLogger(__name__)

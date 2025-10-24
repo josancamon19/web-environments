@@ -1,4 +1,4 @@
-from source_data.database import Database
+from db.database import Database
 
 
 class Step:

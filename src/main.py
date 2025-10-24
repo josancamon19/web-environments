@@ -3,7 +3,7 @@ import signal
 import logging
 from browser.stealth_browser import StealthBrowser
 from config.initial_tasks import InitialTasks
-from tasks.task import TaskManager, CreateTaskDto, Task
+from db.task import TaskManager, CreateTaskDto, Task
 from utils.get_task_description import (
     get_task_description_from_user,
     get_task_type_from_user,
@@ -43,7 +43,9 @@ async def main():
 
         new_task = CreateTaskDto(task_description, task_type, source, website)
         task_id = task_manager.save_task(new_task)
-        task_manager.set_actual_task(Task(task_id, task_description, task_type, source, website))
+        task_manager.set_actual_task(
+            Task(task_id, task_description, task_type, source, website)
+        )
 
         logger.info(f"Task saved: {task_id}")
 

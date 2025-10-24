@@ -1,7 +1,7 @@
 import os
 import logging
 from config.storage_config import SCREENSHOTS_DIR, VIDEOS_DIR, DB_PATH
-from source_data.database import Database
+from db.database import Database
 
 logger = logging.getLogger(__name__)
 

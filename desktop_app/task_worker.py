@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 
 from src.browser.stealth_browser import StealthBrowser
 from src.config.initial_tasks import InitialTasks
-from src.tasks.task import CreateTaskDto, Task, TaskManager
+from src.db.task import CreateTaskDto, Task, TaskManager
 
 logger = logging.getLogger(__name__)
 

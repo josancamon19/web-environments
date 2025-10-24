@@ -65,13 +65,18 @@ class ReplayBundle:
 
     def load_steps(self) -> list[StepEntry]:
         if not self.task_id:
-            logger.warning("Bundle manifest does not include a task id; skipping step replay")
+            logger.warning(
+                "Bundle manifest does not include a task id; skipping step replay"
+            )
             return []
 
         db = Database.get_instance()
         conn = db.get_connection()
         if conn is None:
-            logger.error("Database connection unavailable; cannot load steps for task %s", self.task_id)
+            logger.error(
+                "Database connection unavailable; cannot load steps for task %s",
+                self.task_id,
+            )
             return []
 
         cursor = conn.cursor()
@@ -98,7 +103,9 @@ class ReplayBundle:
                 )
             )
 
-        logger.info("Loaded %d steps from database for task %s", len(steps), self.task_id)
+        logger.info(
+            "Loaded %d steps from database for task %s", len(steps), self.task_id
+        )
         return steps
 
     def guess_start_url(self) -> Optional[str]:

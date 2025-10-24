@@ -16,7 +16,9 @@ class StepEntry:
 
 
 class TaskStepExecutor:
-    def __init__(self, steps: Sequence[StepEntry], *, is_human_trajectory: bool = False):
+    def __init__(
+        self, steps: Sequence[StepEntry], *, is_human_trajectory: bool = False
+    ):
         self.steps = list(steps)
         self.is_human_trajectory = is_human_trajectory
         self._initial_navigation_done = False
@@ -48,7 +50,9 @@ class TaskStepExecutor:
         if category == "action" and subject == "user":
             await self._handle_user_action(page, action, step.event_data)
 
-    async def _handle_state_step(self, page, subject: str, action: str, payload: Dict[str, Any]) -> None:
+    async def _handle_state_step(
+        self, page, subject: str, action: str, payload: Dict[str, Any]
+    ) -> None:
         if subject == "browser" and action == "navigated":
             url = payload.get("url") if isinstance(payload, dict) else None
             if not url or url == "about:blank":
@@ -64,7 +68,9 @@ class TaskStepExecutor:
             elif action in {"loaded", "load"}:
                 await self._safe_wait_for_load(page, "load")
 
-    async def _handle_user_action(self, page, action: str, payload: Dict[str, Any]) -> None:
+    async def _handle_user_action(
+        self, page, action: str, payload: Dict[str, Any]
+    ) -> None:
         if action == "click":
             await self._perform_pointer_click(page, payload)
             return
@@ -105,7 +111,9 @@ class TaskStepExecutor:
         x = payload.get("x")
         y = payload.get("y")
         if isinstance(x, (int, float)) and isinstance(y, (int, float)):
-            await page.evaluate("(coords) => window.scrollTo(coords.x, coords.y)", {"x": x, "y": y})
+            await page.evaluate(
+                "(coords) => window.scrollTo(coords.x, coords.y)", {"x": x, "y": y}
+            )
 
     async def _perform_input(self, page, payload: Dict[str, Any]) -> None:
         value = payload.get("value") if isinstance(payload, dict) else None
@@ -144,7 +152,9 @@ class TaskStepExecutor:
         except Exception as exc:
             logger.debug("Load wait for %s skipped: %s", state, exc)
 
-    def _extract_coordinates(self, payload: Dict[str, Any]) -> Optional[Tuple[float, float]]:
+    def _extract_coordinates(
+        self, payload: Dict[str, Any]
+    ) -> Optional[Tuple[float, float]]:
         coords = payload.get("coordinates") if isinstance(payload, dict) else None
         if isinstance(coords, dict):
             for key in ("client", "page", "offset"):
@@ -184,7 +194,9 @@ class TaskStepExecutor:
         class_name = payload.get("className") if isinstance(payload, dict) else None
         tag = payload.get("tag") if isinstance(payload, dict) else None
         if class_name:
-            classes = [self._css_escape(part) for part in str(class_name).split() if part]
+            classes = [
+                self._css_escape(part) for part in str(class_name).split() if part
+            ]
             if classes:
                 prefix = (tag or "*").lower() if tag else "*"
                 return f"{prefix}{''.join('.' + cls for cls in classes)}"
@@ -217,6 +229,7 @@ class TaskStepExecutor:
             return True
         return current.rstrip("/") != target.rstrip("/")
 
+
 # Escape characters for CSS selectors
 CSS_ESCAPE_MAP = {
     "\n": "\\A ",
@@ -229,4 +242,3 @@ CSS_ESCAPE_MAP = {
     "#": "\\#",
     ":": "\\:",
 }
-

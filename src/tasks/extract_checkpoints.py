@@ -1,17 +1,16 @@
 import json
+import os
+import sys
 from concurrent.futures import ThreadPoolExecutor
-from typing import List
-from pathlib import Path
 from datetime import datetime
+from typing import List
+
 import dspy
 import mlflow
 from tasks.db_to_jsonl_format import BaseToolCallData
 
-import sys
-import os
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-from src.config.storage_config import DATA_DIR
+from src.config.storage_config import DATA_DIR  # noqa: E402
 
 
 def get_checkpoint_extractor(checkpoints: int = 2):

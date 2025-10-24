@@ -3,13 +3,12 @@ from playwright.async_api import async_playwright
 from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
 from config.stealth_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
 from steps.step_record import StepRecord
-from page.actual_page import ActualPage
+from browser.page import ActualPage, NewPageEvent
 from utils.get_tasks_video_path import get_tasks_video_path
 from tasks.task import TaskManager
 import sys
 from browser.request_event import Request_Event
 from browser.response_event import Response_Event
-from page.new_page_event import NewPageEvent
 import os
 from config.storage_config import DATA_DIR
 from capture.offline_capture import OfflineCaptureManager

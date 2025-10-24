@@ -3,10 +3,10 @@ import json
 import logging
 from typing import Any, Dict, Optional, Tuple
 
-from source_data.database import Database
+from db.database import Database
 from utils.get_iso_datetime import get_iso_datetime
-from tasks.task import TaskManager
-from page.actual_page import ActualPage
+from db.task import TaskManager
+from browser.page import ActualPage
 from steps.step import StepManager
 from utils.get_screenshot_path import get_screenshot_path
 from steps.step import Step

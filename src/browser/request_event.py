@@ -1,9 +1,9 @@
 import logging
-from tasks.task import TaskManager
 from steps.step import StepManager
 import json
 from utils.get_iso_datetime import get_iso_datetime
-from source_data.database import Database
+from src.db.task import TaskManager
+from src.db.database import Database
 
 logger = logging.getLogger(__name__)
 
