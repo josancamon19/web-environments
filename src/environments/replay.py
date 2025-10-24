@@ -17,10 +17,10 @@ class StepEntry:
 
 class TaskStepExecutor:
     def __init__(
-        self, steps: Sequence[StepEntry], *, is_human_trajectory: bool = False
+        self, steps: Sequence[StepEntry], *, run_human_trajectory: bool = False
     ):
         self.steps = list(steps)
-        self.is_human_trajectory = is_human_trajectory
+        self.run_human_trajectory = run_human_trajectory
         self._initial_navigation_done = False
 
     async def run(self, page) -> None:
@@ -38,7 +38,7 @@ class TaskStepExecutor:
                     exc,
                     exc_info=True,
                 )
-            await asyncio.sleep(0.2 if self.is_human_trajectory else 0.1)
+            await asyncio.sleep(0.2 if self.run_human_trajectory else 0.1)
 
     async def _run_step(self, page, step: StepEntry) -> None:
         category, subject, action = self._split_event_type(step.event_type)

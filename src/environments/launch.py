@@ -1,4 +1,3 @@
-import argparse
 import asyncio
 import json
 import logging
@@ -7,6 +6,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+import typer
 from playwright.async_api import Browser, BrowserContext, Route
 
 from db.database import Database
@@ -300,14 +300,14 @@ async def _cli(
     *,
     headless: bool,
     allow_fallback: bool,
-    is_human_trajectory: bool,
+    run_human_trajectory: bool,
 ) -> None:
     from playwright.async_api import async_playwright
 
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
     bundle = ReplayBundle(bundle_path)
-    steps = bundle.load_steps() if is_human_trajectory else []
+    steps = bundle.load_steps() if run_human_trajectory else []
 
     async with async_playwright() as pw:
         launch_kwargs: Dict[str, Any] = {"headless": headless}
@@ -330,44 +330,41 @@ async def _cli(
         logger.info("Opening %s", start_url)
         await page.goto(start_url)
         if steps:
-            executor = TaskStepExecutor(steps, is_human_trajectory=is_human_trajectory)
+            executor = TaskStepExecutor(
+                steps, run_human_trajectory=run_human_trajectory
+            )
             await executor.run(page)
         await asyncio.Event().wait()
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Replay a captured browser bundle offline"
-    )
-    parser.add_argument(
-        "bundle", type=Path, help="Path to the capture bundle directory"
-    )
-    parser.add_argument(
-        "--headless", action="store_true", help="Run browser in headless mode"
-    )
-    parser.add_argument(
-        "--allow-network-fallback",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="Allow requests missing from the bundle to hit the live network",
-    )
-    parser.add_argument(
-        "--is-human-trajectory",
-        action="store_true",
-        help="Replay timing with human-like pacing",
-    )
+app = typer.Typer(help="Replay a captured browser bundle offline")
 
-    args = parser.parse_args()
+
+@app.command()
+def main(
+    bundle: Path = typer.Argument(..., help="Path to the capture bundle directory"),
+    headless: bool = typer.Option(False, help="Run browser in headless mode"),
+    allow_network_fallback: bool = typer.Option(
+        True, help="Allow requests missing from the bundle to hit the live network"
+    ),
+    run_human_trajectory: bool = typer.Option(
+        False, help="Replay timing with human-like pacing"
+    ),
+):
+    """Replay a captured browser bundle offline."""
     asyncio.run(
         _cli(
-            args.bundle.expanduser().resolve(),
-            headless=args.headless,
-            allow_fallback=args.allow_network_fallback,
-            is_human_trajectory=args.is_human_trajectory,
+            bundle.expanduser().resolve(),
+            headless=headless,
+            allow_fallback=allow_network_fallback,
+            run_human_trajectory=run_human_trajectory,
         )
     )
-    json.dumps(args, indent=2, ensure_ascii=False)
+
+
+def _main():
+    app()
 
 
 if __name__ == "__main__":
-    main()
+    app()
