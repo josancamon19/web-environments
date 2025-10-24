@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional, Tuple
 from playwright.async_api import Browser, BrowserContext, Route
 
 from db.database import Database
-from capture.replay_task import StepEntry, TaskStepExecutor
+from environments.replay import StepEntry, TaskStepExecutor
 
 
 logger = logging.getLogger(__name__)

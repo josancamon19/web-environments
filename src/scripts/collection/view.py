@@ -126,7 +126,7 @@ def main():
     st.set_page_config(page_title="Task Viewer", page_icon="📋", layout="wide")
 
     st.title("📋 Task Viewer & Editor")
-    project_root = Path(__file__).parent.parent.parent
+    project_root = Path(__file__).parent.parent.parent.parent
     db_path = project_root / "data" / "tasks.db"
     data_dir = project_root / "data"
 

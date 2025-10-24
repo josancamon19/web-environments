@@ -14,9 +14,9 @@ from kernel import Kernel
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-from src.capture.sandbox import SandboxEnvironment, resolve_recorded_bundle
-from src.config.browser_config import CONTEXT_CONFIG
-from src.config.storage_config import DATA_DIR
+from environments.environment import SandboxEnvironment, resolve_recorded_bundle  # noqa: E402
+from config.browser_config import CONTEXT_CONFIG  # noqa: E402
+from config.storage_config import DATA_DIR  # noqa: E402
 
 load_dotenv()
 
@@ -129,16 +129,16 @@ def extract_tool_calls(history: list[dict]) -> List[Dict[str, Any]]:
                                     click_params["selector"] = f"#{attrs['id']}"
                                 elif "jsname" in attrs and attrs["jsname"]:
                                     # jsname is Google's custom attribute that acts like an ID
-                                    click_params["selector"] = (
-                                        f"[jsname='{attrs['jsname']}']"
-                                    )
+                                    click_params[
+                                        "selector"
+                                    ] = f"[jsname='{attrs['jsname']}']"
                                 elif "class" in attrs and attrs["class"]:
                                     classes = attrs["class"].replace(" ", ".")
                                     click_params["selector"] = f"{node_name}.{classes}"
                                 elif "href" in attrs:
-                                    click_params["selector"] = (
-                                        f"{node_name}[href='{attrs['href']}']"
-                                    )
+                                    click_params[
+                                        "selector"
+                                    ] = f"{node_name}[href='{attrs['href']}']"
                                 else:
                                     click_params["selector"] = node_name or "*"
 
@@ -360,12 +360,24 @@ async def run_task_with_agent(
                 device_scale_factor=1.0,
             )
 
+        sensitive_data = None
+        if "credentials" in task and task["credentials"]:
+            sensitive_data = {}
+            for cred in task["credentials"]:
+                website = cred.get("website")
+                fields = cred.get("fields", {})
+                if website and fields:
+                    domain_patterns = [f"https://*.{website}", f"https://{website}"]
+                    for pattern in domain_patterns:
+                        sensitive_data[pattern] = fields
+
         agent = Agent(
             browser_session=browser,
             task=f"Open {task['website_url']} and {task['task_description'].lower()}",
             llm=llm,
             verbose=True,
             register_new_step_callback=capture_accessibility_tree,
+            sensitive_data=sensitive_data,
         )
 
         history = await agent.run(max_steps=30)
@@ -420,6 +432,7 @@ async def run_task_with_agent(
         "answer": answer,
         "usage_summary": usage_summary,
         "step_dom_mapping": step_dom_mapping,
+        "credentials": task.get("credentials"),
         "dump": history_dump,
     }
 
@@ -514,6 +527,7 @@ async def process_single_task(
                 "answer": None,
                 "usage_summary": {},
                 "step_dom_mapping": {},
+                "credentials": task.get("credentials"),
             }
 
             # Write error result to individual JSON file

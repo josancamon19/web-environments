@@ -10,7 +10,7 @@ from typing import List, Optional
 from playwright.async_api import Browser as PlaywrightBrowser
 from playwright.async_api import BrowserContext, BrowserType, async_playwright
 
-from capture.replay import ReplayBundle
+from environments.launch import ReplayBundle
 from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
 
 

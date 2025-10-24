@@ -7,7 +7,7 @@ from typing import List
 
 import dspy
 import mlflow
-from src.scripts.postprocessing.db_to_jsonl_format import BaseToolCallData
+from src.scripts.postprocessing._1_tool_calls_format import BaseToolCallData
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.config.storage_config import DATA_DIR  # noqa: E402

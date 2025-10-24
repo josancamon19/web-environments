@@ -13,7 +13,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Protocol
-from capture.sandbox import SandboxEnvironment
+from environments.environment import SandboxEnvironment
 
 logger = logging.getLogger(__name__)
 
@@ -108,4 +108,5 @@ class SessionProvider(Protocol):
         window_size: Dict[str, int],
         sandbox_bundle: Optional[Path],
         sandbox_log_dir: Optional[Path],
-    ) -> SessionResources: ...
+    ) -> SessionResources:
+        ...
