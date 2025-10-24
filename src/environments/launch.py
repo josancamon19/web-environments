@@ -311,11 +311,15 @@ async def _cli(
 
     async with async_playwright() as pw:
         launch_kwargs: Dict[str, Any] = {"headless": headless}
-        channel = os.environ.get("REPLAY_BROWSER_CHANNEL") or os.environ.get(
-            "RECORDER_BROWSER_CHANNEL"
+        # Default to chrome channel for consistent behavior with recording
+        channel = (
+            # TODO: Requires the same environment variable as recording?
+            os.environ.get("REPLAY_BROWSER_CHANNEL")
+            or os.environ.get("RECORDER_BROWSER_CHANNEL")
+            or "chrome"
         )
-        if channel:
-            launch_kwargs["channel"] = channel
+        launch_kwargs["channel"] = channel
+        logger.info("Launching browser with channel: %s", channel)
 
         browser = await pw.chromium.launch(**launch_kwargs)
         context = await bundle.build_context(
