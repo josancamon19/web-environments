@@ -189,9 +189,9 @@ def process_single_task(
     cursor.execute(
         """
         SELECT id, event_type, event_data, dom_snapshot, timestamp
-        FROM steps 
-        WHERE task_id = ? 
-        ORDER BY id
+        FROM steps
+        WHERE task_id = ?
+        ORDER BY timestamp
     """,
         (task_id,),
     )
