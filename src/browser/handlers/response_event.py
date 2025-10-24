@@ -1,6 +1,6 @@
 import logging
 from db.task import TaskManager
-from browser.request_event import Request_Event
+from browser.handlers.request_event import RequestEvent
 import json
 from utils.get_iso_datetime import get_iso_datetime
 from db.database import Database
@@ -8,21 +8,21 @@ from db.database import Database
 logger = logging.getLogger(__name__)
 
 
-class Response_Event:
+class ResponseEvent:
     _instance = None
     _initialized = False
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(Response_Event, cls).__new__(cls)
+            cls._instance = super(ResponseEvent, cls).__new__(cls)
         return cls._instance
 
     def __init__(self):
         if not self._initialized:
             self.taskManager = TaskManager()
-            self.request_event = Request_Event()
+            self.request_event = RequestEvent()
             self.db = Database.get_instance()
-            Response_Event._initialized = True
+            ResponseEvent._initialized = True
 
     async def listen_for_response(self, response):
         try:

@@ -13,7 +13,7 @@ from kernel import Kernel
 
 from environments.environment import SandboxEnvironment, resolve_recorded_bundle
 from config.browser_config import CONTEXT_CONFIG
-from config.storage_config import DATA_DIR
+from config.storage import DATA_DIR
 
 load_dotenv()
 

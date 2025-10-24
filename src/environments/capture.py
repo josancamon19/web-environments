@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 from playwright.async_api import BrowserContext, Request, Response
 
 from config.browser_config import CONTEXT_CONFIG
-from config.storage_config import DATA_DIR
+from config.storage import DATA_DIR
 from db.task import TaskManager, Task
 from utils.get_iso_datetime import get_iso_datetime
 from db.database import Database

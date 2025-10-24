@@ -1,6 +1,6 @@
 import os
 import time
-from config.storage_config import SCREENSHOTS_DIR
+from config.storage import SCREENSHOTS_DIR
 
 
 def get_screenshot_path(task_id: int, event_name: str):

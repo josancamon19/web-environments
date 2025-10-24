@@ -1,0 +1,2 @@
+- new page (new tab)
+- request/response, refers to actual HTTP Request/Responses handling

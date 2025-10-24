@@ -1,16 +1,17 @@
 import logging
 from playwright.async_api import async_playwright
 from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
-from config.stealth_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
-from browser.step_record import StepRecord
-from browser.page import ActualPage, NewPageEvent
+from config.browser_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
+from browser.recorder import StepRecord
+from browser.page import ActualPage
+from browser.handlers.new_page_event import NewPageEvent
 from utils.get_tasks_video_path import get_tasks_video_path
 from db.task import TaskManager
 import sys
-from browser.request_event import Request_Event
-from browser.response_event import Response_Event
+from browser.handlers.request_event import RequestEvent
+from browser.handlers.response_event import ResponseEvent
 import os
-from config.storage_config import DATA_DIR
+from config.storage import DATA_DIR
 from environments.capture import OfflineCaptureManager
 
 logger = logging.getLogger(__name__)
@@ -22,8 +23,8 @@ class StealthBrowser:
         self.browser = None
         self.context = None
         self.page = None
-        self.request_event = Request_Event()
-        self.response_event = Response_Event()
+        self.request_event = RequestEvent()
+        self.response_event = ResponseEvent()
         self.step_record = StepRecord()
         self.page_event = NewPageEvent()
         self.offline_capture = OfflineCaptureManager()

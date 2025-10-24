@@ -1,8 +1,8 @@
 import asyncio
 import signal
 import logging
-from browser.stealth_browser import StealthBrowser
-from config.initial_tasks import InitialTasks
+from browser.browser import StealthBrowser
+from config.start import InitialTasks
 from db.task import TaskManager, CreateTaskDto, Task
 from utils.get_task_description import (
     get_task_description_from_user,

@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 from html.parser import HTMLParser
 from datetime import datetime
-from config.storage_config import DATA_DIR
+from config.storage import DATA_DIR
 from models import ToolCall, ToolCallData
 
 

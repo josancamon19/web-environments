@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional
 from utils.get_iso_datetime import get_iso_datetime
 from db.schema import SCHEMA_SQL
-from config.storage_config import DB_PATH
+from config.storage import DB_PATH
 import logging
 
 logger = logging.getLogger(__name__)

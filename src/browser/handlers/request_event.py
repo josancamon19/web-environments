@@ -8,13 +8,13 @@ from db.database import Database
 logger = logging.getLogger(__name__)
 
 
-class Request_Event:
+class RequestEvent:
     _instance = None
     _initialized = False
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(Request_Event, cls).__new__(cls)
+            cls._instance = super(RequestEvent, cls).__new__(cls)
         return cls._instance
 
     def __init__(self):
@@ -24,7 +24,7 @@ class Request_Event:
             self.request_step_counter = 0
             self.request_map = {}
             self.db = Database.get_instance()
-            Request_Event._initialized = True
+            RequestEvent._initialized = True
 
     def listen_for_request(self, request):
         try:

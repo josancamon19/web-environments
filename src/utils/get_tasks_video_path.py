@@ -1,7 +1,7 @@
 import os
 
 from utils.get_iso_datetime import get_safe_datetime_for_filename
-from config.storage_config import VIDEOS_DIR
+from config.storage import VIDEOS_DIR
 from db.task import TaskManager
 import logging
 

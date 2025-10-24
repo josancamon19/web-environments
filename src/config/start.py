@@ -1,9 +1,6 @@
 import os
-import logging
-from config.storage_config import SCREENSHOTS_DIR, VIDEOS_DIR, DB_PATH
+from config.storage import SCREENSHOTS_DIR, VIDEOS_DIR, DB_PATH
 from db.database import Database
-
-logger = logging.getLogger(__name__)
 
 
 class InitialTasks:
