@@ -50,9 +50,49 @@ if (!window.__RECORDER_EVENT_LISTENER_LOADED__) {
 
   console.log('🎯 Page event listener script loaded');
 
+  // Queue events until binding becomes available; also bridge iframe -> top frame via postMessage
+  window.__RECORDER_QUEUE__ = window.__RECORDER_QUEUE__ || [];
+
+  function enqueueEvent(eventPayload) {
+    try {
+      window.__RECORDER_QUEUE__.push(eventPayload);
+    } catch (_) {}
+  }
+
+  function flushQueuedEvents() {
+    try {
+      if (typeof window.onPageEvent === 'function' && Array.isArray(window.__RECORDER_QUEUE__) && window.__RECORDER_QUEUE__.length) {
+        const batch = window.__RECORDER_QUEUE__.splice(0, window.__RECORDER_QUEUE__.length);
+        for (const evt of batch) {
+          try { window.onPageEvent(evt); } catch (_) { /* stop flushing on hard failure */ break; }
+        }
+      }
+    } catch (_) {}
+  }
+
+  // Periodically try to flush queue in case binding is registered later
+  try { setInterval(flushQueuedEvents, 500); } catch (_) {}
+
+  // Listen for child iframes posting events to us
+  try {
+    window.addEventListener('message', (e) => {
+      try {
+        const data = e && e.data;
+        if (data && data.__RECORDER_EVENT__) {
+          const eventInfo = data.__RECORDER_EVENT__;
+          if (typeof window.onPageEvent === 'function') {
+            window.onPageEvent(eventInfo);
+          } else {
+            enqueueEvent(eventInfo);
+          }
+        }
+      } catch (_) {}
+    }, { capture: true });
+  } catch (_) {}
+
   function sendEventPage(type, context, payload) {
     try {
-      window.onPageEvent({
+      const eventObj = {
         event_type: type,
         event_context: context,
         event_data: payload,
@@ -62,7 +102,21 @@ if (!window.__RECORDER_EVENT_LISTENER_LOADED__) {
             page_url: window.location.href,
             page_title: document.title,
         }
-      });
+      };
+      if (typeof window.onPageEvent === 'function') {
+        window.onPageEvent(eventObj);
+      } else {
+        // If we're inside an iframe or binding not yet ready, try parent first, else queue
+        try {
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ __RECORDER_EVENT__: eventObj }, '*');
+          } else {
+            enqueueEvent(eventObj);
+          }
+        } catch (_) {
+          enqueueEvent(eventObj);
+        }
+      }
     } catch (e) {
       console.error('[RECORDER] Failed to send event:', e);
     }
@@ -403,5 +457,8 @@ if (!window.__RECORDER_EVENT_LISTENER_LOADED__) {
   } else {
     setupPageEventListener();
   }
+
+  // Attempt immediate flush in case binding exists already
+  try { flushQueuedEvents(); } catch (_) {}
 }
 """

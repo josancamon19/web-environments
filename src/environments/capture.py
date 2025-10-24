@@ -148,16 +148,35 @@ class OfflineCaptureManager:
         except Exception:
             headers = dict(getattr(request, "headers", {}))
 
+        # Safely capture POST data; prefer binary buffer and base64-encode if needed
         post_data = None
-        post_accessor = getattr(request, "post_data", None)
         try:
-            if callable(post_accessor):
+            post_data_buffer_accessor = getattr(request, "post_data_buffer", None)
+            if callable(post_data_buffer_accessor):
                 try:
-                    post_data = await post_accessor()
+                    data_bytes = await post_data_buffer_accessor()
                 except TypeError:
-                    post_data = post_accessor()
+                    data_bytes = post_data_buffer_accessor()
+                if data_bytes:
+                    try:
+                        # Try utf-8 first
+                        post_data = data_bytes.decode("utf-8")
+                    except UnicodeDecodeError:
+                        import base64
+
+                        post_data = base64.b64encode(data_bytes).decode("ascii")
+                else:
+                    post_data = None
             else:
-                post_data = post_accessor
+                # Fallback to post_data (string) if buffer not available
+                post_accessor = getattr(request, "post_data", None)
+                if callable(post_accessor):
+                    try:
+                        post_data = await post_accessor()
+                    except TypeError:
+                        post_data = post_accessor()
+                else:
+                    post_data = post_accessor
         except Exception:
             post_data = None
 

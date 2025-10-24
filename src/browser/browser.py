@@ -112,10 +112,12 @@ class StealthBrowser:
                 page = getattr(source, "page", None)
                 await self.page_event_handler(event_info, page)
 
+            # Expose at context-level
             await self.context.expose_binding("onPageEvent", _on_page_event)
             self._binding_registered = True
 
         if not self._page_script_registered:
+            # Ensure scripts initialize before any content
             await self.context.add_init_script(PAGE_EVENT_LISTENER_SCRIPT)
             self._page_script_registered = True
 
@@ -125,7 +127,26 @@ class StealthBrowser:
         if not page:
             return
         try:
+            # Expose at page-level as a fallback (useful for certain CSP/isolated worlds)
+            try:
+
+                async def _page_binding(source, event_info):
+                    p = getattr(source, "page", None)
+                    await self.page_event_handler(event_info, p)
+
+                await page.expose_binding("onPageEvent", _page_binding)
+            except Exception:
+                pass
             await page.evaluate(PAGE_EVENT_LISTENER_SCRIPT)
+            try:
+                # Also try to install on existing frames
+                for frame in page.frames:
+                    try:
+                        await frame.evaluate(PAGE_EVENT_LISTENER_SCRIPT)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
         except Exception as exc:
             logger.error("[PAGE_EVENT] Failed to initialize listener script: %s", exc)
 
@@ -184,6 +205,7 @@ class StealthBrowser:
                     headless=False,
                     args=BROWSER_ARGS,
                     ignore_default_args=ignore_default_args,
+                    bypass_csp=True,
                     record_video_dir=video_task_path,
                     record_video_size={"width": 1280, "height": 720},
                 )
@@ -197,6 +219,7 @@ class StealthBrowser:
                 headless=False,
                 args=BROWSER_ARGS,
                 ignore_default_args=ignore_default_args,
+                bypass_csp=True,
                 record_video_dir=video_task_path,
                 record_video_size={"width": 1280, "height": 720},
             )
@@ -214,6 +237,7 @@ class StealthBrowser:
             # Create context
             self.context = await self.browser.new_context(
                 **CONTEXT_CONFIG,
+                bypass_csp=True,
                 record_video_dir=video_task_path,
                 record_video_size={"width": 1280, "height": 720},
             )
