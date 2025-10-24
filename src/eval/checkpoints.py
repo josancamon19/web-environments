@@ -1,121 +1,53 @@
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import dspy
 import typer
-from tasks.db_to_jsonl_format import BaseToolCallData
+import mlflow
 
 import sys
 import os
-import mlflow
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.config.storage_config import DATA_DIR
-
-
-# TODO: requires to be a dspy.Agent
-class JudgeCheckpoint(dspy.Signature):
-    """
-    Judge if a model achieved a specific checkpoint goal in a browser task.
-
-    The checkpoint represents an intermediate milestone toward completing the task.
-    You should evaluate whether the model's actions and the state of the browser
-    (as reflected in the DOMs) indicate that this checkpoint goal was achieved.
-
-    The model may take different actions than the human, but if it achieves the
-    same intermediate goal described in the checkpoint reasoning, it should be
-    considered successful.
-    """
-
-    task: str = dspy.InputField(description="The full task description")
-    checkpoint_index: int = dspy.InputField(description="Checkpoint number (0 or 1)")
-    checkpoint_reasoning: str = dspy.InputField(
-        description="Description of what this checkpoint represents"
-    )
-    human_checkpoint_tool_call_index: int = dspy.InputField(
-        description="The tool call index in human trajectory where this checkpoint was reached"
-    )
-
-    agent_trajectory: List[BaseToolCallData] = dspy.InputField(
-        description="The model's complete trajectory of actions"
-    )
-    agent_doms_summary: str = dspy.InputField(
-        description="Summary of key DOMs the model accessed"
-    )
-
-    achieved: bool = dspy.OutputField(
-        description="Whether the model achieved this checkpoint goal"
-    )
-    reasoning: str = dspy.OutputField(
-        description="Explanation of why the checkpoint was or wasn't achieved"
-    )
-    confidence: float = dspy.OutputField(
-        description="Confidence score (0-1) for this judgment"
-    )
-
+from src.eval.judges import get_lm_judge
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def evaluate_single_checkpoint(
-    task_id: int,
-    checkpoint_idx: int,
-    checkpoint_tool_idx: int,
-    checkpoint_reasoning: str,
-    task_description: str,
-    model_trajectory: List[BaseToolCallData],
-    model_doms: Dict[str, str],
-    results_dir: Path,
-) -> Dict[str, Any]:
-    """Evaluate a single checkpoint for a task."""
+def _get_doms_available_for_task(task_id: int, results_dir: Path) -> List[int]:
+    """Get list of available DOM step indices for a task.
 
-    # Create a summary of DOMs (to avoid token limits)
-    # We'll use the first and last few DOMs as a representative sample
-    dom_summary_parts = []
-    dom_steps = sorted([int(k) for k in model_doms.keys()])
+    Args:
+        task_id: The task identifier
+        results_dir: Path to the results directory
 
-    # Sample some DOMs to avoid token limits
-    sample_steps = []
-    if len(dom_steps) > 0:
-        sample_steps.append(dom_steps[0])  # First
-        if len(dom_steps) > 1:
-            sample_steps.append(dom_steps[-1])  # Last
-        if len(dom_steps) > 2:
-            mid = len(dom_steps) // 2
-            sample_steps.append(dom_steps[mid])  # Middle
+    Returns:
+        Sorted list of step indices that have DOM files available
+    """
+    dom_dir = results_dir / "doms" / f"task_{task_id}"
+    step_indices = []
 
-    for step in sorted(set(sample_steps)):
-        dom_content = model_doms[str(step)]
-        # Truncate each DOM to avoid excessive tokens
-        truncated = (
-            dom_content[:2000] + "..." if len(dom_content) > 2000 else dom_content
-        )
-        dom_summary_parts.append(f"Step {step} DOM preview:\n{truncated}")
+    if not dom_dir.exists():
+        logger.debug(f"DOM directory not found for task {task_id}: {dom_dir}")
+        return step_indices
 
-    doms_summary = "\n\n".join(dom_summary_parts)
+    for dom_file in dom_dir.glob("step_*.txt"):
+        # Extract step number from filename like "step_5.txt"
+        step_name = dom_file.stem  # Gets "step_5" from "step_5.txt"
+        if step_name.startswith("step_"):
+            try:
+                step_idx = int(step_name[5:])  # Extract number after "step_"
+                step_indices.append(step_idx)
+            except ValueError:
+                logger.warning(f"Invalid step filename: {dom_file}")
+                continue
 
-    judge = dspy.Predict(JudgeCheckpoint)
-    result = judge(
-        task=task_description,
-        checkpoint_index=checkpoint_idx,
-        checkpoint_reasoning=checkpoint_reasoning,
-        human_checkpoint_tool_call_index=checkpoint_tool_idx,
-        agent_trajectory=model_trajectory,
-        agent_doms_summary=doms_summary,
-    )
-
-    score = 0.33 if result.achieved else 0.0
-
-    return {
-        "achieved": result.achieved,
-        "reasoning": result.reasoning,
-        "confidence": result.confidence,
-        "score": score,
-    }
+    return sorted(step_indices)
 
 
 def evaluate_checkpoints_for_task(
@@ -133,40 +65,42 @@ def evaluate_checkpoints_for_task(
         logger.warning(f"Task {task_id} does not have exactly 2 checkpoints, skipping")
         return None
 
-    task_description = task_data["task_description"]
-    model_trajectory = model_data["tool_calls"]
+    # Extract task description and trajectories from task_data and model_data
+    task_description = task_data.get("task_description", "")
+    human_trajectory = task_data.get("tool_calls", [])
+    model_trajectory = model_data.get("tool_calls", [])
 
-    # Load model DOMs
-    step_dom_mapping = model_data.get("step_dom_mapping", {})
-    model_doms = {}
-    for step, dom_path in step_dom_mapping.items():
-        try:
-            full_path = results_dir / dom_path
-            if full_path.exists():
-                model_doms[step] = open(full_path, "r").read()
-        except Exception as e:
-            logger.warning(f"Failed to load DOM for task {task_id}, step {step}: {e}")
+    def evaluate_single_checkpoint(
+        checkpoint_idx: int, checkpoint_reasoning: str
+    ) -> Dict[str, Any]:
+        judge = get_lm_judge(results_dir)
 
-    # Evaluate each checkpoint
+        result = judge(
+            task_id=task_id,
+            task_description=task_description,
+            human_trajectory=human_trajectory,
+            agent_trajectory=model_trajectory,
+            checkpoint_index=checkpoint_idx,
+            checkpoint_reasoning=checkpoint_reasoning,
+            agent_doms_available=_get_doms_available_for_task(task_id, results_dir),
+        )
+
+        return {
+            "achieved": result.achieved,
+            "reasoning": result.reasoning,
+            "confidence": result.confidence,
+            "score": 0.0 if not result.achieved else 0.33,
+        }
+
     checkpoint_results = {}
     total_score = 0.0
-
     for idx in range(2):
-        checkpoint_tool_idx = checkpoints[idx]
-        checkpoint_reason = checkpoints_reasoning[idx]
-
         logger.info(f"Evaluating task {task_id}, checkpoint {idx}...")
 
         try:
             result = evaluate_single_checkpoint(
-                task_id=task_id,
-                checkpoint_idx=idx,
-                checkpoint_tool_idx=checkpoint_tool_idx,
-                checkpoint_reasoning=checkpoint_reason,
-                task_description=task_description,
-                model_trajectory=model_trajectory,
-                model_doms=model_doms,
-                results_dir=results_dir,
+                checkpoint_idx=checkpoints[idx],
+                checkpoint_reasoning=checkpoints_reasoning[idx],
             )
 
             checkpoint_results[f"checkpoint_{idx}"] = result
@@ -177,6 +111,8 @@ def evaluate_checkpoints_for_task(
                 f"{'achieved' if result['achieved'] else 'not achieved'} "
                 f"(confidence: {result['confidence']:.2f})"
             )
+            if not result["score"]:
+                break
         except Exception as e:
             logger.error(f"Failed to evaluate checkpoint {idx} for task {task_id}: {e}")
             checkpoint_results[f"checkpoint_{idx}"] = {
@@ -198,7 +134,7 @@ def evaluate_checkpoints(results_dir: str, judge_model: str):
         f"openai/{judge_model}",
         reasoning_effort="high",
         temperature=1.0,
-        max_tokens=64000,
+        max_tokens=120000,
     )
     mlflow.set_tracking_uri("http://127.0.0.1:5000")
     mlflow.set_experiment(f"eval-checkpoints-{results_dir.split('/')[-1]}")
@@ -243,13 +179,14 @@ def evaluate_checkpoints(results_dir: str, judge_model: str):
         task_id
         for task_id, result in grade_data["task_results"].items()
         if not result["correct"]
-    ]
+    ][0:1]
 
     logger.info(f"Found {len(failed_task_ids)} failed tasks to evaluate checkpoints")
 
     def evaluate_task_wrapper(task_id_str):
         """Wrapper for parallel execution."""
         task_id = int(task_id_str)
+        print("task_id", task_id)
 
         if task_id not in human_tasks_by_id:
             logger.warning(f"Task {task_id} not found in tasks.jsonl")

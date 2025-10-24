@@ -16,54 +16,12 @@ import mlflow
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.config.storage_config import DATA_DIR
 
+from src.eval.judges import JudgeCompletion
+
 # Disable MLflow logging to avoid spam warnings
 os.environ["MLFLOW_TRACKING_URI"] = ""
 mlflow.set_tracking_uri("")
 logging.getLogger("mlflow").setLevel(logging.ERROR)
-
-
-class JudgeCompletion(dspy.Signature):
-    # - clarify that in the way the human trajectory and dom match the description, should determine if model last_step matches the dom and task completion, model not hallucinating.
-    """
-    You are a judge for evaluating the performance of a model in completing a browser task.
-    You will be given the golden trajectory, meaning the human trajectory that executed the task, including the last dom the human saw, and the answer the human provided.
-    - consider the human answer is potentially very brief but matches the task description and it is grounded on the DOM.
-
-    You will also be given
-    1. the model's completion step data, which contains the model's state, tabs opened, url's, page title, thinking, and answer.
-    2. the model's trajectory, which contains the model's actions.
-    3. the model's last dom accessed.
-
-    Your task is to ensure the model's answer is correct given the task description, grounded on the DOM, and also mimicks human actions and response.
-    The answers might be different from human to model, because
-    1) the web is in constant change, products, lists, stocks constantly change.
-    2) the website might've been updated, thus some steps/navigations might differ as well.
-    """
-
-    task: str = dspy.InputField(description="The task description")
-    # ====
-    agent_completion: Dict[str, Any] = dspy.InputField(
-        description="The last model step dump contents"
-    )
-    agent_trajectory: List[BaseToolCallData] = dspy.InputField(
-        description="The model's trajectory"
-    )
-    agent_dom: str = dspy.InputField(description="The last model step dom contents")
-    # ====
-    human_trajectory: List[BaseToolCallData] = dspy.InputField(
-        description="The human trajectory"
-    )
-    human_dom: str = dspy.InputField(description="The last human dom contents")
-    human_answer: str = dspy.InputField(description="The human answer")
-    # ====
-
-    correct: bool = dspy.OutputField(
-        description="Whether the model's answer is correct or not"
-    )
-    reasoning: str = dspy.OutputField(description="The reasoning for your judgement")
-    confidence: float = dspy.OutputField(
-        description="The confidence score for your judgement"
-    )
 
 
 logging.basicConfig(level=logging.INFO)
@@ -110,7 +68,9 @@ def evaluate_model_outputs(results_dir: str, judge_model: str):
             logger.warning(f"Failed to read {json_file}: {e}")
             continue
 
-    def _get_model_completion_step(model_task: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _get_model_completion_step(
+        model_task: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
         """Find the completion step where the model signaled done."""
         for step in model_task.get("dump", []):
             # Check if this step has a "done" action
@@ -123,7 +83,7 @@ def evaluate_model_outputs(results_dir: str, judge_model: str):
                     if "result" in step_copy:
                         del step_copy["result"]
                     return step_copy
-            
+
             # Also check result for is_done flag
             results = step.get("result", [])
             if results and isinstance(results, list):
@@ -133,7 +93,7 @@ def evaluate_model_outputs(results_dir: str, judge_model: str):
                         if "result" in step_copy:
                             del step_copy["result"]
                         return step_copy
-        
+
         return None
 
     def evaluate_single_task(model_task):
@@ -146,7 +106,9 @@ def evaluate_model_outputs(results_dir: str, judge_model: str):
 
         model_completion_step = _get_model_completion_step(model_task)
         if not model_completion_step:
-            logger.warning(f"No completion step found for task {task_id} - model did not call 'done'")
+            logger.warning(
+                f"No completion step found for task {task_id} - model did not call 'done'"
+            )
             return task_id, {
                 "correct": False,
                 "reasoning": "Model did not complete the task - no 'done' action was called (likely hit step limit or encountered error)",
@@ -154,7 +116,7 @@ def evaluate_model_outputs(results_dir: str, judge_model: str):
             }
 
         model_trajectory = model_task.get("tool_calls", [])
-        
+
         # Find the last available DOM step (may not match trajectory length)
         step_dom_mapping = model_task.get("step_dom_mapping", {})
         if not step_dom_mapping:
@@ -164,10 +126,10 @@ def evaluate_model_outputs(results_dir: str, judge_model: str):
                 "reasoning": "No DOM states captured in model trajectory",
                 "confidence": 0,
             }
-        
+
         last_step = max(int(k) for k in step_dom_mapping.keys())
         model_last_dom_path = step_dom_mapping[str(last_step)]
-        
+
         try:
             model_last_dom = open(results_dir / model_last_dom_path, "r").read()
         except Exception as e:
@@ -191,7 +153,9 @@ def evaluate_model_outputs(results_dir: str, judge_model: str):
         # If no DOM state in human trajectory, use a placeholder
         # (some simple tasks may only have go_to with no DOM capture)
         if not human_last_dom_path:
-            logger.warning(f"No dom_state found in human trajectory for task {task_id} - using placeholder")
+            logger.warning(
+                f"No dom_state found in human trajectory for task {task_id} - using placeholder"
+            )
             human_last_dom = "[Human trajectory has no DOM capture - likely a simple task with only initial page load]"
         else:
             try:
@@ -199,7 +163,7 @@ def evaluate_model_outputs(results_dir: str, judge_model: str):
             except Exception as e:
                 logger.warning(f"Failed to read human DOM for task {task_id}: {e}")
                 human_last_dom = f"[Error reading human DOM: {e}]"
-        
+
         human_answer = human_task["answer"]
         # breakpoint()
         # ===
@@ -243,14 +207,14 @@ def evaluate_model_outputs(results_dir: str, judge_model: str):
     total_tasks = len(evaluations)
     correct_count = len(correct_results)
     incorrect_count = len(incorrect_results)
-    
+
     # Categorize failure reasons
     failure_categories = {
         "model_incomplete": 0,  # Model didn't call done
         "dom_issues": 0,  # DOM reading or mapping issues
         "incorrect_answer": 0,  # Model completed but answer was wrong
     }
-    
+
     for result in incorrect_results:
         reasoning = result.get("reasoning", "").lower()
         if "did not complete" in reasoning or "no 'done' action" in reasoning:
@@ -325,9 +289,21 @@ def evaluate_model_outputs(results_dir: str, judge_model: str):
             "model_incomplete": failure_categories["model_incomplete"],
             "dom_issues": failure_categories["dom_issues"],
             "incorrect_answer": failure_categories["incorrect_answer"],
-            "model_incomplete_pct": round(failure_categories["model_incomplete"] / total_tasks * 100, 2) if total_tasks > 0 else 0,
-            "dom_issues_pct": round(failure_categories["dom_issues"] / total_tasks * 100, 2) if total_tasks > 0 else 0,
-            "incorrect_answer_pct": round(failure_categories["incorrect_answer"] / total_tasks * 100, 2) if total_tasks > 0 else 0,
+            "model_incomplete_pct": round(
+                failure_categories["model_incomplete"] / total_tasks * 100, 2
+            )
+            if total_tasks > 0
+            else 0,
+            "dom_issues_pct": round(
+                failure_categories["dom_issues"] / total_tasks * 100, 2
+            )
+            if total_tasks > 0
+            else 0,
+            "incorrect_answer_pct": round(
+                failure_categories["incorrect_answer"] / total_tasks * 100, 2
+            )
+            if total_tasks > 0
+            else 0,
         },
         "confidence_stats": {
             "overall": {
