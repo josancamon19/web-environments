@@ -118,13 +118,24 @@ class OfflineCaptureManager:
         await self.prepare_for_context_close()
 
     async def prepare_for_context_close(self) -> None:
+        """Capture storage state before context closes. May fail if context already closed."""
         if not self._active or not self._context:
             return
 
         if self._pre_close_completed:
             return
 
-        await self._capture_storage_state()
+        # Check if context is still alive before trying to capture state
+        try:
+            # This will fail if context is already closed
+            _ = self._context.pages
+            await self._capture_storage_state()
+        except Exception as exc:
+            logger.warning(
+                "[CAPTURE] Context already closed, cannot capture storage state: %s",
+                exc,
+            )
+
         self._pre_close_completed = True
 
     async def finalize_after_context_close(self) -> None:
@@ -144,11 +155,9 @@ class OfflineCaptureManager:
     async def _capture_storage_state(self) -> None:
         if not self._context or not self._storage_state_path:
             return
-        try:
-            await self._context.storage_state(path=str(self._storage_state_path))
-            logger.info("[CAPTURE] Storage state saved to %s", self._storage_state_path)
-        except Exception as exc:
-            logger.error("[CAPTURE] Failed to capture storage state: %s", exc)
+
+        await self._context.storage_state(path=str(self._storage_state_path))
+        logger.info("[CAPTURE] Storage state saved to %s", self._storage_state_path)
 
     async def _finalize_manifest(self) -> None:
         if not self._manifest_path:
@@ -190,8 +199,13 @@ class OfflineCaptureManager:
         await self.prepare_for_context_close()
 
         if self._context:
-            await self._context.close()
-            logger.info("[CAPTURE] Context closed for HAR finalization")
+            try:
+                # Try to close context if not already closed
+                await self._context.close()
+                logger.info("[CAPTURE] Context closed for HAR finalization")
+            except Exception as exc:
+                # Context may already be closed (persistent context closed by user)
+                logger.debug("[CAPTURE] Context already closed: %s", exc)
 
         await self.finalize_after_context_close()
 
@@ -226,17 +240,23 @@ class OfflineCaptureManager:
             if self._har_path.exists():
                 file_size = self._har_path.stat().st_size
                 logger.info(
-                    "[CAPTURE] HAR file saved successfully: %s (%d bytes)",
+                    "[CAPTURE] ✓ HAR file saved successfully: %s (%d bytes)",
                     self._har_path,
                     file_size,
                 )
                 return
             await asyncio.sleep(check_interval)
 
+        # HAR not found - log detailed error
         logger.error(
-            "[CAPTURE] HAR file not found at %s after %d seconds. "
-            "Offline replay will be unavailable. "
-            "This usually means the context was not properly closed.",
+            "[CAPTURE] ✗ HAR file not found at %s after %d seconds.",
             self._har_path,
             max_wait_seconds,
+        )
+        logger.error("[CAPTURE] Offline replay will be UNAVAILABLE for this session.")
+        logger.error(
+            "[CAPTURE] Common causes:\n"
+            "  - Browser context was forcefully closed (Ctrl+C, window closed)\n"
+            "  - Playwright persistent context closed before HAR could flush\n"
+            "  - Connection to browser driver was severed prematurely"
         )

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any, Dict, Optional
 from playwright.async_api import async_playwright
@@ -117,31 +118,36 @@ class StealthBrowser:
         print("✅ DOM listeners setup complete")
 
     async def _initialize_page_event_script(self, page):
+        """Initialize page event listener script on a page and its frames."""
         if not page:
             return
+
         try:
             # Expose at page-level as a fallback (useful for certain CSP/isolated worlds)
-            try:
+            async def _page_binding(source, event_info):
+                p = getattr(source, "page", None)
+                await self.page_event_handler(event_info, p)
 
-                async def _page_binding(source, event_info):
-                    p = getattr(source, "page", None)
-                    await self.page_event_handler(event_info, p)
-
-                await page.expose_binding("onPageEvent", _page_binding)
-            except Exception:
-                pass
-            await page.evaluate(PAGE_EVENT_LISTENER_SCRIPT)
-            try:
-                # Also try to install on existing frames
-                for frame in page.frames:
-                    try:
-                        await frame.evaluate(PAGE_EVENT_LISTENER_SCRIPT)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+            await page.expose_binding("onPageEvent", _page_binding)
         except Exception as exc:
-            logger.error("[PAGE_EVENT] Failed to initialize listener script: %s", exc)
+            logger.debug("[PAGE_EVENT] Could not expose page binding: %s", exc)
+
+        try:
+            await page.evaluate(PAGE_EVENT_LISTENER_SCRIPT)
+        except Exception as exc:
+            logger.error("[PAGE_EVENT] Failed to evaluate listener script: %s", exc)
+            return
+
+        # Also install on existing frames
+        for frame in page.frames:
+            try:
+                await frame.evaluate(PAGE_EVENT_LISTENER_SCRIPT)
+            except Exception as exc:
+                logger.debug(
+                    "[PAGE_EVENT] Could not evaluate script on frame %s: %s",
+                    frame.url,
+                    exc,
+                )
 
     async def page_event_handler(self, event_info, page=None):
         """Handle page events from browser"""
@@ -162,24 +168,54 @@ class StealthBrowser:
             logger.error(f"[PAGE_EVENT] Error handling event: {e}", exc_info=True)
 
     async def close(self):
-        """Close browser"""
+        """Close browser and finalize capture."""
+        # Prepare for close - try to save storage state (may fail if context already closed)
         if self.context:
             await self.offline_capture.prepare_for_context_close()
+
+        # Close context - this triggers HAR save (if context still open)
+        if self.context:
             try:
-                await self.context.close()
+                # Check if context is still alive before trying to close
+                try:
+                    _ = self.context.pages
+                    is_alive = True
+                except Exception:
+                    is_alive = False
+
+                if is_alive:
+                    logger.info("[BROWSER] Closing context to trigger HAR save...")
+                    await self.context.close()
+                    logger.info(
+                        "[BROWSER] ✓ Context closed successfully - waiting for HAR flush..."
+                    )
+                    # Give Playwright time to flush HAR to disk
+                    await asyncio.sleep(0.5)
+                else:
+                    logger.warning(
+                        "[BROWSER] ✗ Context already closed - HAR will NOT be saved"
+                    )
             except Exception as exc:
-                logger.error("[CAPTURE] Error closing browser context: %s", exc)
+                logger.warning("[BROWSER] Failed to close context: %s", exc)
+
+        # Close browser if using non-persistent context
         if self.browser:
             try:
                 await self.browser.close()
+                logger.info("[BROWSER] Browser closed")
             except Exception as exc:
-                logger.error("[CAPTURE] Error closing browser: %s", exc)
-        try:
-            await self.offline_capture.finalize_after_context_close()
-        except Exception as exc:
-            logger.error("[CAPTURE] Failed to finalize offline capture: %s", exc)
+                logger.debug(
+                    "[BROWSER] Browser already closed or failed to close: %s", exc
+                )
+
+        # Finalize capture - wait for HAR and write manifest
+        await self.offline_capture.finalize_after_context_close()
+
+        # Stop playwright
         if self.playwright:
             await self.playwright.stop()
+
+        # Cleanup page listeners
         if self.page_event:
             self.page_event.detach_all_page_listeners()
 
