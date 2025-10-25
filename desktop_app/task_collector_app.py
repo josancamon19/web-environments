@@ -1,5 +1,3 @@
-"""Tkinter desktop app that orchestrates task collection sessions."""
-
 import logging
 import multiprocessing
 import os
@@ -12,6 +10,12 @@ import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
+import sqlite3
+from google.cloud import storage
+from config.storage import DATA_DIR
+from dotenv import load_dotenv
+import json
 
 # macOS-specific fix for tkinter bus errors
 if sys.platform == "darwin":
@@ -21,23 +25,12 @@ if sys.platform == "darwin":
     if "DISPLAY" not in os.environ:
         os.environ["DISPLAY"] = ":0.0"
 
-import tkinter as tk
-from tkinter import messagebox
-from tkinter.scrolledtext import ScrolledText
-from tkinter import ttk
-from typing import Optional
-import sqlite3
+import tkinter as tk  # noqa: E402
+from tkinter import messagebox  # noqa: E402
+from tkinter.scrolledtext import ScrolledText  # noqa: E402
+from tkinter import ttk  # noqa: E402
 
-from src.config.storage_config import DATA_DIR
-
-try:
-    from google.cloud import storage
-except ModuleNotFoundError:  # pragma: no cover - optional dependency for uploads
-    storage = None  # type: ignore[assignment]
-
-import base64
-from dotenv import load_dotenv
-import json
+from desktop_app.task_worker import run_task_worker  # noqa: E402
 
 load_dotenv()
 
@@ -100,8 +93,10 @@ def ensure_google_credentials() -> tuple[bool, Optional[str]]:
     #  - Parent directory match running directly from the script
     creds_path = Path(__file__).resolve().with_name("google-credentials.json")
     if not creds_path.exists():
-        creds_path = Path(__file__).resolve().parent.with_name("google-credentials.json")
-    
+        creds_path = (
+            Path(__file__).resolve().parent.with_name("google-credentials.json")
+        )
+
     if creds_path.exists():
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(creds_path)
         _GOOGLE_CREDS_READY = True
@@ -115,7 +110,8 @@ def ensure_google_credentials() -> tuple[bool, Optional[str]]:
     )
     _GOOGLE_CREDS_ERROR = message
     logger.error(
-        "Credential setup failed. Please contact your administrator for assistance.")
+        "Credential setup failed. Please contact your administrator for assistance."
+    )
     return False, message
 
 
@@ -163,8 +159,7 @@ class UsernameDialog(tk.Toplevel):
         button_frame = tk.Frame(main_frame)
         button_frame.pack(fill=tk.X)
 
-        ok_button = tk.Button(button_frame, text="OK",
-                              command=self.ok, width=10)
+        ok_button = tk.Button(button_frame, text="OK", command=self.ok, width=10)
         ok_button.pack(side=tk.RIGHT, padx=(5, 0))
 
         cancel_button = tk.Button(
@@ -329,8 +324,7 @@ class TextAreaDialog(tk.Toplevel):
         button_frame.pack(fill=tk.X, pady=(10, 0))
 
         # OK and Cancel buttons
-        ok_button = tk.Button(button_frame, text="OK",
-                              command=self.ok, width=10)
+        ok_button = tk.Button(button_frame, text="OK", command=self.ok, width=10)
         ok_button.pack(side=tk.RIGHT, padx=(5, 0))
 
         cancel_button = tk.Button(
@@ -500,10 +494,8 @@ class TasksViewDialog(tk.Toplevel):
 
         # Create context menu for edit and delete options
         self.context_menu = tk.Menu(self, tearoff=0)
-        self.context_menu.add_command(
-            label="Edit Website", command=self.edit_website)
-        self.context_menu.add_command(
-            label="Edit Answer", command=self.edit_answer)
+        self.context_menu.add_command(label="Edit Website", command=self.edit_website)
+        self.context_menu.add_command(label="Edit Answer", command=self.edit_answer)
         self.context_menu.add_separator()
         self.context_menu.add_command(
             label="Delete Task", command=self.delete_selected_task
@@ -550,10 +542,8 @@ class TasksViewDialog(tk.Toplevel):
         tree_frame.grid_columnconfigure(0, weight=1)
 
         # Style the treeview with tags for alternating colors in dark mode
-        self.tree.tag_configure(
-            "evenrow", background="#252525", foreground="#e0e0e0")
-        self.tree.tag_configure(
-            "oddrow", background="#1e1e1e", foreground="#e0e0e0")
+        self.tree.tag_configure("evenrow", background="#252525", foreground="#e0e0e0")
+        self.tree.tag_configure("oddrow", background="#1e1e1e", foreground="#e0e0e0")
 
         # Add info label with dark styling
         info_container = tk.Frame(main_frame, bg="#2b2b2b")
@@ -702,11 +692,13 @@ class TasksViewDialog(tk.Toplevel):
             cursor = conn.cursor()
 
             # Query to get tasks with the requested fields
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT id, description, task_type, source, website, answer, created_at, duration_seconds, video_path
                 FROM tasks
                 ORDER BY created_at DESC
-            """)
+            """
+            )
 
             tasks = cursor.fetchall()
             conn.close()
@@ -826,12 +818,10 @@ class TasksViewDialog(tk.Toplevel):
             cursor.execute("DELETE FROM steps WHERE task_id = ?", (task_id,))
 
             # Delete requests associated with this task
-            cursor.execute(
-                "DELETE FROM requests WHERE task_id = ?", (task_id,))
+            cursor.execute("DELETE FROM requests WHERE task_id = ?", (task_id,))
 
             # Delete responses associated with this task
-            cursor.execute(
-                "DELETE FROM responses WHERE task_id = ?", (task_id,))
+            cursor.execute("DELETE FROM responses WHERE task_id = ?", (task_id,))
 
             # Delete task (CASCADE will handle any remaining related records)
             cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
@@ -866,8 +856,7 @@ class TasksViewDialog(tk.Toplevel):
                     shutil.rmtree(captures_dir)
                     print(f"Deleted captures directory: {captures_dir}")
                 except Exception as e:
-                    print(
-                        f"Error deleting captures directory {captures_dir}: {e}")
+                    print(f"Error deleting captures directory {captures_dir}: {e}")
 
             # Remove from tree view
             self.tree.delete(item)
@@ -905,8 +894,7 @@ class TasksViewDialog(tk.Toplevel):
         try:
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT website FROM tasks WHERE id = ?", (task_id,))
+            cursor.execute("SELECT website FROM tasks WHERE id = ?", (task_id,))
             result = cursor.fetchone()
             current_website = result[0] if result and result[0] else ""
             conn.close()
@@ -1044,8 +1032,6 @@ if getattr(sys, "frozen", False):
 if str(BASE_PATH) not in sys.path:
     sys.path.insert(0, str(BASE_PATH))
 
-# pylint: disable=wrong-import-position
-from desktop_app.task_worker import run_task_worker
 
 logging.basicConfig(
     level=logging.INFO,
@@ -1181,8 +1167,7 @@ class TaskCollectorApp:
             *[label for label, _ in SOURCE_CHOICES],
         )
         # We need to map displayed label to code; track in dictionary
-        self._source_label_to_value = {
-            label: value for label, value in SOURCE_CHOICES}
+        self._source_label_to_value = {label: value for label, value in SOURCE_CHOICES}
         source_menu.config(width=35, font=("Helvetica", 11))
         source_menu.pack(anchor=tk.W, pady=(0, 0))
 
@@ -1434,17 +1419,14 @@ class TaskCollectorApp:
                 "be disabled until the dependency is available."
             )
             self._log(f"⚠️ {warning}")
-            messagebox.showwarning("Upload Unavailable",
-                                   warning, parent=self.root)
+            messagebox.showwarning("Upload Unavailable", warning, parent=self.root)
             return
 
         creds_ready, error_message = ensure_google_credentials()
         if creds_ready:
             self._log("✅ Google Cloud credentials loaded successfully.")
         elif error_message:
-            self._log(
-                f"❌ {error_message}"
-            )
+            self._log(f"❌ {error_message}")
 
     def _log(self, message: str) -> None:
         self.log_queue.put(message)
@@ -1681,8 +1663,7 @@ class TaskCollectorApp:
             zip_size = os.path.getsize(temp_zip_path)
             zip_size_mb = zip_size / (1024 * 1024)
 
-            self._log(
-                f"Created zip file: {zip_filename} ({zip_size_mb:.1f} MB)")
+            self._log(f"Created zip file: {zip_filename} ({zip_size_mb:.1f} MB)")
             progress_dialog.update_progress(
                 "Uploading to Google Cloud...", 55, f"{zip_size_mb:.1f} MB"
             )
@@ -1742,8 +1723,7 @@ class TaskCollectorApp:
             # Small delay to show 100%
             self.root.after(500, progress_dialog.destroy)
 
-            self._set_status("Upload completed successfully!",
-                             status_type="ready")
+            self._set_status("Upload completed successfully!", status_type="ready")
             self._log(
                 f"✅ Successfully uploaded {zip_filename} to collection-reports bucket"
             )
@@ -1763,8 +1743,7 @@ class TaskCollectorApp:
 
             error_msg = f"Failed to upload data: {exc}"
             self._log(f"❌ {error_msg}")
-            self._set_status(
-                "Upload failed – see log for details", status_type="error")
+            self._set_status("Upload failed – see log for details", status_type="error")
             messagebox.showerror("Upload Error", error_msg)
 
     def launch_task(self) -> None:
@@ -1775,8 +1754,7 @@ class TaskCollectorApp:
             return
 
         displayed_source = self.source_var.get()
-        source_value = self._source_label_to_value.get(
-            displayed_source, "none")
+        source_value = self._source_label_to_value.get(displayed_source, "none")
         task_type = self.task_type_var.get()
         description = self.description_text.get("1.0", tk.END).strip()
         website = self.website_entry.get().strip() or None
@@ -1833,8 +1811,7 @@ class TaskCollectorApp:
 
     def complete_task(self) -> None:
         if not self.task_running:
-            messagebox.showinfo(
-                "No active task", "Launch a task before completing it.")
+            messagebox.showinfo("No active task", "Launch a task before completing it.")
             return
 
         answer: Optional[str] = ""

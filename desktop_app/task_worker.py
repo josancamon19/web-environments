@@ -7,8 +7,8 @@ import logging
 from multiprocessing.connection import Connection
 from typing import Any, Dict, Optional
 
-from src.browser.stealth_browser import StealthBrowser
-from src.config.initial_tasks import InitialTasks
+from browser.browser import StealthBrowser
+from config.start import InitialTasks
 from src.db.task import CreateTaskDto, Task, TaskManager
 
 logger = logging.getLogger(__name__)
