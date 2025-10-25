@@ -369,7 +369,7 @@ class StealthBrowser:
                 bypass_csp=True,
                 record_har_path=self.har_path,
                 record_har_content="embed",   # use "omit" if you prefer smaller HARs
-                record_har_mode="minimal",    # switch to "full" for exhaustive capture
+                record_har_mode="full",    # switch to "full" for exhaustive capture
                 service_workers="block",
             )
             if video_task_path:
