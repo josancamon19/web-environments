@@ -11,7 +11,7 @@ from playwright.async_api import Browser as PlaywrightBrowser
 from playwright.async_api import BrowserContext, BrowserType, async_playwright
 
 from environments.launch import ReplayBundle
-from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
+from config.browser_config import BROWSER_ARGS
 
 
 logger = logging.getLogger(__name__)
@@ -146,7 +146,10 @@ class SandboxEnvironment:
 
         # Ensure at least one context exists for routing
         if not self._browser.contexts:
-            context = await self._browser.new_context(**CONTEXT_CONFIG)
+            context = await self.bundle.build_context(
+                self._browser,
+                allow_network_fallback=self.allow_network_fallback,
+            )
             await self._configure_context(context)
         else:
             for context in list(self._browser.contexts):
@@ -164,8 +167,9 @@ class SandboxEnvironment:
             page = context.pages[0]
             try:
                 await page.goto(start_url)
+                logger.info("[SANDBOX] Preloaded start URL: %s", start_url)
             except Exception as exc:
-                logger.debug("[SANDBOX] Failed to preload %s: %s", start_url, exc)
+                logger.warning("[SANDBOX] Failed to preload %s: %s", start_url, exc)
 
         return self._ws_endpoint
 
@@ -203,32 +207,22 @@ class SandboxEnvironment:
         raise RuntimeError("Timed out waiting for Chrome debugger endpoint")
 
     async def _configure_context(self, context: BrowserContext) -> None:
-        if context in self._contexts:
-            return
-        self._contexts.append(context)
+        if context not in self._contexts:
+            self._contexts.append(context)
         await self.bundle.attach(
             context,
             allow_network_fallback=self.allow_network_fallback,
         )
 
     async def close(self) -> None:
-        # Flush logs before closing
-        if self.bundle:
-            try:
-                self.bundle.flush_logs()
-            except Exception as e:
-                logger.warning("Failed to flush logs: %s", e)
-
+        """Close sandbox environment cleanly."""
         if self._browser:
-            try:
-                await self._browser.close()
-            except Exception:
-                pass
+            await self._browser.close()
+            logger.info("[SANDBOX] Browser closed")
+
         if self._playwright:
-            try:
-                await self._playwright.stop()
-            except Exception:
-                pass
+            await self._playwright.stop()
+            logger.info("[SANDBOX] Playwright stopped")
 
         self._browser = None
         self._playwright = None

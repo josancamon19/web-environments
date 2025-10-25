@@ -2,12 +2,11 @@ import asyncio
 import json
 import logging
 import os
-from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 import typer
-from playwright.async_api import Browser, BrowserContext, Route
+from playwright.async_api import Browser, BrowserContext
 
 from db.database import Database
 from environments.replay import StepEntry, TaskStepExecutor
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class ReplayBundle:
-    """Replay previously captured browsing resources."""
+    """Replay a previously captured browsing session."""
 
     def __init__(self, bundle_path: Path, log_dir: Optional[Path] = None):
         bundle_path = bundle_path.expanduser().resolve()
@@ -39,29 +38,14 @@ class ReplayBundle:
         self.manifest_path = manifest_path
 
         self.manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
-        self.resources = self.manifest.get("resources", [])
-        self.environment = self.manifest.get("environment", {})
+        self.har_path = self._resolve_har_path()
+        self.environment = self.manifest.get("context", {})
         self.task_info: Dict[str, Any] = self.manifest.get("task") or {}
         self.task_id: Optional[int] = self.task_info.get("id")
-        self._payloads: Dict[Tuple[str, str, str], list[Dict[str, Any]]] = defaultdict(
-            list
-        )
-        self._payload_indices: Dict[Tuple[str, str, str], int] = defaultdict(int)
-
-        # Set up logging for cached vs not-found URLs
         self.log_dir = log_dir
-        self._cached_urls: set[str] = set()
-        self._not_found_urls: set[str] = set()
+        self._har_cache: Optional[Dict[str, Any]] = None
 
-        for resource in self.resources:
-            key = self._resource_key(resource)
-            self._payloads[key].append(resource)
-
-        logger.info(
-            "Loaded bundle %s with %s recorded resources",
-            bundle_path,
-            len(self.resources),
-        )
+        logger.info("Loaded bundle %s", bundle_path)
 
     def load_steps(self) -> list[StepEntry]:
         if not self.task_id:
@@ -109,13 +93,14 @@ class ReplayBundle:
         return steps
 
     def guess_start_url(self) -> Optional[str]:
-        for resource in self.resources:
-            if (
-                resource.get("resource_type") == "document"
-                and resource.get("status", 200) < 400
-            ):
-                return resource.get("url")
-        return None
+        entries = self._har_entries()
+        if not entries:
+            return None
+        try:
+            first = entries[0]
+            return first.get("request", {}).get("url")
+        except Exception:
+            return None
 
     async def build_context(
         self,
@@ -123,14 +108,38 @@ class ReplayBundle:
         *,
         allow_network_fallback: bool = False,
     ) -> BrowserContext:
-        context_config = dict(self.environment.get("context_config") or {})
+        options = dict(self.environment.get("options") or {})
+        launch_meta = self.environment.get("launch") or {}
+
+        # Remove properties that are only valid during recording
+        options.pop("record_video_dir", None)
+        options.pop("record_video_size", None)
+        options.pop("mode", None)
+        options.pop("channel", None)
+        options.pop("user_data_dir", None)
+
         storage_state_path = self._storage_state_path()
 
         if storage_state_path:
-            context_config["storage_state"] = str(storage_state_path)
+            try:
+                options["storage_state"] = json.loads(
+                    storage_state_path.read_text(encoding="utf-8")
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to load storage state from %s: %s", storage_state_path, exc
+                )
 
-        context = await browser.new_context(**context_config)
+        context = await browser.new_context(**options)
         await self.attach(context, allow_network_fallback=allow_network_fallback)
+
+        if launch_meta.get("browser_channel"):
+            logger.info(
+                "Replay using channel %s with %d HAR entries",
+                launch_meta["browser_channel"],
+                len(self._har_entries()),
+            )
+
         return context
 
     async def attach(
@@ -139,135 +148,16 @@ class ReplayBundle:
         *,
         allow_network_fallback: bool = False,
     ) -> None:
-        async def _handler(route: Route):
-            await self._fulfill(route, allow_network_fallback=allow_network_fallback)
-
-        await context.route("**/*", _handler)
-
-    async def _fulfill(self, route: Route, *, allow_network_fallback: bool) -> None:
-        request = route.request
-        post_data = await self._safe_post_data(request)
-        key = (request.method, request.url, post_data or "")
-
-        entries = self._payloads.get(key)
-        payload: Optional[Dict[str, Any]] = None
-
-        if entries:
-            idx = self._payload_indices[key]
-            if idx < len(entries):
-                payload = entries[idx]
-                self._payload_indices[key] = idx + 1
-            elif request.method.upper() == "GET":
-                payload = entries[-1]
-                logger.debug(
-                    "Reusing cached GET response for %s (recorded %d uses)",
-                    request.url,
-                    len(entries),
-                )
-            else:
-                payload = entries[-1]
-                logger.info(
-                    "Reusing last response for %s %s beyond recorded count",
-                    request.method,
-                    request.url,
-                )
-
-        if payload:
-            # Log cached URL
-            if self.log_dir and request.url not in self._cached_urls:
-                self._cached_urls.add(request.url)
-
-            body_bytes = self._load_body(payload)
-            headers = dict(payload.get("response_headers") or {})
-            if body_bytes is not None:
-                has_length = any(k.lower() == "content-length" for k in headers)
-                if not has_length:
-                    headers["content-length"] = str(len(body_bytes))
-
-            status = payload.get("status") or 200
-            await route.fulfill(status=status, headers=headers, body=body_bytes)
+        if getattr(context, "_har_attached", False):
             return
 
-        # Log not-found URL
-        if self.log_dir and request.url not in self._not_found_urls:
-            self._not_found_urls.add(request.url)
-
-        if allow_network_fallback:
-            await route.continue_()
-            return
-
-        message = f"Offline bundle missing resource for {request.method} {request.url}"
-        logger.warning(message)
-        await route.fulfill(status=504, body=message)
-
-    def flush_logs(self) -> None:
-        """Write cached and not-found URLs to log files."""
-        if not self.log_dir:
-            return
-
-        self.log_dir.mkdir(parents=True, exist_ok=True)
-
-        if self._cached_urls:
-            cached_log_path = self.log_dir / "cached.log"
-            with open(cached_log_path, "w", encoding="utf-8") as f:
-                for url in sorted(self._cached_urls):
-                    f.write(f"{url}\n")
-            logger.info(
-                "Wrote %d cached URLs to %s", len(self._cached_urls), cached_log_path
-            )
-
-        if self._not_found_urls:
-            not_found_log_path = self.log_dir / "not-found.log"
-            with open(not_found_log_path, "w", encoding="utf-8") as f:
-                for url in sorted(self._not_found_urls):
-                    f.write(f"{url}\n")
-            logger.info(
-                "Wrote %d not-found URLs to %s",
-                len(self._not_found_urls),
-                not_found_log_path,
-            )
-
-    def _load_body(self, payload: Dict[str, Any]) -> Optional[bytes]:
-        body_path = payload.get("body_path")
-        if not body_path:
-            size = payload.get("body_size")
-            if size:
-                logger.debug(
-                    "Recorded size without body path for %s", payload.get("url")
-                )
-            return b"" if size == 0 else None
-
-        target = self.bundle_path / body_path
-        if not target.exists():
-            logger.warning("Missing body file %s", target)
-            return None
-
-        return target.read_bytes()
-
-    def _storage_state_path(self) -> Optional[Path]:
-        storage_dir = self.bundle_path / "storage"
-        storage_state = storage_dir / "storage_state.json"
-        return storage_state if storage_state.exists() else None
-
-    async def _safe_post_data(self, request) -> Optional[str]:
-        accessor = getattr(request, "post_data", None)
-        try:
-            if callable(accessor):
-                try:
-                    return await accessor()
-                except TypeError:
-                    return accessor()
-            return accessor
-        except Exception:
-            return None
-
-    @staticmethod
-    def _resource_key(resource: Dict[str, Any]) -> Tuple[str, str, str]:
-        return (
-            resource.get("method") or "GET",
-            resource.get("url") or "",
-            resource.get("post_data") or "",
+        not_found = "fallback" if allow_network_fallback else "abort"
+        await context.route_from_har(
+            str(self.har_path),
+            url="**/*",
+            not_found=not_found,
         )
+        setattr(context, "_har_attached", True)
 
     @staticmethod
     def _resolve_manifest(bundle_path: Path) -> Path:
@@ -293,6 +183,35 @@ class ReplayBundle:
                 return manifest
 
         return manifest  # fall back to initial attempt for error reporting
+
+    def _resolve_har_path(self) -> Path:
+        har_rel = self.manifest.get("har_path")
+        if not har_rel:
+            raise FileNotFoundError("Capture manifest missing 'har_path'")
+        candidate = self.bundle_path / har_rel
+        if not candidate.exists():
+            raise FileNotFoundError(f"HAR file not found at {candidate}")
+        return candidate
+
+    def _storage_state_path(self) -> Optional[Path]:
+        storage_rel = self.manifest.get("storage_state")
+        if not storage_rel:
+            return None
+        candidate = self.bundle_path / storage_rel
+        return candidate if candidate.exists() else None
+
+    def _har_entries(self) -> list[Dict[str, Any]]:
+        if self._har_cache is None:
+            try:
+                data = json.loads(self.har_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                logger.warning("Failed to read HAR file %s: %s", self.har_path, exc)
+                data = {}
+            self._har_cache = data if isinstance(data, dict) else {}
+
+        log = self._har_cache.get("log") if isinstance(self._har_cache, dict) else None
+        entries = log.get("entries") if isinstance(log, dict) else None
+        return entries if isinstance(entries, list) else []
 
 
 async def _cli(

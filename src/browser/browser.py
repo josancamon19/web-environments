@@ -1,4 +1,5 @@
 import logging
+from typing import Any, Dict, Optional
 from playwright.async_api import async_playwright
 from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
 from config.browser_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
@@ -38,13 +39,16 @@ class StealthBrowser:
         # Prefer system Chrome with a persistent user profile; reduce automation fingerprints
 
         VIDEO_TASK_PATH = get_tasks_video_path()
+        capture_context_kwargs = self.offline_capture.prepare_session()
 
         task_manager = TaskManager()
         task_manager.set_last_task_path(VIDEO_TASK_PATH)
 
-        self.context = await self.open_browser_context(VIDEO_TASK_PATH)
+        self.context = await self.open_browser_context(
+            VIDEO_TASK_PATH, capture_context_kwargs
+        )
 
-        await self.offline_capture.start(self.context)
+        await self.offline_capture.attach(self.context)
 
         self.context.on("request", self.request_event.listen_for_request)
         self.context.on("response", self.response_event.listen_for_response)
@@ -160,19 +164,28 @@ class StealthBrowser:
     async def close(self):
         """Close browser"""
         if self.context:
+            await self.offline_capture.prepare_for_context_close()
             try:
-                await self.offline_capture.stop()
+                await self.context.close()
             except Exception as exc:
-                logger.error("[CAPTURE] Failed to finalize offline capture: %s", exc)
-            await self.context.close()
+                logger.error("[CAPTURE] Error closing browser context: %s", exc)
         if self.browser:
-            await self.browser.close()
+            try:
+                await self.browser.close()
+            except Exception as exc:
+                logger.error("[CAPTURE] Error closing browser: %s", exc)
+        try:
+            await self.offline_capture.finalize_after_context_close()
+        except Exception as exc:
+            logger.error("[CAPTURE] Failed to finalize offline capture: %s", exc)
         if self.playwright:
             await self.playwright.stop()
         if self.page_event:
             self.page_event.detach_all_page_listeners()
 
-    async def open_browser_context(self, video_task_path: str):
+    async def open_browser_context(
+        self, video_task_path: str, capture_context_kwargs: Optional[Dict[str, Any]]
+    ):
         """Open browser context"""
         preferred_channel = (
             os.environ.get("RECORDER_BROWSER_CHANNEL", "chrome").strip() or None
@@ -186,6 +199,12 @@ class StealthBrowser:
             "--use-mock-keychain",
             "--password-store=basic",
         ]
+        capture_context_kwargs = capture_context_kwargs or {}
+        self.offline_capture.register_launch_metadata(
+            browser_channel=preferred_channel,
+            browser_args=BROWSER_ARGS,
+            user_data_dir=user_data_dir,
+        )
         if preferred_channel:
             try:
                 self.context = await self.playwright.chromium.launch_persistent_context(
@@ -197,6 +216,15 @@ class StealthBrowser:
                     bypass_csp=True,
                     record_video_dir=video_task_path,
                     record_video_size={"width": 1280, "height": 720},
+                    **capture_context_kwargs,
+                )
+                self.offline_capture.register_context_options(
+                    {
+                        "mode": "persistent",
+                        "channel": preferred_channel,
+                        "user_data_dir": user_data_dir,
+                        "record_video_dir": video_task_path,
+                    }
                 )
                 return self.context
             except Exception as e:
@@ -211,6 +239,15 @@ class StealthBrowser:
                 bypass_csp=True,
                 record_video_dir=video_task_path,
                 record_video_size={"width": 1280, "height": 720},
+                **capture_context_kwargs,
+            )
+            self.offline_capture.register_context_options(
+                {
+                    "mode": "persistent",
+                    "channel": preferred_channel,
+                    "user_data_dir": user_data_dir,
+                    "record_video_dir": video_task_path,
+                }
             )
             return self.context
 
@@ -224,12 +261,15 @@ class StealthBrowser:
             )
             # self.browser.on("close", self.manual_browser_close)
             # Create context
-            self.context = await self.browser.new_context(
+            context_kwargs: Dict[str, Any] = {
                 **CONTEXT_CONFIG,
-                bypass_csp=True,
-                record_video_dir=video_task_path,
-                record_video_size={"width": 1280, "height": 720},
-            )
+                "bypass_csp": True,
+                "record_video_dir": video_task_path,
+                "record_video_size": {"width": 1280, "height": 720},
+                **capture_context_kwargs,
+            }
+            self.context = await self.browser.new_context(**context_kwargs)
+            self.offline_capture.register_context_options(context_kwargs)
             return self.context
         except Exception as e:
             logger.error(f"[LAUNCH_BROWSER] Error launching browser: {e}")
