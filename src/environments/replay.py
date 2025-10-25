@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, Optional, Sequence, Set, Tuple
 
 
 logger = logging.getLogger(__name__)
@@ -17,13 +17,19 @@ class StepEntry:
 
 class TaskStepExecutor:
     def __init__(
-        self, steps: Sequence[StepEntry], *, run_human_trajectory: bool = False
+        self,
+        steps: Sequence[StepEntry],
+        *,
+        run_human_trajectory: bool = False,
+        recorded_documents: Optional[Set[str]] = None,
     ):
         self.steps = list(steps)
         self.run_human_trajectory = run_human_trajectory
+        self.recorded_documents = {url.rstrip("/") for url in recorded_documents or set()}
         self._initial_navigation_done = False
 
     async def run(self, page) -> None:
+        self.page = page
         if page.url and page.url != "about:blank":
             self._initial_navigation_done = True
 
@@ -42,8 +48,7 @@ class TaskStepExecutor:
 
     async def _run_step(self, page, step: StepEntry) -> None:
         category, subject, action = self._split_event_type(step.event_type)
-
-        if category == "state":
+        if category == "state" and subject == "browser" and action == "navigated":
             await self._handle_state_step(page, subject, action, step.event_data)
             return
 
@@ -58,9 +63,13 @@ class TaskStepExecutor:
             if not url or url == "about:blank":
                 return
             if not self._initial_navigation_done or self._urls_differ(page.url, url):
-                await self._safe_goto(page, url)
+                normalized = url.rstrip("/")
+                if normalized in self.recorded_documents:
+                    await self._safe_goto(page, url)
+                else:
+                    await self._ensure_location(page, url)
                 self._initial_navigation_done = True
-            return
+            return  
 
         if subject == "page":
             if action in {"domcontentloaded", "domcontentload"}:
@@ -151,6 +160,43 @@ class TaskStepExecutor:
             await page.wait_for_load_state(state, timeout=15000)
         except Exception as exc:
             logger.debug("Load wait for %s skipped: %s", state, exc)
+
+    async def _ensure_location(self, page, url: str) -> None:
+        normalized = url.rstrip("/")
+        try:
+            await page.wait_for_function(
+                "expected => window.location.href.replace(/\\/+$/, '') === expected",
+                normalized,
+                timeout=3000,
+            )
+            return
+        except Exception:
+            pass
+
+        await page.evaluate(
+            (
+                "expected => {"
+                "  const current = window.location.href.replace(/\\/+$/, '');"
+                "  if (current === expected) return true;"
+                "  const currentBase = current.split('#', 1)[0];"
+                "  const expectedParts = expected.split('#', 2);"
+                "  const expectedBase = expectedParts[0];"
+                "  const expectedHash = expectedParts.length > 1 ? expectedParts[1] : null;"
+                "  if (expectedHash !== null && currentBase === expectedBase) {"
+                "    const targetHash = '#' + expectedHash;"
+                "    if (window.location.hash === targetHash) return true;"
+                "    window.location.hash = expectedHash;"
+                "    window.dispatchEvent(new HashChangeEvent('hashchange', { newURL: window.location.href, oldURL: current }));"
+                "    return true;"
+                "  }"
+                "  window.history.replaceState(null, document.title, expected);"
+                "  window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));"
+                "  return true;"
+                " }"
+            ),
+            normalized,
+        )
+        await page.wait_for_timeout(200)
 
     def _extract_coordinates(
         self, payload: Dict[str, Any]

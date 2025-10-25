@@ -46,6 +46,7 @@ class ReplayBundle:
         self._payloads: Dict[Tuple[str, str, str], list[Dict[str, Any]]] = defaultdict(
             list
         )
+        self.document_urls: set[str] = set()
         self._payload_indices: Dict[Tuple[str, str, str], int] = defaultdict(int)
 
         # Set up logging for cached vs not-found URLs
@@ -55,6 +56,10 @@ class ReplayBundle:
 
         for resource in self.resources:
             key = self._resource_key(resource)
+            if (resource.get("resource_type") or "").lower() == "document":
+                url = resource.get("url")
+                if url:
+                    self.document_urls.add(url.rstrip("/"))
             self._payloads[key].append(resource)
 
         logger.info(
@@ -331,7 +336,9 @@ async def _cli(
         await page.goto(start_url)
         if steps:
             executor = TaskStepExecutor(
-                steps, run_human_trajectory=run_human_trajectory
+                steps,
+                run_human_trajectory=run_human_trajectory,
+                recorded_documents=bundle.document_urls,
             )
             await executor.run(page)
         await asyncio.Event().wait()
@@ -345,7 +352,7 @@ def main(
     bundle: Path = typer.Argument(..., help="Path to the capture bundle directory"),
     headless: bool = typer.Option(False, help="Run browser in headless mode"),
     allow_network_fallback: bool = typer.Option(
-        True, help="Allow requests missing from the bundle to hit the live network"
+        False, help="Allow requests missing from the bundle to hit the live network"
     ),
     run_human_trajectory: bool = typer.Option(
         False, help="Replay timing with human-like pacing"
