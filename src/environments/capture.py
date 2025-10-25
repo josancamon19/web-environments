@@ -45,6 +45,10 @@ class OfflineCaptureManager:
         self._environment: Dict[str, Any] = {}
         self._atexit_registered = False
 
+    # Register listeners
+    async def on_response(self, response):
+        await self._handle_response(response)
+
     async def start(self, context: BrowserContext) -> None:
         """Initialize capture directories and register listeners."""
 
@@ -80,12 +84,9 @@ class OfflineCaptureManager:
             "context_config": CONTEXT_CONFIG,
             "started_at": self._started_at,
         }
-
-        # Register listeners
-        context.on(
-            "response",
-            lambda response: asyncio.create_task(self._handle_response(response)),
-        )
+        
+        context.on("response", self.on_response)
+        
         context.on(
             "requestfailed",
             lambda request: asyncio.create_task(self._handle_request_failed(request)),
@@ -141,8 +142,7 @@ class OfflineCaptureManager:
 
         request = response.request
         url = request.url
-        self._origins.add(self._origin_from_url(url))
-
+        # Write requests url to a file in a list
         try:
             headers = await request.all_headers()
         except Exception:
