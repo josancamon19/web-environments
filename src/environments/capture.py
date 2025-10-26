@@ -108,7 +108,7 @@ class OfflineCaptureManager:
             encoding="utf-8",
         )
 
-        self._finalize_manifest_sync()
+        self._finalize_manifest()
         self._active = False
         logger.info("[CAPTURE] Offline capture session finalized")
 
@@ -129,7 +129,80 @@ class OfflineCaptureManager:
         if self._failures_log_path:
             await asyncio.to_thread(self._append_jsonl, self._failures_log_path, entry)
 
+    # ====== HANDLE RESPONSE ======
+
+    async def _extract_post_data(self, request: Request) -> Optional[str]:
+        """Extract POST data from request, handling both binary and text formats."""
+        try:
+            # Try binary buffer first (more reliable)
+            post_data_buffer_accessor = getattr(request, "post_data_buffer", None)
+            if callable(post_data_buffer_accessor):
+                try:
+                    data_bytes = await post_data_buffer_accessor()
+                except TypeError:
+                    data_bytes = post_data_buffer_accessor()
+
+                if data_bytes:
+                    try:
+                        return data_bytes.decode("utf-8")
+                    except UnicodeDecodeError:
+                        import base64
+
+                        return base64.b64encode(data_bytes).decode("ascii")
+                return None
+
+            # Fallback to post_data (string)
+            post_accessor = getattr(request, "post_data", None)
+            if callable(post_accessor):
+                try:
+                    return await post_accessor()
+                except TypeError:
+                    return post_accessor()
+            return post_accessor
+        except Exception:
+            return None
+
+    async def _process_response_body(self, response: Response) -> Dict[str, Any]:
+        """Extract and store response body, returning metadata."""
+        body_data = {
+            "body_hash": None,
+            "body_path": None,
+            "body_size": None,
+            "body_error": None,
+        }
+
+        try:
+            body_bytes = await response.body()
+        except Exception as exc:
+            body_data["body_error"] = str(exc)
+            return body_data
+
+        if body_bytes is None or len(body_bytes) == 0:
+            return body_data
+
+        body_data["body_size"] = len(body_bytes)
+        body_hash = hashlib.sha256(body_bytes).hexdigest()
+        body_data["body_hash"] = body_hash
+
+        # Save body to disk if not already stored
+        if body_hash not in self._body_map and self._resources_path:
+            target_path = self._resources_path / f"{body_hash}.bin"
+            await asyncio.to_thread(target_path.write_bytes, body_bytes)
+            self._body_map[body_hash] = target_path.relative_to(
+                self._session_path
+            ).as_posix()
+
+        body_data["body_path"] = self._body_map.get(body_hash)
+        return body_data
+
+    async def _generate_resource_id(self) -> str:
+        """Generate a unique resource ID."""
+        async with self._lock:
+            self._resource_counter += 1
+            return f"res_{self._resource_counter:05d}"
+
     async def _handle_response(self, response: Response) -> None:
+        """Handle a response by capturing all relevant data."""
         if not self._active:
             return
 
@@ -137,81 +210,21 @@ class OfflineCaptureManager:
         url = request.url
         self._origins.add(self._origin_from_url(url))
 
-        try:
-            headers = await request.all_headers()
-        except Exception:
-            headers = dict(getattr(request, "headers", {}))
+        async def extract_headers(obj: Request | Response) -> Dict[str, str]:
+            """Extract headers from a request or response object."""
+            try:
+                return await obj.all_headers()
+            except Exception:
+                return dict(getattr(obj, "headers", {}))
 
-        # Safely capture POST data; prefer binary buffer and base64-encode if needed
-        post_data = None
-        try:
-            post_data_buffer_accessor = getattr(request, "post_data_buffer", None)
-            if callable(post_data_buffer_accessor):
-                try:
-                    data_bytes = await post_data_buffer_accessor()
-                except TypeError:
-                    data_bytes = post_data_buffer_accessor()
-                if data_bytes:
-                    try:
-                        # Try utf-8 first
-                        post_data = data_bytes.decode("utf-8")
-                    except UnicodeDecodeError:
-                        import base64
+        # Extract request and response data
+        request_headers = await extract_headers(request)
+        response_headers = await extract_headers(response)
+        post_data = await self._extract_post_data(request)
+        body_data = await self._process_response_body(response)
+        resource_id = await self._generate_resource_id()
 
-                        post_data = base64.b64encode(data_bytes).decode("ascii")
-                else:
-                    post_data = None
-            else:
-                # Fallback to post_data (string) if buffer not available
-                post_accessor = getattr(request, "post_data", None)
-                if callable(post_accessor):
-                    try:
-                        post_data = await post_accessor()
-                    except TypeError:
-                        post_data = post_accessor()
-                else:
-                    post_data = post_accessor
-        except Exception:
-            post_data = None
-
-        try:
-            response_headers = await response.all_headers()
-        except Exception:
-            response_headers = dict(getattr(response, "headers", {}))
-
-        status = response.status
-
-        body_bytes: Optional[bytes] = None
-        body_hash: Optional[str] = None
-        body_path: Optional[str] = None
-        body_size: Optional[int] = None
-        body_error: Optional[str] = None
-
-        try:
-            body_bytes = await response.body()
-        except Exception as exc:
-            body_error = str(exc)
-
-        if body_bytes is not None:
-            body_size = len(body_bytes)
-            if body_size > 0:
-                body_hash = hashlib.sha256(body_bytes).hexdigest()
-                if body_hash not in self._body_map and self._resources_path:
-                    target_path = self._resources_path / f"{body_hash}.bin"
-                    await asyncio.to_thread(target_path.write_bytes, body_bytes)
-                    self._body_map[body_hash] = target_path.relative_to(
-                        self._session_path
-                    ).as_posix()
-
-                body_path = self._body_map.get(body_hash)
-
-        async with self._lock:
-            self._resource_counter += 1
-            resource_id = f"res_{self._resource_counter:05d}"
-
-        initiator = (
-            (headers.get("referer") or headers.get("Referer")) if headers else None
-        )
+        # Build resource entry
         entry = {
             "id": resource_id,
             "timestamp": get_iso_datetime(),
@@ -219,23 +232,21 @@ class OfflineCaptureManager:
             "method": request.method,
             "resource_type": request.resource_type,
             "frame_url": request.frame.url if request.frame else None,
-            "initiator": initiator,
-            "status": status,
-            "request_headers": headers,
+            "initiator": request_headers.get("referer")
+            or request_headers.get("Referer"),
+            "status": response.status,
+            "request_headers": request_headers,
             "response_headers": response_headers,
             "post_data": post_data,
-            "body_path": body_path,
-            "body_hash": body_hash,
-            "body_size": body_size,
-            "body_error": body_error,
+            **body_data,
         }
 
+        # Store and log
         self._resources.append(entry)
         if self._requests_log_path:
             await asyncio.to_thread(self._append_jsonl, self._requests_log_path, entry)
 
-    def _finalize_manifest_sync(self) -> None:
-        """Write manifest synchronously."""
+    def _finalize_manifest(self) -> None:
         if not self._manifest_path:
             return
 
@@ -278,5 +289,5 @@ class OfflineCaptureManager:
         if not self._active:
             return
         logger.warning("[CAPTURE] Atexit handler called - writing manifest only")
-        self._finalize_manifest_sync()
+        self._finalize_manifest()
         self._active = False

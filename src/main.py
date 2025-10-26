@@ -11,10 +11,6 @@ from utils.get_task_description import (
     get_website_from_user,
 )
 
-# TODO: Fix desktop app to collect storage and resources properly
-# TODO: Simplify capture.py code further
-# TODO: test replay works, test human trajectory works
-
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
