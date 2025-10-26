@@ -76,7 +76,17 @@ class StealthBrowser:
 
         actual_page = ActualPage()
         actual_page.set_page(self.page)
-        self.page.on("console", lambda msg: print(f"🌐 Browser console: {msg.text}"))
+
+        async def console_handler(msg):
+            # Skip common noisy warnings
+            text = msg.text
+            if "Blocked script execution in 'about:blank'" in text:
+                return
+            if "Failed to execute 'postMessage'" in text:
+                return
+            print(f"🌐 Browser console: {text}")
+
+        self.page.on("console", console_handler)
 
         await self.apply_stealth_techniques()
         await self._initialize_page_event_script(self.page)

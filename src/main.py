@@ -10,6 +10,9 @@ from utils.get_task_description import (
     get_source_from_user,
     get_website_from_user,
 )
+# TODO: Fix desktop app to collect storage and resources properly
+# TODO: Simplify capture.py code further
+# TODO: test replay works, test human trajectory works
 
 logging.basicConfig(
     level=logging.DEBUG,  # Changed to DEBUG to see all logs
