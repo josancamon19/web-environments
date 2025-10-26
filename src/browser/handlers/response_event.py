@@ -24,7 +24,7 @@ class ResponseEvent:
             self.db = Database.get_instance()
             ResponseEvent._initialized = True
 
-    async def listen_for_response(self, response):
+    async def listen(self, response):
         try:
             req = response.request
             if req.resource_type not in ("xhr", "fetch", "document"):

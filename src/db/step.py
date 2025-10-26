@@ -54,21 +54,21 @@ class StepManager:
 
     def __init__(self):
         if not self._initialized:
-            self.actual_step = None
+            self.current_step = None
             self.step_repository = StepRepository()
             StepManager._initialized = True
 
     def save_step(self, step: CreateStepDto):
         return self.step_repository.save(step)
 
-    def get_actual_step(self):
-        return self.actual_step
+    def get_current_step(self):
+        return self.current_step
 
     def set_actual_step(self, step: Step):
-        self.actual_step = step
+        self.current_step = step
 
     def end_actual_step(self):
-        self.actual_step = None
+        self.current_step = None
 
     @classmethod
     def get_instance(cls):

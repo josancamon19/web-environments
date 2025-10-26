@@ -48,10 +48,6 @@ class OfflineCaptureManager:
 
         task_manager = TaskManager.get_instance()
         task = task_manager.get_actual_task()
-        if not task:
-            logger.warning("[CAPTURE] No active task; offline capture disabled")
-            return
-
         if self._active:
             logger.debug("[CAPTURE] Session already active")
             return
@@ -103,21 +99,15 @@ class OfflineCaptureManager:
         if not self._active:
             return
 
-        # Capture storage state while context is still alive
-        if self._context and self._storage_path:
-            try:
-                logger.info("[CAPTURE] Capturing storage state")
-                state = await self._context.storage_state()
-                # Write synchronously to avoid event loop issues
-                (self._storage_path / "storage_state.json").write_text(
-                    json.dumps(state, indent=2, ensure_ascii=False),
-                    encoding="utf-8",
-                )
-                logger.info("[CAPTURE] Storage state captured successfully")
-            except Exception as exc:
-                logger.error("[CAPTURE] Failed to capture storage state: %s", exc)
+        if not self._storage_path or not self._context:
+            raise ValueError("Storage path or context not set")
 
-        # Write manifest synchronously
+        state = await self._context.storage_state()
+        (self._storage_path / "storage_state.json").write_text(
+            json.dumps(state, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
         self._finalize_manifest_sync()
         self._active = False
         logger.info("[CAPTURE] Offline capture session finalized")
@@ -219,6 +209,9 @@ class OfflineCaptureManager:
             self._resource_counter += 1
             resource_id = f"res_{self._resource_counter:05d}"
 
+        initiator = (
+            (headers.get("referer") or headers.get("Referer")) if headers else None
+        )
         entry = {
             "id": resource_id,
             "timestamp": get_iso_datetime(),
@@ -226,9 +219,7 @@ class OfflineCaptureManager:
             "method": request.method,
             "resource_type": request.resource_type,
             "frame_url": request.frame.url if request.frame else None,
-            "initiator": (headers.get("referer") or headers.get("Referer"))
-            if headers
-            else None,
+            "initiator": initiator,
             "status": status,
             "request_headers": headers,
             "response_headers": response_headers,

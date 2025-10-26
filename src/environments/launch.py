@@ -72,12 +72,7 @@ class ReplayBundle:
 
         db = Database.get_instance()
         conn = db.get_connection()
-        if conn is None:
-            logger.error(
-                "Database connection unavailable; cannot load steps for task %s",
-                self.task_id,
-            )
-            return []
+        assert conn is not None, "Database connection unavailable"
 
         cursor = conn.cursor()
         cursor.execute(
@@ -250,14 +245,35 @@ class ReplayBundle:
         return storage_state if storage_state.exists() else None
 
     async def _safe_post_data(self, request) -> Optional[str]:
-        accessor = getattr(request, "post_data", None)
+        """Safely extract POST data, handling both text and binary payloads."""
         try:
-            if callable(accessor):
+            # Try post_data_buffer first (returns bytes)
+            buffer_accessor = getattr(request, "post_data_buffer", None)
+            if callable(buffer_accessor):
                 try:
-                    return await accessor()
+                    data_bytes = await buffer_accessor()
                 except TypeError:
-                    return accessor()
-            return accessor
+                    data_bytes = buffer_accessor()
+
+                if data_bytes:
+                    try:
+                        # Try UTF-8 decode for text data
+                        return data_bytes.decode("utf-8")
+                    except UnicodeDecodeError:
+                        # For binary data, base64 encode it
+                        import base64
+
+                        return base64.b64encode(data_bytes).decode("ascii")
+                return None
+
+            # Fallback: try accessing post_data property (may fail on binary)
+            # We can't use getattr because it triggers the property getter
+            # which may throw UnicodeDecodeError
+            try:
+                post_data = request.post_data
+                return post_data
+            except (UnicodeDecodeError, AttributeError):
+                return None
         except Exception:
             return None
 
