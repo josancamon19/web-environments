@@ -13,8 +13,6 @@ from config.browser_config import CONTEXT_CONFIG
 from config.storage import DATA_DIR
 from db.task import TaskManager, Task
 from utils.get_iso_datetime import get_iso_datetime
-from db.database import Database
-
 
 logger = logging.getLogger(__name__)
 
@@ -101,16 +99,26 @@ class OfflineCaptureManager:
         )
 
     async def stop(self) -> None:
-        if not self._active or not self._context:
+        """Finalize capture - must be called BEFORE context closes."""
+        if not self._active:
             return
 
-        await self._finalize_manifest()
-        await self._capture_storage_state()
-        await self._capture_session_storage()
-        await self._capture_local_storage()
-        await self._capture_indexed_db()
-        await self._export_task_records()
+        # Capture storage state while context is still alive
+        if self._context and self._storage_path:
+            try:
+                logger.info("[CAPTURE] Capturing storage state")
+                state = await self._context.storage_state()
+                # Write synchronously to avoid event loop issues
+                (self._storage_path / "storage_state.json").write_text(
+                    json.dumps(state, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                logger.info("[CAPTURE] Storage state captured successfully")
+            except Exception as exc:
+                logger.error("[CAPTURE] Failed to capture storage state: %s", exc)
 
+        # Write manifest synchronously
+        self._finalize_manifest_sync()
         self._active = False
         logger.info("[CAPTURE] Offline capture session finalized")
 
@@ -129,11 +137,7 @@ class OfflineCaptureManager:
         }
         self._request_failures.append(entry)
         if self._failures_log_path:
-            await asyncio.to_thread(
-                self._append_jsonl,
-                self._failures_log_path,
-                entry,
-            )
+            await asyncio.to_thread(self._append_jsonl, self._failures_log_path, entry)
 
     async def _handle_response(self, response: Response) -> None:
         if not self._active:
@@ -239,12 +243,18 @@ class OfflineCaptureManager:
         if self._requests_log_path:
             await asyncio.to_thread(self._append_jsonl, self._requests_log_path, entry)
 
-    async def _finalize_manifest(self) -> None:
+    def _finalize_manifest_sync(self) -> None:
+        """Write manifest synchronously."""
         if not self._manifest_path:
             return
 
         manifest = {
-            "task": self._serialize_task(self._task),
+            "task": {
+                "id": self._task.id,
+                "description": self._task.description,
+                "task_type": self._task.task_type,
+                "source": self._task.source,
+            },
             "started_at": self._started_at,
             "finished_at": get_iso_datetime(),
             "environment": self._environment,
@@ -253,134 +263,10 @@ class OfflineCaptureManager:
             "origins": sorted(o for o in self._origins if o),
         }
 
-        await asyncio.to_thread(
-            self._manifest_path.write_text,
+        self._manifest_path.write_text(
             json.dumps(manifest, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
-
-    async def _capture_storage_state(self) -> None:
-        if not self._context or not self._storage_path:
-            return
-
-        storage_state_path = self._storage_path / "storage_state.json"
-        try:
-            state = await self._context.storage_state()
-            await asyncio.to_thread(
-                storage_state_path.write_text,
-                json.dumps(state, indent=2, ensure_ascii=False),
-                encoding="utf-8",
-            )
-        except Exception as exc:
-            logger.info(
-                "[CAPTURE] storage_state() unavailable (%s); falling back to cookie snapshot",
-                exc,
-            )
-            try:
-                cookies = await self._context.cookies()
-            except Exception:
-                cookies = []
-
-            fallback_state = {"cookies": cookies, "origins": []}
-            await asyncio.to_thread(
-                storage_state_path.write_text,
-                json.dumps(fallback_state, indent=2, ensure_ascii=False),
-                encoding="utf-8",
-            )
-
-    async def _capture_session_storage(self) -> None:
-        if not self._context or not self._storage_path:
-            return
-
-        session_entries: list[Dict[str, Any]] = []
-        for page in self._context.pages:
-            try:
-                data = await page.evaluate(
-                    "() => {"
-                    "  if (!window.sessionStorage) return null;"
-                    "  const data = {};"
-                    "  for (let i = 0; i < sessionStorage.length; i++) {"
-                    "    const key = sessionStorage.key(i);"
-                    "    data[key] = sessionStorage.getItem(key);"
-                    "  }"
-                    "  return { origin: location.origin, data };"
-                    "}"
-                )
-                if data:
-                    session_entries.append(data)
-            except Exception as exc:
-                logger.debug("[CAPTURE] Failed to read sessionStorage: %s", exc)
-
-        if session_entries:
-            target = self._storage_path / "session_storage.json"
-            await asyncio.to_thread(
-                target.write_text,
-                json.dumps(session_entries, indent=2, ensure_ascii=False),
-                encoding="utf-8",
-            )
-
-    async def _capture_local_storage(self) -> None:
-        if not self._context or not self._storage_path:
-            return
-
-        local_entries: list[Dict[str, Any]] = []
-        for page in self._context.pages:
-            try:
-                data = await page.evaluate(
-                    "() => {"
-                    "  if (!window.localStorage) return null;"
-                    "  const data = {};"
-                    "  for (let i = 0; i < localStorage.length; i++) {"
-                    "    const key = localStorage.key(i);"
-                    "    data[key] = localStorage.getItem(key);"
-                    "  }"
-                    "  return { origin: location.origin, data };"
-                    "}"
-                )
-                if data:
-                    local_entries.append(data)
-            except Exception as exc:
-                logger.debug("[CAPTURE] Failed to read localStorage: %s", exc)
-
-        if local_entries:
-            target = self._storage_path / "local_storage.json"
-            await asyncio.to_thread(
-                target.write_text,
-                json.dumps(local_entries, indent=2, ensure_ascii=False),
-                encoding="utf-8",
-            )
-
-    async def _capture_indexed_db(self) -> None:
-        if not self._context or not self._storage_path:
-            return
-
-        summaries: list[Dict[str, Any]] = []
-        for page in self._context.pages:
-            try:
-                data = await page.evaluate(
-                    "async () => {"
-                    "  if (!('indexedDB' in window) || !indexedDB.databases) {"
-                    "    return null;"
-                    "  }"
-                    "  const dbs = await indexedDB.databases();"
-                    "  return {"
-                    "    origin: location.origin,"
-                    "    databases: dbs ? dbs.map(db => ({ name: db.name, version: db.version })) : []"
-                    "  };"
-                    "}"
-                )
-                if data:
-                    summaries.append(data)
-            except Exception as exc:
-                logger.debug("[CAPTURE] Failed to inspect indexedDB: %s", exc)
-
-        if summaries:
-            target = self._storage_path / "indexeddb.json"
-            await asyncio.to_thread(
-                target.write_text,
-                json.dumps(summaries, indent=2, ensure_ascii=False),
-                encoding="utf-8",
-            )
 
     @staticmethod
     def _append_jsonl(path: Path, entry: Dict[str, Any]) -> None:
@@ -396,98 +282,10 @@ class OfflineCaptureManager:
             return None
         return f"{parts.scheme}://{parts.netloc}"
 
-    @staticmethod
-    def _serialize_task(task: Optional[Task]) -> Optional[Dict[str, Any]]:
-        if not task:
-            return None
-        return {
-            "id": task.id,
-            "description": task.description,
-            "task_type": task.task_type,
-            "source": task.source,
-        }
-
-    async def _export_task_records(self) -> None:
-        if not self._task or not self._session_path:
-            return
-
-        db = Database.get_instance()
-        conn = db.get_connection()
-        if conn is None:
-            return
-
-        def export() -> None:
-            cursor = conn.cursor()
-
-            steps_path = self._session_path / "steps.jsonl"
-            cursor.execute(
-                "SELECT id, timestamp, event_type, event_data, dom_snapshot, dom_snapshot_metadata, screenshot_path "
-                "FROM steps WHERE task_id = ? ORDER BY id",
-                (self._task.id,),
-            )
-            with steps_path.open("w", encoding="utf-8") as fh:
-                for row in cursor.fetchall():
-                    record = {
-                        "id": row[0],
-                        "timestamp": row[1],
-                        "event_type": row[2],
-                        "event_data": row[3],
-                        "dom_snapshot": row[4],
-                        "dom_snapshot_metadata": row[5],
-                        "screenshot_path": row[6],
-                    }
-                    fh.write(json.dumps(record, ensure_ascii=False) + "\n")
-
-            requests_path = self._session_path / "requests_db.jsonl"
-            cursor.execute(
-                "SELECT id, step_id, request_uid, url, method, headers, post_data, cookies, timestamp "
-                "FROM requests WHERE task_id = ? ORDER BY id",
-                (self._task.id,),
-            )
-            with requests_path.open("w", encoding="utf-8") as fh:
-                for row in cursor.fetchall():
-                    record = {
-                        "id": row[0],
-                        "step_id": row[1],
-                        "request_uid": row[2],
-                        "url": row[3],
-                        "method": row[4],
-                        "headers": row[5],
-                        "post_data": row[6],
-                        "cookies": row[7],
-                        "timestamp": row[8],
-                    }
-                    fh.write(json.dumps(record, ensure_ascii=False) + "\n")
-
-            responses_path = self._session_path / "responses_db.jsonl"
-            cursor.execute(
-                "SELECT id, request_id, status, headers, LENGTH(body) as body_size, timestamp "
-                "FROM responses WHERE task_id = ? ORDER BY id",
-                (self._task.id,),
-            )
-            with responses_path.open("w", encoding="utf-8") as fh:
-                for row in cursor.fetchall():
-                    record = {
-                        "id": row[0],
-                        "request_id": row[1],
-                        "status": row[2],
-                        "headers": row[3],
-                        "body_size": row[4],
-                        "timestamp": row[5],
-                    }
-                    fh.write(json.dumps(record, ensure_ascii=False) + "\n")
-
-        await asyncio.to_thread(export)
-
     def _finalize_sync(self) -> None:
+        """Emergency cleanup called by atexit - only writes manifest."""
         if not self._active:
             return
-
-        try:
-            asyncio.run(self.stop())
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            try:
-                loop.run_until_complete(self.stop())
-            finally:
-                loop.close()
+        logger.warning("[CAPTURE] Atexit handler called - writing manifest only")
+        self._finalize_manifest_sync()
+        self._active = False

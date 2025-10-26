@@ -1,5 +1,4 @@
 import asyncio
-import signal
 import logging
 from browser.browser import StealthBrowser
 from config.start import InitialTasks
@@ -55,40 +54,33 @@ async def main():
 
         print("Browser launched successfully!")
 
+        print("\n" + "=" * 60)
         print("You can now navigate to any page and interact with it.")
         print("Page events will be logged to the console.")
-        print("Press Ctrl+C to exit")
+        print("=" * 60)
+        print("\n💡 When you're done, press ENTER here to complete the task")
+        print("=" * 60 + "\n")
 
-        loop = asyncio.get_running_loop()
-        shutdown_complete = asyncio.Event()
-        shutdown_started = False
+        # Simple blocking wait - no async complexity
+        await asyncio.to_thread(input)
 
-        async def shutdown():
-            print(f'\n🛑 Task completed: "{task_description}"')
+        print(f'\n🛑 Task completed: "{task_description}"')
+        print("🔄 Closing browser and stopping recording...")
 
-            if task_type == "information_retrieval":
-                answer = await asyncio.to_thread(get_answer_from_user)
-                task_manager.save_task_answer(answer)
+        # Close browser cleanly - this will capture storage state and stop logging
+        await stealth_browser.close()
 
-            print("🔄 Closing browser...")
-            task_manager.end_actual_task()
-            task_manager.save_task_video(task_manager.get_last_task_path())
-            await stealth_browser.close()
-            shutdown_complete.set()
+        task_manager.end_actual_task()
+        task_manager.save_task_video(task_manager.get_last_task_path())
 
-        def signal_handler(signum, frame):
-            nonlocal shutdown_started
-            if not shutdown_started:
-                shutdown_started = True
-                loop.create_task(shutdown())
+        print("✅ Browser closed and recording saved")
 
-        signal.signal(signal.SIGINT, signal_handler)
-
-        # Leave it on about:blank
-        # await stealth_browser.page.goto("https://www.google.com")
-        # await stealth_browser.page.wait_for_load_state("domcontentloaded")
-
-        await shutdown_complete.wait()
+        # Now ask for answer AFTER everything is closed and quiet
+        if task_type == "information_retrieval":
+            print("\n" + "=" * 60)
+            answer = await asyncio.to_thread(get_answer_from_user)
+            task_manager.save_task_answer(answer)
+            print("=" * 60)
 
     except Exception as error:
         print(f"Ha ocurrido un error al ejecutar la tarea: {error}")
