@@ -1,14 +1,16 @@
 import asyncio
 import logging
 from typing import Any, Dict, Optional, Tuple
-from db.step import Step
+from db.models import StepModel
 
 
 logger = logging.getLogger(__name__)
 
 
 class TaskStepExecutor:
-    def __init__(self, trajectory: list[Step], *, run_human_trajectory: bool = False):
+    def __init__(
+        self, trajectory: list[StepModel], *, run_human_trajectory: bool = False
+    ):
         self.trajectory = trajectory
         self.run_human_trajectory = run_human_trajectory
         self._initial_navigation_done = False
@@ -31,15 +33,15 @@ class TaskStepExecutor:
             base_delay = 0.2 if self.run_human_trajectory else 0.1
             await asyncio.sleep(base_delay)
 
-    async def _run_step(self, page, step: Step) -> None:
+    async def _run_step(self, page, step: StepModel) -> None:
         category, subject, action = self._split_event_type(step.event_type)
 
         if category == "state":
-            await self._handle_state_step(page, subject, action, step.event_data)
+            await self._handle_state_step(page, subject, action, step.event_data_json)
             return
 
         if category == "action" and subject == "user":
-            await self._handle_user_action(page, action, step.event_data)
+            await self._handle_user_action(page, action, step.event_data_json)
 
     async def _handle_state_step(
         self, page, subject: str, action: str, payload: Dict[str, Any]

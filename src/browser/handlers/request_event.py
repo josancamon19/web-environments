@@ -73,7 +73,7 @@ class RequestEvent:
         step_id = step.id if step else None
 
         # Get the current task
-        current_task = self.task_manager.get_actual_task()
+        current_task = self.task_manager.get_current_task()
         if not current_task:
             logger.warning("[REQUEST] No active task found, skipping request recording")
             return

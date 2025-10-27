@@ -54,7 +54,7 @@ def run_task_worker(
             new_task = CreateTaskDto(description, task_type, source, website)
             task_id = task_manager.save_task(new_task)
             task = Task(task_id, description, task_type, source, website)
-            task_manager.set_actual_task(task)
+            task_manager.set_current_task(task)
             _send_safe(pipe, {"type": "task_started", "task_id": task_id})
             _send_safe(
                 pipe,
@@ -96,11 +96,11 @@ def run_task_worker(
 
             try:
                 if task_manager:
-                    task_manager.end_actual_task()
+                    task_manager.end_current_task()
                     last_path = task_manager.get_last_task_path()
                     if last_path:
                         task_manager.save_task_video(last_path)
-                    task_manager.set_actual_task(None)  # type: ignore[arg-type]
+                    task_manager.set_current_task(None)  # type: ignore[arg-type]
             except Exception as mgr_error:  # pylint: disable=broad-except
                 logger.warning("Failed to finalise task metadata: %s", mgr_error)
 

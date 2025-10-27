@@ -1,41 +1,14 @@
 """Task management using Peewee ORM."""
+
 from typing import Optional
 import logging
 
 from db.database import Database
 from db.models import TaskModel
 from utils.environment_fingerprint import get_environment_fingerprint_json
+from utils.get_iso_datetime import get_iso_datetime
 
 logger = logging.getLogger(__name__)
-
-
-class Task:
-    """Task domain object."""
-
-    def __init__(
-        self,
-        id: int,
-        description: str,
-        task_type: str = "action",
-        source: str = "none",
-        website: Optional[str] = None,
-    ):
-        self.id = id
-        self.description = description
-        self.task_type = task_type
-        self.source = source
-        self.website = website
-
-    @classmethod
-    def from_model(cls, model: TaskModel) -> "Task":
-        """Create Task from Peewee model."""
-        return cls(
-            id=model.id,
-            description=model.description,
-            task_type=model.task_type,
-            source=model.source,
-            website=model.website,
-        )
 
 
 class CreateTaskDto:
@@ -69,9 +42,10 @@ class TaskManager:
     def __init__(self):
         """Initialize the singleton (only once)."""
         if not self._initialized:
-            self.tasks = None
+            self.current_task = None
             self.last_task_path = None
-            self.task_repository = TaskRepository()
+            # Ensure database is initialized
+            Database.get_instance()
             TaskManager._initialized = True
 
     @classmethod
@@ -81,57 +55,46 @@ class TaskManager:
             cls._instance = cls()
         return cls._instance
 
-    def get_actual_task(self) -> Task:
-        """Get the current active task."""
-        return self.tasks
+    def get_current_task(self) -> Optional[TaskModel]:
+        return self.current_task
 
-    def set_actual_task(self, task: Task):
-        """Set the current active task."""
-        self.tasks = task
+    def set_current_task(self, task: TaskModel):
+        self.current_task = task
 
-    def get_last_task_path(self) -> str:
-        """Get the path of the last task."""
-        return self.last_task_path
-
-    def set_last_task_path(self, path: str):
-        """Set the path of the last task."""
-        self.last_task_path = path
-
-    def end_actual_task(self):
-        """End the current active task."""
-        if self.tasks:
-            self.task_repository.update_task_ended_at(self.tasks.id)
-        else:
-            logger.warning("No active task to end")
-
-    def save_task(self, task: CreateTaskDto) -> int:
-        """Save a new task and return its ID."""
-        return self.task_repository.save(task)
-
-    def save_task_video(self, video_path: str):
-        """Save video path for the current task."""
-        if self.tasks:
-            self.task_repository.save_task_video(self.tasks.id, video_path)
+    def set_current_task_video_path(self, video_path: str):
+        """Set video path for the current task."""
+        if self.current_task:
+            TaskModel.update(video_path=video_path).where(
+                TaskModel.id == self.current_task.id
+            ).execute()
         else:
             logger.warning("No active task to save video for")
 
-    def save_task_answer(self, answer: str):
-        """Save answer for the current task."""
-        if self.tasks:
-            self.task_repository.save_task_answer(self.tasks.id, answer)
+    def set_current_task_answer(self, answer: str):
+        """Set answer for the current task."""
+        if self.current_task:
+            TaskModel.update(answer=answer).where(
+                TaskModel.id == self.current_task.id
+            ).execute()
+            print(f"Answer saved for task {self.current_task.id}")
         else:
             logger.warning("No active task to save answer for")
 
+    def get_last_task_path(self) -> str:
+        return self.last_task_path
 
-class TaskRepository:
-    """Repository for task persistence using Peewee ORM."""
+    def set_last_task_path(self, path: str):
+        self.last_task_path = path
 
-    def __init__(self):
-        # Ensure database is initialized
-        Database.get_instance()
+    def end_current_task(self):
+        if self.current_task:
+            db = Database.get_instance()
+            db.end_task(self.current_task.id)
+        else:
+            logger.warning("No active task to end")
 
-    def save(self, task: CreateTaskDto) -> int:
-        """Create a new task and return its ID."""
+    def create_task(self, task: CreateTaskDto) -> int:
+        """Save a new task and return its ID."""
         fingerprint = get_environment_fingerprint_json()
         task_model = TaskModel.create(
             description=task.description,
@@ -139,29 +102,6 @@ class TaskRepository:
             source=task.source,
             website=task.website,
             environment_fingerprint=fingerprint,
-            created_at=self._get_iso_datetime(),
+            created_at=get_iso_datetime(),
         )
         return task_model.id
-
-    def update_task_ended_at(self, task_id: int):
-        """Update task end time and calculate duration."""
-        from db.database import Database
-
-        db = Database.get_instance()
-        db.end_task(task_id)
-
-    def save_task_video(self, task_id: int, video_path: str):
-        """Update task with video path."""
-        TaskModel.update(video_path=video_path).where(TaskModel.id == task_id).execute()
-
-    def save_task_answer(self, task_id: int, answer: str):
-        """Update task with answer."""
-        TaskModel.update(answer=answer).where(TaskModel.id == task_id).execute()
-        print(f"Answer saved for task {task_id}")
-
-    @staticmethod
-    def _get_iso_datetime() -> str:
-        """Get current ISO datetime."""
-        from utils.get_iso_datetime import get_iso_datetime
-
-        return get_iso_datetime()

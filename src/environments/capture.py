@@ -11,7 +11,8 @@ from playwright.async_api import BrowserContext, Request, Response
 
 from config.browser_config import CONTEXT_CONFIG
 from config.storage import DATA_DIR
-from db.task import TaskManager, Task
+from db.task import TaskManager
+from db.models import TaskModel
 from utils.get_iso_datetime import get_iso_datetime
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ class OfflineCaptureManager:
         self._lock = asyncio.Lock()
         self._active = False
         self._context: Optional[BrowserContext] = None
-        self._task: Optional[Task] = None
+        self._task: Optional[TaskModel] = None
 
         self._session_path: Optional[Path] = None
         self._resources_path: Optional[Path] = None
@@ -76,7 +77,7 @@ class OfflineCaptureManager:
         """Initialize capture directories and register listeners."""
 
         task_manager = TaskManager.get_instance()
-        task = task_manager.get_actual_task()
+        task = task_manager.get_current_task()
         if self._active:
             logger.debug("[CAPTURE] Session already active")
             return

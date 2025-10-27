@@ -2,7 +2,8 @@ import asyncio
 import logging
 from browser.browser import StealthBrowser
 from config.start import InitialTasks
-from db.task import TaskManager, CreateTaskDto, Task
+from db.task import TaskManager, CreateTaskDto
+from db.models import TaskModel
 from utils.get_task_description import (
     get_task_description_from_user,
     get_task_type_from_user,
@@ -19,6 +20,9 @@ logging.basicConfig(
         logging.FileHandler("recorder_debug.log"),
     ],
 )
+
+# Suppress verbose Peewee SQL debug logs
+logging.getLogger("peewee").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +46,9 @@ async def main():
 
         new_task = CreateTaskDto(task_description, task_type, source, website)
         task_id = task_manager.save_task(new_task)
-        task_manager.set_actual_task(
-            Task(task_id, task_description, task_type, source, website)
-        )
+        # Get the task we just created
+        task_model = TaskModel.get_by_id(task_id)
+        task_manager.set_current_task(task_model)
 
         logger.info(f"Task saved: {task_id}")
 
@@ -70,7 +74,7 @@ async def main():
         # Close browser cleanly - this will capture storage state and stop logging
         await stealth_browser.close()
 
-        task_manager.end_actual_task()
+        task_manager.end_current_task()
         task_manager.save_task_video(task_manager.get_last_task_path())
 
         print("✅ Browser closed and recording saved")
@@ -83,7 +87,7 @@ async def main():
             print("=" * 60)
 
     except Exception as error:
-        print(f"Ha ocurrido un error al ejecutar la tarea: {error}")
+        print(f"Error while executing task {error}")
         await stealth_browser.close()
 
 

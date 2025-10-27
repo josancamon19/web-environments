@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 def get_tasks_video_path():
     task_manager = TaskManager()
-    task = task_manager.get_actual_task()
+    task = task_manager.get_current_task()
 
     if not task:
         logger.error("No active task found when getting video path")

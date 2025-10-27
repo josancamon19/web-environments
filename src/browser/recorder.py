@@ -9,7 +9,7 @@ from db.task import TaskManager
 from browser.page import ActualPage
 from db.step import StepManager
 from utils.get_screenshot_path import get_screenshot_path
-from db.step import Step
+from db.models import StepModel
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class Recorder:
     async def record_step(self, step_info: dict, omit_screenshot: bool = False):
         try:
             timestamp = get_iso_datetime()
-            actual_task = self.task_manager.get_actual_task()
+            actual_task = self.task_manager.get_current_task()
 
             if not actual_task:
                 logger.error("[RECORD_STEP] No active task found")
@@ -118,18 +118,9 @@ class Recorder:
                 screenshot_path=actual_screenshot_path,
             )
 
-            self.step_manager.set_actual_step(
-                Step(
-                    id=step_id,
-                    task_id=actual_task.id,
-                    timestamp=timestamp,
-                    event_type=context_type_action,
-                    event_data=event_data_json,
-                    dom_snapshot=dom_snapshot,
-                    dom_snapshot_metadata=dom_snapshot_metadata_json,
-                    screenshot_path=actual_screenshot_path,
-                )
-            )
+            # Get the step we just created from the database
+            step_model = StepModel.get_by_id(step_id)
+            self.step_manager.set_current_step(step_model)
 
         except Exception as e:
             logger.error(f"[RECORD_STEP] Failed to record step: {e}", exc_info=True)

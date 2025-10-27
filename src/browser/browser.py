@@ -41,7 +41,7 @@ class StealthBrowser:
         task_manager.set_last_task_path(VIDEO_TASK_PATH)
 
         # Get HAR path for this task before starting capture
-        task = task_manager.get_actual_task()
+        task = task_manager.get_current_task()
         har_path = self.environment_capturer.get_har_path(task.id)
 
         self.context = await self.launch_browser(VIDEO_TASK_PATH, har_path)
@@ -250,7 +250,7 @@ class StealthBrowser:
     async def manual_browser_close(self):
         logger.info("Browser closed manually")
         task_manager = TaskManager()
-        task_manager.end_actual_task()
+        task_manager.end_current_task()
         last_task_path = task_manager.get_last_task_path()
         logger.info(f"Last task path: {last_task_path}")
         await self.close()

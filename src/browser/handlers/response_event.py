@@ -60,7 +60,7 @@ class ResponseEvent:
 
         # Don't create a step - just insert into responses table
         # Get the current task
-        current_task = self.task_manager.get_actual_task()
+        current_task = self.task_manager.get_current_task()
         if not current_task:
             logger.warning(
                 "[RESPONSE] No active task found, skipping response recording"
