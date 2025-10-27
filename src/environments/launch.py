@@ -67,7 +67,11 @@ class ReplayBundle:
         return None
 
     async def build_context(
-        self, browser: Browser, *, allow_network_fallback: bool = False
+        self,
+        browser: Browser,
+        *,
+        allow_network_fallback: bool = False,
+        use_har: bool = False,
     ) -> BrowserContext:
         context_config = dict(self.environment.get("context_config") or {})
         storage_state_path = self._storage_state_path()
@@ -76,7 +80,28 @@ class ReplayBundle:
             context_config["storage_state"] = str(storage_state_path)
 
         context = await browser.new_context(**context_config)
-        await self.attach(context, allow_network_fallback=allow_network_fallback)
+
+        # Choose replay mode: HAR or manual request handling
+        if use_har:
+            har_path = self.bundle_path / "recording.har"
+            if har_path.exists():
+                logger.info("Using HAR replay from %s", har_path)
+                await context.route_from_har(
+                    str(har_path),
+                    not_found="fallback" if allow_network_fallback else "abort",
+                    update=False,  # Don't update the HAR, just replay
+                )
+            else:
+                logger.warning(
+                    "HAR file not found at %s, falling back to manual replay", har_path
+                )
+                await self.attach(
+                    context, allow_network_fallback=allow_network_fallback
+                )
+        else:
+            logger.info("Using manual request replay from manifest")
+            await self.attach(context, allow_network_fallback=allow_network_fallback)
+
         return context
 
     async def attach(
@@ -93,6 +118,7 @@ class ReplayBundle:
     async def _fulfill(self, route: Route, *, allow_network_fallback: bool) -> None:
         request = route.request
         post_data = await self._safe_post_data(request)
+        # TODO: we can do some LM parsing here, to map to the correct URL, as some interactions might generate at times different URL combinations, maybe even POST data handling
         key = (request.method, request.url, post_data or "")
 
         entries = self._payloads.get(key)
@@ -119,7 +145,6 @@ class ReplayBundle:
                 )
 
         if payload:
-            # Log cached URL
             if self.log_dir and request.url not in self._cached_urls:
                 self._cached_urls.add(request.url)
 
@@ -131,6 +156,10 @@ class ReplayBundle:
                     headers["content-length"] = str(len(body_bytes))
 
             status = payload.get("status") or 200
+            # if request.method == "POST":
+            #     logger.info(f"Fulfilled POST {request.url} with cached payload")
+            #     logger.info(f"Headers: {headers}")
+            #     logger.info(f"Status: {status}")
             await route.fulfill(status=status, headers=headers, body=body_bytes)
             return
 
@@ -143,7 +172,7 @@ class ReplayBundle:
             return
 
         message = f"Offline bundle missing resource for {request.method} {request.url}"
-        logger.warning(message)
+        # logger.warning(message)
         await route.fulfill(status=504, body=message)
 
     def flush_logs(self) -> None:
@@ -268,6 +297,7 @@ async def _cli(
     headless: bool,
     allow_fallback: bool,
     run_human_trajectory: bool,
+    use_har: bool,
 ) -> None:
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
     bundle = ReplayBundle(bundle_path)
@@ -292,7 +322,7 @@ async def _cli(
 
         browser = await pw.chromium.launch(**launch_kwargs)
         context = await bundle.build_context(
-            browser, allow_network_fallback=allow_fallback
+            browser, allow_network_fallback=allow_fallback, use_har=use_har
         )
         page = await context.new_page()
         start_url = bundle.guess_start_url() or "about:blank"
@@ -321,6 +351,9 @@ def main(
     run_human_trajectory: bool = typer.Option(
         False, help="Replay timing with human-like pacing"
     ),
+    use_har: bool = typer.Option(
+        False, help="Use HAR replay instead of manual request handling"
+    ),
 ):
     """Replay a captured browser bundle offline."""
     asyncio.run(
@@ -329,6 +362,7 @@ def main(
             headless=headless,
             allow_fallback=allow_network_fallback,
             run_human_trajectory=run_human_trajectory,
+            use_har=use_har,
         )
     )
 

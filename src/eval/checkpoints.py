@@ -8,7 +8,7 @@ import dspy
 import mlflow
 import typer
 
-from src.config.storage_config import DATA_DIR
+from src.config.storage import DATA_DIR
 from src.eval.judges import get_lm_judge
 
 logging.basicConfig(level=logging.INFO)

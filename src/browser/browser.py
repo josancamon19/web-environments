@@ -1,6 +1,6 @@
 import logging
 from playwright.async_api import BrowserContext, async_playwright
-from config.browser_config import BROWSER_ARGS
+from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
 from config.browser_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
 from browser.recorder import Recorder
 from browser.page import ActualPage
@@ -11,7 +11,6 @@ import sys
 from browser.handlers.request_event import RequestEvent
 from browser.handlers.response_event import ResponseEvent
 import os
-from config.storage import DATA_DIR
 from environments.capture import OfflineCaptureManager
 
 logger = logging.getLogger(__name__)
@@ -41,7 +40,11 @@ class StealthBrowser:
         task_manager = TaskManager()
         task_manager.set_last_task_path(VIDEO_TASK_PATH)
 
-        self.context = await self.launch_browser(VIDEO_TASK_PATH)
+        # Get HAR path for this task before starting capture
+        task = task_manager.get_actual_task()
+        har_path = self.environment_capturer.get_har_path(task.id)
+
+        self.context = await self.launch_browser(VIDEO_TASK_PATH, har_path)
         await self.environment_capturer.start(self.context)
         self.context.on("request", self.request_event_handler.listen)
         self.context.on("response", self.response_event_handler.listen)
@@ -82,6 +85,8 @@ class StealthBrowser:
             if "Blocked script execution in 'about:blank'" in text:
                 return
             if "Failed to execute 'postMessage'" in text:
+                return
+            if "Blocked script execution in" in text:
                 return
             print(f"🌐 Browser console: {text}")
 
@@ -169,27 +174,46 @@ class StealthBrowser:
         await self.playwright.stop()
         self.page_event_handler.detach_all_page_listeners()
 
-    async def launch_browser(self, video_task_path: str) -> BrowserContext:
+    async def launch_browser(
+        self, video_task_path: str, har_path: str
+    ) -> BrowserContext:
         """Open browser context"""
         preferred_channel = (
             os.environ.get("RECORDER_BROWSER_CHANNEL", "chrome").strip() or None
         )
-        user_data_dir = os.path.join(DATA_DIR, "user-data")
         # args = ["--disable-blink-features=AutomationControlled"]
         ignore_default_args = [
             "--enable-automation",
             "--use-mock-keychain",
             "--password-store=basic",
         ]
-        self.context = await self.playwright.chromium.launch_persistent_context(
-            user_data_dir=user_data_dir,
+        # user_data_dir = os.path.join(DATA_DIR, "user-data") # Doesn't seem to be needed for anything right now
+        # self.context = await self.playwright.chromium.launch_persistent_context(
+        #     user_data_dir=user_data_dir,
+        #     channel=preferred_channel,
+        #     headless=False,
+        #     args=BROWSER_ARGS,
+        #     ignore_default_args=ignore_default_args,
+        #     bypass_csp=True,
+        #     record_video_dir=video_task_path,
+        #     record_video_size={"width": 1280, "height": 720},
+        # )
+
+        # TODO: I don't think this allows for spinning up the HAR recording
+        browser = await self.playwright.chromium.launch(
             channel=preferred_channel,
             headless=False,
             args=BROWSER_ARGS,
             ignore_default_args=ignore_default_args,
+        )
+
+        self.context = await browser.new_context(
+            **CONTEXT_CONFIG,
             bypass_csp=True,
             record_video_dir=video_task_path,
             record_video_size={"width": 1280, "height": 720},
+            record_har_path=har_path,
+            record_har_mode="full",
         )
         return self.context
 

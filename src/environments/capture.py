@@ -32,6 +32,7 @@ class OfflineCaptureManager:
         self._manifest_path: Optional[Path] = None
         self._requests_log_path: Optional[Path] = None
         self._failures_log_path: Optional[Path] = None
+        self._har_path: Optional[Path] = None
 
         self._resource_counter = 0
         self._body_map: Dict[str, str] = {}
@@ -42,6 +43,34 @@ class OfflineCaptureManager:
         self._started_at: Optional[str] = None
         self._environment: Dict[str, Any] = {}
         self._atexit_registered = False
+
+    def _initialize_session_path(self, task_id: int) -> None:
+        """Initialize session path and timestamp. Called once before HAR recording starts."""
+        if self._session_path:
+            return  # Already initialized
+
+        if not self._started_at:
+            self._started_at = get_iso_datetime()
+
+        base_path = Path(DATA_DIR) / "captures"
+        timestamp_slug = self._started_at.replace(":", "-")
+        self._session_path = base_path / f"task_{task_id}" / timestamp_slug
+        self._resources_path = self._session_path / "resources"
+        self._storage_path = self._session_path / "storage"
+        self._manifest_path = self._session_path / "manifest.json"
+        self._requests_log_path = self._session_path / "requests.jsonl"
+        self._failures_log_path = self._session_path / "request_failures.jsonl"
+        self._har_path = self._session_path / "recording.har"
+
+    def get_har_path(self, task_id: int) -> str:
+        """Get the HAR file path for a task before starting capture."""
+        self._initialize_session_path(task_id)
+        assert self._har_path is not None, "HAR path should be set after initialization"
+
+        # Create directory structure early for HAR recording
+        self._session_path.mkdir(parents=True, exist_ok=True)
+
+        return str(self._har_path)
 
     async def start(self, context: BrowserContext) -> None:
         """Initialize capture directories and register listeners."""
@@ -54,19 +83,11 @@ class OfflineCaptureManager:
 
         self._context = context
         self._task = task
-        self._started_at = get_iso_datetime()
 
-        base_path = Path(DATA_DIR) / "captures"
-        timestamp_slug = (
-            self._started_at.replace(":", "-") if self._started_at else "session"
-        )
-        self._session_path = base_path / f"task_{task.id}" / timestamp_slug
-        self._resources_path = self._session_path / "resources"
-        self._storage_path = self._session_path / "storage"
-        self._manifest_path = self._session_path / "manifest.json"
-        self._requests_log_path = self._session_path / "requests.jsonl"
-        self._failures_log_path = self._session_path / "request_failures.jsonl"
+        # Ensure session path is initialized (it should be if get_har_path was called)
+        self._initialize_session_path(task.id)
 
+        # Create all subdirectories
         for path in (self._session_path, self._resources_path, self._storage_path):
             path.mkdir(parents=True, exist_ok=True)
 
@@ -116,7 +137,12 @@ class OfflineCaptureManager:
         if not self._active:
             return
 
-        failure = request.failure
+        try:
+            failure = request.failure
+        except Exception:
+            # Context/page already closed, skip this failure
+            return
+
         timestamp = get_iso_datetime()
         entry = {
             "url": request.url,
@@ -206,8 +232,13 @@ class OfflineCaptureManager:
         if not self._active:
             return
 
-        request = response.request
-        url = request.url
+        try:
+            request = response.request
+            url = request.url
+        except Exception:
+            # Context/page already closed, skip this response
+            return
+
         self._origins.add(self._origin_from_url(url))
 
         async def extract_headers(obj: Request | Response) -> Dict[str, str]:

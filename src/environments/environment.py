@@ -75,11 +75,14 @@ class SandboxEnvironment:
         browser_args: Optional[List[str]] = None,
         safe_mode: bool = False,
         log_dir: Optional[Path] = None,
+        use_har: bool = False,
     ) -> None:
         self.bundle = ReplayBundle(bundle_path, log_dir=log_dir)
         self.allow_network_fallback = allow_network_fallback
         self.safe_mode = safe_mode
+        self.use_har = use_har
 
+        # TODO: what is this needed for?
         env_headless = os.environ.get("SANDBOX_HEADLESS")
         env_safe_mode = os.environ.get("SANDBOX_SAFE_MODE")
         # TODO: ignore this env vars bullshit
@@ -208,10 +211,28 @@ class SandboxEnvironment:
         if context in self._contexts:
             return
         self._contexts.append(context)
-        await self.bundle.attach(
-            context,
-            allow_network_fallback=self.allow_network_fallback,
-        )
+
+        # Configure replay mode based on use_har setting
+        if self.use_har:
+            har_path = self.bundle.bundle_path / "recording.har"
+            if har_path.exists():
+                logger.info("[SANDBOX] Using HAR replay from %s", har_path)
+                await context.route_from_har(
+                    str(har_path),
+                    not_found="fallback" if self.allow_network_fallback else "abort",
+                    update=False,
+                )
+            else:
+                logger.warning("[SANDBOX] HAR file not found, using manual replay")
+                await self.bundle.attach(
+                    context,
+                    allow_network_fallback=self.allow_network_fallback,
+                )
+        else:
+            await self.bundle.attach(
+                context,
+                allow_network_fallback=self.allow_network_fallback,
+            )
 
     async def close(self) -> None:
         # Flush logs before closing
