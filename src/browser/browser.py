@@ -108,8 +108,16 @@ class StealthBrowser:
         if not self._binding_registered:
 
             async def _on_page_event(source, event_info):
-                page = getattr(source, "page", None)
-                await self.page_event_handler(event_info, page)
+                try:
+                    logger.info(
+                        f"[BINDING] _on_page_event called with event_type: {event_info.get('event_type', 'unknown')}"
+                    )
+                    page = getattr(source, "page", None)
+                    await self.handle_page_event(event_info, page)
+                except Exception as e:
+                    logger.error(
+                        f"[BINDING] Error in _on_page_event: {e}", exc_info=True
+                    )
 
             # Expose at context-level
             await self.context.expose_binding("onPageEvent", _on_page_event)
@@ -131,7 +139,7 @@ class StealthBrowser:
 
                 async def _page_binding(source, event_info):
                     p = getattr(source, "page", None)
-                    await self.page_event_handler(event_info, p)
+                    await self.handle_page_event(event_info, p)
 
                 await page.expose_binding("onPageEvent", _page_binding)
             except Exception:
@@ -149,15 +157,14 @@ class StealthBrowser:
         except Exception as exc:
             logger.error("[PAGE_EVENT] Failed to initialize listener script: %s", exc)
 
-    async def page_event_handler(self, event_info, page=None):
+    async def handle_page_event(self, event_info, page=None):
         """Handle page events from browser"""
         try:
             event_type = event_info.get("event_type", "unknown")
             event_context = event_info.get("event_context", "unknown")
             logger.debug(f"[PAGE_EVENT] Received: {event_context}:{event_type}")
 
-            step_record = Recorder()
-            await step_record.record_step(
+            await self.recorder.record_step(
                 {
                     "event_info": event_info,
                     "prefix_action": f"{event_context}",
@@ -199,7 +206,27 @@ class StealthBrowser:
         #     record_video_size={"width": 1280, "height": 720},
         # )
 
-        # TODO: I don't think this allows for spinning up the HAR recording
+        # TODO: The non persistent context, is not collecting local storage or indexedDB in storage_state.json, is that or using the HAR??
+        # review a different website than amazon
+        # - the HAR allows for pretty much the same as manual, and also, doesn't start with signed in cookies cached (manual does)
+        # - Still neither method is capable of matching POST requests perfectly seems like
+        # - is it already matching GET requests
+        # TODO: scrolls not happening in replay
+        # TODO: are there any obvious issues in replay?
+
+        # TODO: compare a run with the dataset from Cristian
+        # TODO: collect a couple of tasks this way
+
+        # TODO: does the agent launch works?
+        # TODO: does the agent when evaluated works on the environment?
+        # TODO: improve launching and running the environment
+
+        # TODO: SPA based changes pages work?
+
+        # ====== once this works well ======
+
+        # TODO: collect env with further n steps depth
+
         browser = await self.playwright.chromium.launch(
             channel=preferred_channel,
             headless=False,

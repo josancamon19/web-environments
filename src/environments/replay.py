@@ -28,7 +28,8 @@ class TaskStepExecutor:
                     exc,
                     exc_info=True,
                 )
-            await asyncio.sleep(0.2 if self.run_human_trajectory else 0.1)
+            base_delay = 0.2 if self.run_human_trajectory else 0.1
+            await asyncio.sleep(base_delay)
 
     async def _run_step(self, page, step: Step) -> None:
         category, subject, action = self._split_event_type(step.event_type)
@@ -101,9 +102,33 @@ class TaskStepExecutor:
         x = payload.get("x")
         y = payload.get("y")
         if isinstance(x, (int, float)) and isinstance(y, (int, float)):
-            await page.evaluate(
-                "(coords) => window.scrollTo(coords.x, coords.y)", {"x": x, "y": y}
-            )
+            # logger.info("Scrolling to x=%s, y=%s", x, y)
+            try:
+                # Use instant scroll behavior and ensure we scroll both window and document
+                await page.evaluate(
+                    """(coords) => {
+                        // Try multiple methods to ensure scroll happens
+                        window.scrollTo({
+                            left: coords.x,
+                            top: coords.y,
+                            behavior: 'instant'
+                        });
+                        // Fallback for older browsers
+                        if (window.scrollX !== coords.x || window.scrollY !== coords.y) {
+                            window.scrollTo(coords.x, coords.y);
+                        }
+                        // Also try scrolling document element directly
+                        if (document.documentElement) {
+                            document.documentElement.scrollLeft = coords.x;
+                            document.documentElement.scrollTop = coords.y;
+                        }
+                    }""",
+                    {"x": x, "y": y},
+                )
+            except Exception as exc:
+                logger.warning("Failed to scroll to (%s, %s): %s", x, y, exc)
+        else:
+            logger.warning("Invalid scroll coordinates: x=%s, y=%s", x, y)
 
     async def _perform_input(self, page, payload: Dict[str, Any]) -> None:
         value = payload.get("value") if isinstance(payload, dict) else None

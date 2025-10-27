@@ -105,8 +105,14 @@ if (!window.__RECORDER_EVENT_LISTENER_LOADED__) {
       };
       if (typeof window.onPageEvent === 'function') {
         window.onPageEvent(eventObj);
+        if (type === 'scroll') {
+          console.log('[RECORDER] ✅ Scroll event sent via onPageEvent');
+        }
       } else {
         // If we're inside an iframe or binding not yet ready, try parent first, else queue
+        if (type === 'scroll') {
+          console.log('[RECORDER] ⚠️ onPageEvent not available, queuing scroll event');
+        }
         try {
           if (window.parent && window.parent !== window) {
             window.parent.postMessage({ __RECORDER_EVENT__: eventObj }, '*');
@@ -233,18 +239,27 @@ if (!window.__RECORDER_EVENT_LISTENER_LOADED__) {
   function setupPageEventListener() {
 
     let scrollArmed = true;
-    window.addEventListener('scroll', (event) => {
+    
+    // Listen for scroll on both window and document to catch all cases
+    const handleScroll = (event) => {
         if (!scrollArmed) return;
         scrollArmed = false;
 
         const info = {
-            x: window.scrollX,
-            y: window.scrollY
+            x: window.scrollX || window.pageXOffset || document.documentElement.scrollLeft || 0,
+            y: window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0
         };
+        console.log('📜 Scroll detected:', info);
         sendEventPage('scroll', 'action:user', info);
 
-        setTimeout(() => { scrollArmed = true; }, 500);
-    }, { capture: true, passive: true });
+
+        // don't over capture scroll events (was in 500 ms, which was missing plenty, but 100, also captured too many)
+        setTimeout(() => { scrollArmed = true; }, 250);
+    };
+    
+    // Attach to both window and document to ensure we catch scroll events
+    window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+    document.addEventListener('scroll', handleScroll, { capture: true, passive: true });
 
     // Click event
     document.addEventListener('click', (e) => {
