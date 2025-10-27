@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import os
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -72,12 +71,16 @@ class ReplayBundle:
         *,
         allow_network_fallback: bool = False,
         use_har: bool = False,
+        include_storage_state: bool = False,
     ) -> BrowserContext:
         context_config = dict(self.environment.get("context_config") or {})
-        storage_state_path = self._storage_state_path()
-
-        if storage_state_path:
-            context_config["storage_state"] = str(storage_state_path)
+        if include_storage_state:
+            storage_state_path = self._storage_state_path()
+            if storage_state_path:
+                context_config["storage_state"] = str(storage_state_path)
+            else:
+                logger.warning("Storage state file not found, using empty state")
+                context_config["storage_state"] = "{}"
 
         context = await browser.new_context(**context_config)
 
@@ -294,10 +297,13 @@ class ReplayBundle:
 async def _cli(
     bundle_path: Path,
     *,
+    channel: str,
     headless: bool,
     allow_fallback: bool,
     run_human_trajectory: bool,
     use_har: bool,
+    exit_on_completion: bool,
+    include_storage_state: bool,
 ) -> None:
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
     bundle = ReplayBundle(bundle_path)
@@ -309,20 +315,13 @@ async def _cli(
     )
 
     async with async_playwright() as pw:
-        launch_kwargs: Dict[str, Any] = {"headless": headless}
-        # Default to chrome channel for consistent behavior with recording
-        channel = (
-            # TODO: Requires the same environment variable as recording?
-            os.environ.get("REPLAY_BROWSER_CHANNEL")
-            or os.environ.get("RECORDER_BROWSER_CHANNEL")
-            or "chrome"
-        )
-        launch_kwargs["channel"] = channel
-        logger.info("Launching browser with channel: %s", channel)
-
+        launch_kwargs: Dict[str, Any] = {"headless": headless, "channel": channel}
         browser = await pw.chromium.launch(**launch_kwargs)
         context = await bundle.build_context(
-            browser, allow_network_fallback=allow_fallback, use_har=use_har
+            browser,
+            allow_network_fallback=allow_fallback,
+            use_har=use_har,
+            include_storage_state=include_storage_state,
         )
         page = await context.new_page()
         start_url = bundle.guess_start_url() or "about:blank"
@@ -345,14 +344,23 @@ app = typer.Typer(help="Replay a captured browser bundle offline")
 def main(
     bundle: Path = typer.Argument(..., help="Path to the capture bundle directory"),
     headless: bool = typer.Option(False, help="Run browser in headless mode"),
+    # Default to chrome channel for consistent behavior with recording
+    channel: str = typer.Option("chrome", help="Browser channel to use for replay"),
+    use_har: bool = typer.Option(
+        True, help="Use HAR replay instead of manual request handling"
+    ),
     allow_network_fallback: bool = typer.Option(
         False, help="Allow requests missing from the bundle to hit the live network"
     ),
+    exit_on_completion: bool = typer.Option(
+        False, help="Exit the program after completing the replay"
+    ),
+    include_storage_state: bool = typer.Option(
+        False,
+        help="Include the storage state in the replay (means any collected signed in cookies/storage info from trajectory would be included in launch)",
+    ),
     run_human_trajectory: bool = typer.Option(
         False, help="Replay timing with human-like pacing"
-    ),
-    use_har: bool = typer.Option(
-        False, help="Use HAR replay instead of manual request handling"
     ),
 ):
     """Replay a captured browser bundle offline."""
@@ -360,9 +368,12 @@ def main(
         _cli(
             bundle.expanduser().resolve(),
             headless=headless,
+            channel=channel,
             allow_fallback=allow_network_fallback,
             run_human_trajectory=run_human_trajectory,
             use_har=use_har,
+            exit_on_completion=exit_on_completion,
+            include_storage_state=include_storage_state,
         )
     )
 
