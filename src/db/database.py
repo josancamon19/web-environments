@@ -1,71 +1,64 @@
+"""Database management using Peewee ORM."""
 import os
-import sqlite3
+import logging
 from datetime import datetime
 from typing import Optional
-from utils.get_iso_datetime import get_iso_datetime
-from db.schema import SCHEMA_SQL
+
 from config.storage import DB_PATH
-import logging
+from db.models import (
+    ALL_MODELS,
+    db,
+    TaskModel,
+    StepModel,
+    RequestModel,
+    ResponseModel,
+)
+from utils.get_iso_datetime import get_iso_datetime
 
 logger = logging.getLogger(__name__)
 
 
 class Database:
-    """
-    Singleton Database class for managing SQLite connections and operations
-    """
+    """Singleton Database class for managing Peewee ORM."""
 
     _instance: Optional["Database"] = None
     _initialized: bool = False
 
     def __new__(cls, db_path: str = None) -> "Database":
-        """Create singleton instance"""
+        """Create singleton instance."""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self, db_path: str = None):
-        """Initialize the singleton (only once)"""
+        """Initialize the singleton (only once)."""
         if not self._initialized:
             # Use provided path or default
             self.db_path = db_path or DB_PATH
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-            # Allow access from multiple threads; guarded by higher-level locks in recorder
-            self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
-            self.conn.execute("PRAGMA foreign_keys = ON;")
+
+            # Initialize Peewee database
+            db.init(self.db_path, pragmas={"foreign_keys": 1, "journal_mode": "wal"})
+
+            # Create tables if they don't exist
             self._ensure_schema()
             Database._initialized = True
 
     @classmethod
     def get_instance(cls, db_path: str = None) -> "Database":
-        """Get the singleton instance"""
+        """Get the singleton instance."""
         if cls._instance is None:
             cls._instance = cls(db_path or DB_PATH)
         return cls._instance
 
     def _ensure_schema(self):
-        cur = self.conn.cursor()
-        cur.executescript(SCHEMA_SQL)
-        self.conn.commit()
-        # Run migrations
-        self._migrate_add_website_column()
-
-    def _migrate_add_website_column(self):
-        """Add website column to tasks table if it doesn't exist"""
-        cur = self.conn.cursor()
-        # Check if website column exists
-        cur.execute("PRAGMA table_info(tasks)")
-        columns = [row[1] for row in cur.fetchall()]
-
-        if "website" not in columns:
-            logger.info("Migrating database: adding 'website' column to tasks table")
-            cur.execute("ALTER TABLE tasks ADD COLUMN website TEXT")
-            self.conn.commit()
-            logger.info("Migration completed successfully")
+        """Create tables if they don't exist."""
+        db.connect(reuse_if_open=True)
+        db.create_tables(ALL_MODELS, safe=True)
 
     @staticmethod
     def _parse_iso_datetime(timestamp_str: str) -> datetime:
-        """Parse ISO datetime string, handling both old (with hyphens) and new (proper ISO) formats"""
+        """Parse ISO datetime string, handling both old (with hyphens) and new (proper ISO) formats."""
         # Normalize the timestamp string
         normalized = timestamp_str.replace("Z", "+00:00")
 
@@ -88,23 +81,23 @@ class Database:
         raise ValueError(f"Cannot parse timestamp: {timestamp_str}")
 
     def close(self):
-        """Close database connection"""
+        """Close database connection."""
         try:
-            if hasattr(self, "conn"):
-                self.conn.close()
+            if not db.is_closed():
+                db.close()
         except Exception:
             pass
 
     def get_connection(self):
-        """Get the database connection"""
-        return self.conn if hasattr(self, "conn") else None
+        """Get the database connection (for compatibility)."""
+        return db if not db.is_closed() else None
 
     def is_initialized(self) -> bool:
-        """Check if database is initialized"""
+        """Check if database is initialized."""
         return self._initialized
 
     def get_db_path(self) -> str:
-        """Get database file path"""
+        """Get database file path."""
         return self.db_path if hasattr(self, "db_path") else ""
 
     def start_task(
@@ -115,56 +108,39 @@ class Database:
         website: Optional[str] = None,
         environment_fingerprint: Optional[str] = None,
     ) -> int:
+        """Create a new task and return its ID."""
         created_at = get_iso_datetime()
-        cur = self.conn.cursor()
-        cur.execute(
-            """
-            INSERT INTO tasks(
-                description,
-                task_type,
-                source,
-                website,
-                created_at,
-                environment_fingerprint
-            ) VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                description,
-                task_type,
-                source,
-                website,
-                created_at,
-                environment_fingerprint,
-            ),
+        task = TaskModel.create(
+            description=description,
+            task_type=task_type,
+            source=source,
+            website=website,
+            created_at=created_at,
+            environment_fingerprint=environment_fingerprint,
         )
-        self.conn.commit()
         website_info = f", Website: {website}" if website else ""
         print(
-            f"Task started: {cur.lastrowid} (Type: {task_type}, Source: {source}{website_info})"
+            f"Task started: {task.id} (Type: {task_type}, Source: {source}{website_info})"
         )
-        return cur.lastrowid
+        return task.id
 
     def end_task(self, task_id: int):
+        """Mark a task as ended and calculate duration."""
         ended_at = get_iso_datetime()
         duration_seconds = None
 
         try:
-            cur = self.conn.cursor()
-            cur.execute("SELECT created_at FROM tasks WHERE id = ?", (task_id,))
-            row = cur.fetchone()
-            if row and row[0]:
-                start_raw = row[0]
+            task = TaskModel.get_by_id(task_id)
+            if task.created_at:
                 end_dt = self._parse_iso_datetime(ended_at)
-                start_dt = self._parse_iso_datetime(start_raw)
+                start_dt = self._parse_iso_datetime(task.created_at)
                 duration_seconds = round((end_dt - start_dt).total_seconds(), 3)
         except Exception as exc:
             logger.warning("Failed to compute duration for task %s: %s", task_id, exc)
 
-        self.conn.execute(
-            "UPDATE tasks SET ended_at = ?, duration_seconds = ? WHERE id = ?",
-            (ended_at, duration_seconds, task_id),
-        )
-        self.conn.commit()
+        TaskModel.update(ended_at=ended_at, duration_seconds=duration_seconds).where(
+            TaskModel.id == task_id
+        ).execute()
 
     def insert_step(
         self,
@@ -176,21 +152,17 @@ class Database:
         dom_snapshot_metadata: str,
         screenshot_path: str,
     ) -> int:
-        cur = self.conn.cursor()
-        cur.execute(
-            "INSERT INTO steps(task_id, timestamp, event_type, event_data, dom_snapshot, dom_snapshot_metadata, screenshot_path) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (
-                task_id,
-                timestamp,
-                event_type,
-                event_data,
-                dom_snapshot,
-                dom_snapshot_metadata,
-                screenshot_path,
-            ),
+        """Insert a new step and return its ID."""
+        step = StepModel.create(
+            task=task_id,
+            timestamp=timestamp,
+            event_type=event_type,
+            event_data=event_data,
+            dom_snapshot=dom_snapshot,
+            dom_snapshot_metadata=dom_snapshot_metadata,
+            screenshot_path=screenshot_path,
         )
-        self.conn.commit()
-        return cur.lastrowid
+        return step.id
 
     def insert_request(
         self,
@@ -204,23 +176,19 @@ class Database:
         cookies: str,
         timestamp: str,
     ) -> int:
-        cur = self.conn.cursor()
-        cur.execute(
-            "INSERT INTO requests(task_id, step_id, request_uid, url, method, headers, post_data, cookies, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                task_id,
-                step_id,
-                request_uid,
-                url,
-                method,
-                headers,
-                post_data,
-                cookies,
-                timestamp,
-            ),
+        """Insert a new request and return its ID."""
+        request = RequestModel.create(
+            task=task_id,
+            step=step_id,
+            request_uid=request_uid,
+            url=url,
+            method=method,
+            headers=headers,
+            post_data=post_data,
+            cookies=cookies,
+            timestamp=timestamp,
         )
-        self.conn.commit()
-        return cur.lastrowid
+        return request.id
 
     def insert_response(
         self,
@@ -231,23 +199,22 @@ class Database:
         body: bytes,
         timestamp: str,
     ) -> int:
-        cur = self.conn.cursor()
-        cur.execute(
-            "INSERT INTO responses(task_id, request_id, status, headers, body, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
-            (task_id, request_id, status, headers, body, timestamp),
+        """Insert a new response and return its ID."""
+        response = ResponseModel.create(
+            task=task_id,
+            request=request_id,
+            status=status,
+            headers=headers,
+            body=body,
+            timestamp=timestamp,
         )
-        self.conn.commit()
-        return cur.lastrowid
+        return response.id
 
     def save_task_video(self, task_id: int, video_path: str):
-        cur = self.conn.cursor()
-        cur.execute(
-            "UPDATE tasks SET video_path = ? WHERE id = ?", (video_path, task_id)
-        )
-        self.conn.commit()
+        """Update task with video path."""
+        TaskModel.update(video_path=video_path).where(TaskModel.id == task_id).execute()
 
     def save_task_answer(self, task_id: int, answer: str):
-        cur = self.conn.cursor()
-        cur.execute("UPDATE tasks SET answer = ? WHERE id = ?", (answer, task_id))
-        self.conn.commit()
+        """Update task with answer."""
+        TaskModel.update(answer=answer).where(TaskModel.id == task_id).execute()
         print(f"Answer saved for task {task_id}")

@@ -339,7 +339,6 @@ async def _cli(
                 logger.info("Trajectory completed, exiting as requested")
                 return
 
-        # Keep browser open indefinitely unless exit_on_completion was triggered
         await asyncio.Event().wait()
 
 

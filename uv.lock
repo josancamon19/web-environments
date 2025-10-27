@@ -2109,6 +2109,12 @@ wheels = [
 ]
 
 [[package]]
+name = "peewee"
+version = "3.18.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/04/89/76f6f1b744c8608e0d416b588b9d63c2a500ff800065ae610f7c80f532d6/peewee-3.18.2.tar.gz", hash = "sha256:77a54263eb61aff2ea72f63d2eeb91b140c25c1884148e28e4c0f7c4f64996a0", size = 949220, upload-time = "2025-07-08T12:52:03.941Z" }
+
+[[package]]
 name = "pefile"
 version = "2023.2.7"
 source = { registry = "https://pypi.org/simple" }
@@ -6037,6 +6043,7 @@ dependencies = [
     { name = "litellm" },
     { name = "openai" },
     { name = "pandas" },
+    { name = "peewee" },
     { name = "playwright" },
     { name = "pre-commit" },
     { name = "pyarrow" },
@@ -6064,6 +6071,7 @@ requires-dist = [
     { name = "litellm", specifier = ">=1.78.7" },
     { name = "openai", specifier = ">=1.109.1" },
     { name = "pandas", specifier = ">=2.2.0" },
+    { name = "peewee", specifier = ">=3.17.0" },
     { name = "playwright", specifier = ">=1.55.0" },
     { name = "pre-commit", specifier = ">=4.3.0" },
     { name = "pyarrow", specifier = ">=18.0.0" },

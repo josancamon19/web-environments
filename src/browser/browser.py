@@ -206,13 +206,18 @@ class StealthBrowser:
         #     record_video_size={"width": 1280, "height": 720},
         # )
 
-        # TODO: check a website that uses indexedDB, see if it's being collected
-        # TODO: should an env be launched with the storage state generated from capture? no right? that would avoid the need for signing in, it should probably launch clean
+        # TODO: event_data inconsistency str / dict
+        # TODO: Switch page.evaluate in replay to something else
+        # - CSS scape extend, URL Comparisons is too simple, navigation.wait in replay, race condition of page.move and page.click, timeouts too deterministic
+        # - goto wait_until, scroll coordinate handling offset,
+        # - Playwright warns that HAR replay never serves requests intercepted by service workers; those requests bypass the HAR entirely (docs/src/mock.md:417), consider blocking sw
+        # TODO: merge changes with existing PR's
+
         # TODO: post data obsfucation, to handle edge case matching or LM selection for POST requests?
         # - Normalize JSON (remove volatile fields; sort keys) and hash; tolerate multipart boundary changes; ignore known nonce/timestamp params.
         # TODO: collect a couple of tasks this way
-        # TODO: refactor to use peewee ORM for db, to avoid random parsing and select bs everywhere
 
+        # TODO: environment.py should be cleaned and reuse more of launch.py
         # TODO: does the agent launch works?
         # TODO: does the agent when evaluated works on the environment?
         # TODO: improve launching and running the environment
@@ -222,7 +227,8 @@ class StealthBrowser:
 
         # ====== once this works well ======
 
-        # TODO: collect env with further n steps depth
+        # TODO: collect env with further n steps depth, using replay to bypass auths sections
+        # TODO: eval runs in parallel containers, or ran on kernel, hosting tunneled versions locally while it runs?
 
         browser = await self.playwright.chromium.launch(
             channel=preferred_channel,

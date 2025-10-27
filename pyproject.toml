@@ -13,6 +13,7 @@ dependencies = [
     "litellm>=1.78.7",
     "openai>=1.109.1",
     "pandas>=2.2.0",
+    "peewee>=3.17.0",
     "playwright>=1.55.0",
     "pre-commit>=4.3.0",
     "pyarrow>=18.0.0",
