@@ -6,13 +6,15 @@ then upload to HuggingFace Hub.
 
 import json
 import os
-import sqlite3
 from pathlib import Path
 
 import pandas as pd
 from huggingface_hub import HfApi
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
+
+from db.models import StepModel, RequestModel
+from db.database import Database
 
 console = Console()
 
@@ -35,32 +37,20 @@ def load_tasks_from_jsonl(jsonl_path: Path) -> list[dict]:
 
 
 def get_database_stats(db_path: Path, task_id: int) -> dict:
-    """Query database for additional statistics about a task."""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+    """Query database for additional statistics about a task using Peewee."""
+    # Initialize database
+    Database.get_instance(str(db_path))
 
-    # Get counts of steps and requests
-    cursor.execute(
-        """
-        SELECT 
-            COUNT(DISTINCT s.id) as steps_count,
-            COUNT(DISTINCT r.id) as requests_count
-        FROM tasks t
-        LEFT JOIN steps s ON t.id = s.task_id
-        LEFT JOIN requests r ON t.id = r.task_id
-        WHERE t.id = ?
-        GROUP BY t.id
-        """,
-        (task_id,),
-    )
+    # Count steps for this task
+    steps_count = StepModel.select().where(StepModel.task == task_id).count()
 
-    row = cursor.fetchone()
-    conn.close()
+    # Count requests for this task
+    requests_count = RequestModel.select().where(RequestModel.task == task_id).count()
 
-    if row:
-        return {"recorded_steps_count": row[0], "recorded_http_requests_count": row[1]}
-    else:
-        return {"recorded_steps_count": 0, "recorded_http_requests_count": 0}
+    return {
+        "recorded_steps_count": steps_count,
+        "recorded_http_requests_count": requests_count,
+    }
 
 
 def generate_reference_urls(task_id: int, bucket_name: str) -> dict:

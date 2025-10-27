@@ -1,11 +1,12 @@
 """Main script to convert recorded task events into structured tool calls."""
 
-import sqlite3
 import json
 from typing import Dict, Any, Optional
 from pathlib import Path
 from datetime import datetime
 from config.storage import DATA_DIR
+from db.models import TaskModel, StepModel
+from db.database import Database
 from scripts.postprocessing.tool_calls.event_handlers import (
     handle_initial_navigation,
     handle_domain_navigation,
@@ -75,7 +76,6 @@ def calculate_duration(
 
 
 def process_single_task(
-    cursor,
     task_id: int,
     task_description: str,
     task_type: str = None,
@@ -89,7 +89,6 @@ def process_single_task(
     Process a single task and convert it to tool calls.
 
     Args:
-        cursor: Database cursor
         task_id: The ID of the task to convert
         task_description: Description of the task
         task_type: Type of the task (e.g., "information_retrieval", "action")
@@ -103,18 +102,12 @@ def process_single_task(
         Dictionary with task data and tool calls
     """
 
-    # Get all steps for the task with DOM snapshots
-    cursor.execute(
-        """
-        SELECT id, event_type, event_data, dom_snapshot, timestamp
-        FROM steps
-        WHERE task_id = ?
-        ORDER BY timestamp
-    """,
-        (task_id,),
+    # Get all steps for the task with DOM snapshots using Peewee
+    steps_query = (
+        StepModel.select()
+        .where(StepModel.task == task_id)
+        .order_by(StepModel.timestamp)
     )
-
-    steps = cursor.fetchall()
 
     # Helper function that captures task_id
     def save_dom_fn(step_id: int, dom_snapshot: Optional[str]) -> Optional[str]:
@@ -125,8 +118,17 @@ def process_single_task(
     click_buffer = None  # Buffer to accumulate related click events
     first_navigation_handled = False  # Track if we've handled the first navigation
 
-    # Convert steps to list for lookahead
-    steps_list = list(steps)
+    # Convert steps to list for lookahead - convert to tuples like the old version
+    steps_list = [
+        (
+            step.id,
+            step.event_type,
+            step.event_data,  # Already a string in DB
+            step.dom_snapshot,
+            step.timestamp,
+        )
+        for step in steps_query
+    ]
 
     for idx, (
         step_id,
@@ -287,56 +289,35 @@ def parse(
         db_path: Path to the SQLite database
         output_path: Path to the output JSONL file
     """
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+    # Initialize database
+    Database.get_instance(db_path)
 
-    # Get all tasks with task_type, answer, website, and timing info
-    cursor.execute(
-        """
-        SELECT id, description, task_type, answer, website, 
-               created_at, ended_at, duration_seconds 
-        FROM tasks 
-        ORDER BY id
-    """
-    )
-    tasks = cursor.fetchall()
+    # Get all tasks with task_type, answer, website, and timing info using Peewee
+    tasks = TaskModel.select().order_by(TaskModel.id)
 
-    if not tasks:
+    if not tasks.exists():
         print("No tasks found in database")
         return
 
     all_results = []
 
-    for (
-        task_id,
-        task_description,
-        task_type,
-        answer,
-        website,
-        created_at,
-        ended_at,
-        duration_seconds,
-    ) in tasks:
-        print(f"Processing task {task_id}: {task_description}")
+    for task in tasks:
+        print(f"Processing task {task.id}: {task.description}")
         result = process_single_task(
-            cursor,
-            task_id,
-            task_description,
-            task_type,
-            answer,
-            website,
-            created_at,
-            ended_at,
-            duration_seconds,
+            task.id,
+            task.description,
+            task.task_type,
+            task.answer,
+            task.website,
+            task.created_at,
+            task.ended_at,
+            task.duration_seconds,
         )
         all_results.append(result)
         print(f"  Found {len(result['tool_calls'])} tool calls")
-        if task_type == "information_retrieval":
-            print(
-                f"  Task type: {task_type}, Answer: {answer[:50] if answer else 'None'}..."
-            )
-
-    conn.close()
+        if task.task_type == "information_retrieval":
+            answer_preview = task.answer[:50] if task.answer else "None"
+            print(f"  Task type: {task.task_type}, Answer: {answer_preview}...")
 
     # Write all results to file at once (not append)
     output_file = Path(output_path)
@@ -348,8 +329,6 @@ def parse(
 
     print(f"\nSuccessfully processed {len(all_results)} tasks")
     print(f"Results written to {output_path}")
-
-    return all_results
 
 
 if __name__ == "__main__":

@@ -1,67 +1,74 @@
-import sqlite3
+"""Streamlit app for viewing and managing tasks."""
 import pandas as pd
 import streamlit as st
 from pathlib import Path
 import shutil
 
+from db.models import TaskModel, StepModel, RequestModel, ResponseModel
+from db.database import Database
 
-def load_tasks(db_path: Path):
-    """Load tasks from database."""
-    conn = sqlite3.connect(db_path)
-    query = """
-    SELECT id, description, answer, website
-    FROM tasks
-    ORDER BY id
-    """
-    df = pd.read_sql_query(query, conn)
-    conn.close()
-    return df
+
+def load_tasks(db_path: Path) -> pd.DataFrame:
+    """Load tasks from database using Peewee ORM."""
+    # Initialize database
+    Database.get_instance(str(db_path))
+
+    # Query tasks
+    tasks = TaskModel.select(
+        TaskModel.id, TaskModel.description, TaskModel.answer, TaskModel.website
+    ).order_by(TaskModel.id)
+
+    # Convert to list of dicts for pandas
+    data = []
+    for task in tasks:
+        data.append(
+            {
+                "id": task.id,
+                "description": task.description,
+                "answer": task.answer,
+                "website": task.website,
+            }
+        )
+
+    return pd.DataFrame(data)
 
 
 def update_tasks_batch(db_path: Path, updates: list):
-    """Update multiple tasks in the database in a batch."""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+    """Update multiple tasks in the database in a batch using Peewee."""
+    # Initialize database
+    Database.get_instance(str(db_path))
 
     for task_id, description, answer, website in updates:
-        cursor.execute(
-            """
-            UPDATE tasks
-            SET description = ?, answer = ?, website = ?
-            WHERE id = ?
-            """,
-            (description, answer, website, task_id),
-        )
-
-    conn.commit()
-    conn.close()
+        TaskModel.update(description=description, answer=answer, website=website).where(
+            TaskModel.id == task_id
+        ).execute()
 
 
 def delete_task(db_path: Path, task_id: int, data_dir: Path) -> tuple[bool, str]:
-    """Delete a task and all its related data.
+    """Delete a task and all its related data using Peewee ORM.
 
     Returns:
         tuple: (success: bool, message: str)
     """
     try:
-        # Delete from database
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
+        # Initialize database
+        Database.get_instance(str(db_path))
 
-        # Delete steps (which will cascade to delete requests and responses if foreign keys are set up)
-        cursor.execute("DELETE FROM steps WHERE task_id = ?", (task_id,))
+        # Delete from database using Peewee ORM
+        # Foreign keys with CASCADE will handle related records automatically
+        # But we'll delete explicitly for clarity
+
+        # Delete steps (which will cascade to delete related data if foreign keys are set up)
+        StepModel.delete().where(StepModel.task == task_id).execute()
 
         # Delete requests associated with this task
-        cursor.execute("DELETE FROM requests WHERE task_id = ?", (task_id,))
+        RequestModel.delete().where(RequestModel.task == task_id).execute()
 
         # Delete responses associated with this task
-        cursor.execute("DELETE FROM responses WHERE task_id = ?", (task_id,))
+        ResponseModel.delete().where(ResponseModel.task == task_id).execute()
 
         # Delete task
-        cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
-
-        conn.commit()
-        conn.close()
+        TaskModel.delete().where(TaskModel.id == task_id).execute()
 
         # Delete file system directories
         deleted_dirs = []
