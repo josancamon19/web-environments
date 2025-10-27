@@ -334,6 +334,12 @@ async def _cli(
                 run_human_trajectory=run_human_trajectory,
             )
             await executor.run(page)
+            if exit_on_completion:
+                await asyncio.sleep(1)
+                logger.info("Trajectory completed, exiting as requested")
+                return
+
+        # Keep browser open indefinitely unless exit_on_completion was triggered
         await asyncio.Event().wait()
 
 
