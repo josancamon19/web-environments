@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from typing import Any, Dict, Optional, Tuple
+from playwright.async_api import Page, Locator, TimeoutError as PlaywrightTimeoutError
 from db.models import StepModel
 
 
@@ -10,12 +11,12 @@ logger = logging.getLogger(__name__)
 class TaskStepExecutor:
     def __init__(
         self, trajectory: list[StepModel], *, run_human_trajectory: bool = False
-    ):
-        self.trajectory = trajectory
-        self.run_human_trajectory = run_human_trajectory
-        self._initial_navigation_done = False
+    ) -> None:
+        self.trajectory: list[StepModel] = trajectory
+        self.run_human_trajectory: bool = run_human_trajectory
+        self._initial_navigation_done: bool = False
 
-    async def run(self, page) -> None:
+    async def run(self, page: Page) -> None:
         if page.url and page.url != "about:blank":
             self._initial_navigation_done = True
 
@@ -30,10 +31,10 @@ class TaskStepExecutor:
                     exc,
                     exc_info=True,
                 )
-            base_delay = 0.2 if self.run_human_trajectory else 0.1
+            base_delay: float = 0.2 if self.run_human_trajectory else 0.1
             await asyncio.sleep(base_delay)
 
-    async def _run_step(self, page, step: StepModel) -> None:
+    async def _run_step(self, page: Page, step: StepModel) -> None:
         category, subject, action = self._split_event_type(step.event_type)
 
         if category == "state":
@@ -44,7 +45,7 @@ class TaskStepExecutor:
             await self._handle_user_action(page, action, step.event_data_json)
 
     async def _handle_state_step(
-        self, page, subject: str, action: str, payload: Dict[str, Any]
+        self, page: Page, subject: str, action: str, payload: Dict[str, Any]
     ) -> None:
         if subject == "browser" and action == "navigated":
             url = payload.get("url") if isinstance(payload, dict) else None
@@ -62,7 +63,7 @@ class TaskStepExecutor:
                 await self._safe_wait_for_load(page, "load")
 
     async def _handle_user_action(
-        self, page, action: str, payload: Dict[str, Any]
+        self, page: Page, action: str, payload: Dict[str, Any]
     ) -> None:
         if action == "click":
             await self._perform_pointer_click(page, payload)
@@ -82,31 +83,38 @@ class TaskStepExecutor:
         if action == "submit":
             await self._perform_submit(page, payload)
 
-    async def _perform_pointer_click(self, page, payload: Dict[str, Any]) -> None:
-        coords = self._extract_coordinates(payload)
+    async def _perform_pointer_click(self, page: Page, payload: Dict[str, Any]) -> None:
+        coords: Optional[Tuple[float, float]] = self._extract_coordinates(payload)
         if coords is None:
-            selector = self._build_selector(payload)
+            selector: Optional[str] = self._build_selector(payload)
             if selector:
-                await page.click(selector, timeout=5000)
+                try:
+                    # Use locator for better reliability and auto-waiting
+                    await page.locator(selector).click(timeout=5000)
+                except PlaywrightTimeoutError:
+                    logger.warning(
+                        "Failed to click element with selector: %s", selector
+                    )
             return
         x, y = coords
         await page.mouse.move(x, y)
+        await asyncio.sleep(0.1)
         await page.mouse.click(x, y)
 
-    async def _perform_pointer_move(self, page, payload: Dict[str, Any]) -> None:
-        coords = self._extract_coordinates(payload)
+    async def _perform_pointer_move(self, page: Page, payload: Dict[str, Any]) -> None:
+        coords: Optional[Tuple[float, float]] = self._extract_coordinates(payload)
         if coords is None:
             return
         x, y = coords
         await page.mouse.move(x, y)
 
-    async def _perform_scroll(self, page, payload: Dict[str, Any]) -> None:
-        x = payload.get("x")
-        y = payload.get("y")
+    async def _perform_scroll(self, page: Page, payload: Dict[str, Any]) -> None:
+        x: Any = payload.get("x")
+        y: Any = payload.get("y")
         if isinstance(x, (int, float)) and isinstance(y, (int, float)):
-            # logger.info("Scrolling to x=%s, y=%s", x, y)
             try:
-                # Use instant scroll behavior and ensure we scroll both window and document
+                # Use evaluate for absolute scroll positioning (acceptable use case per Playwright docs)
+                # as there's no direct API for setting exact scroll coordinates
                 await page.evaluate(
                     """(coords) => {
                         // Try multiple methods to ensure scroll happens
@@ -132,50 +140,34 @@ class TaskStepExecutor:
         else:
             logger.warning("Invalid scroll coordinates: x=%s, y=%s", x, y)
 
-    async def _perform_input(self, page, payload: Dict[str, Any]) -> None:
-        value = payload.get("value") if isinstance(payload, dict) else None
+    async def _perform_input(self, page: Page, payload: Dict[str, Any]) -> None:
+        value: Optional[str] = (
+            payload.get("value") if isinstance(payload, dict) else None
+        )
         if value is None:
             return
-        await page.evaluate(
-            """
-            (data) => {
-                const lookup = (root) => {
-                    if (!data) return null;
-                    if (data.id) {
-                        const el = root.getElementById(data.id);
-                        if (el) return el;
-                    }
-                    if (data.className) {
-                        const classSelector = data.className
-                            .split(/\\s+/)
-                            .filter(Boolean)
-                            .map(cls => '.' + CSS.escape(cls))
-                            .join('');
-                        if (classSelector) {
-                            const tag = (data.tag || '*').toLowerCase();
-                            const found = root.querySelector(tag + classSelector);
-                            if (found) return found;
-                        }
-                    }
-                    return null;
-                };
-                let target = lookup(document);
-                if (!target) target = document.activeElement;
-                if (!target) return false;
-                if ('value' in target) {
-                    target.value = data.value;
-                    target.dispatchEvent(new Event('input', { bubbles: true }));
-                    target.dispatchEvent(new Event('change', { bubbles: true }));
-                    return true;
-                }
-                return false;
-            }
-            """,
-            payload,
-        )
 
-    async def _perform_keydown(self, page, payload: Dict[str, Any]) -> None:
-        key = payload.get("key") if isinstance(payload, dict) else None
+        # Try to use locator with selector first
+        selector: Optional[str] = self._build_selector(payload)
+        if selector:
+            try:
+                # Use locator.fill() for better reliability and auto-waiting
+                locator: Locator = page.locator(selector)
+                await locator.fill(value, timeout=5000)
+                return
+            except PlaywrightTimeoutError:
+                logger.warning("Failed to fill element with selector: %s", selector)
+
+        # Fallback to focused element
+        try:
+            focused_locator: Locator = page.locator(":focus")
+            if await focused_locator.count() > 0:
+                await focused_locator.fill(value, timeout=2000)
+        except Exception as exc:
+            logger.warning("Failed to fill focused element: %s", exc)
+
+    async def _perform_keydown(self, page: Page, payload: Dict[str, Any]) -> None:
+        key: Optional[str] = payload.get("key") if isinstance(payload, dict) else None
         if not key:
             return
         try:
@@ -183,72 +175,62 @@ class TaskStepExecutor:
         except Exception:
             await page.keyboard.type(key)
 
-    async def _perform_submit(self, page, payload: Dict[str, Any]) -> None:
-        await page.evaluate(
-            """
-            (data) => {
-                const lookup = (root) => {
-                    if (!data) return null;
-                    if (data.id) {
-                        const el = root.getElementById(data.id);
-                        if (el) return el;
-                    }
-                    if (data.className) {
-                        const classSelector = data.className
-                            .split(/\\s+/)
-                            .filter(Boolean)
-                            .map(cls => '.' + CSS.escape(cls))
-                            .join('');
-                        if (classSelector) {
-                            const tag = (data.tag || 'form').toLowerCase();
-                            const el = root.querySelector(tag + classSelector);
-                            if (el) return el;
-                        }
-                    }
-                    return null;
-                };
-                let form = lookup(document);
-                if (!form) {
-                    const active = document.activeElement;
-                    if (active && active.form) form = active.form;
-                }
-                if (!form) form = document.querySelector('form');
-                if (!form) return false;
-                if (typeof form.requestSubmit === 'function') {
-                    form.requestSubmit();
-                } else {
-                    form.submit();
-                }
-                return true;
-            }
-            """,
-            payload,
-        )
+    async def _perform_submit(self, page: Page, payload: Dict[str, Any]) -> None:
+        # Try to find and submit the form using locators
+        selector: Optional[str] = self._build_selector(payload)
 
-    async def _safe_goto(self, page, url: str) -> None:
+        try:
+            if selector:
+                # Try pressing Enter on the form element
+                form_locator: Locator = page.locator(selector)
+                if await form_locator.count() > 0:
+                    await form_locator.press("Enter", timeout=2000)
+                    return
+
+            # Try to find and click a submit button
+            submit_button: Locator = page.locator(
+                'button[type="submit"], input[type="submit"]'
+            ).first
+            if await submit_button.count() > 0:
+                await submit_button.click(timeout=2000)
+                return
+
+            # Fallback: press Enter on the focused element or first form
+            focused: Locator = page.locator(":focus")
+            if await focused.count() > 0:
+                await focused.press("Enter", timeout=2000)
+            else:
+                # Last resort: press Enter on the first form
+                first_form: Locator = page.locator("form").first
+                if await first_form.count() > 0:
+                    await first_form.press("Enter", timeout=2000)
+        except Exception as exc:
+            logger.warning("Failed to submit form: %s", exc)
+
+    async def _safe_goto(self, page: Page, url: str) -> None:
         try:
             logger.info("Navigating to %s", url)
             await page.goto(url, wait_until="domcontentloaded")
         except Exception as exc:
             logger.warning("Failed to navigate to %s: %s", url, exc)
 
-    async def _safe_wait_for_load(self, page, state: str) -> None:
+    async def _safe_wait_for_load(self, page: Page, state: str) -> None:
         try:
-            await page.wait_for_load_state(state, timeout=15000)
+            await page.wait_for_load_state(state, timeout=15000)  # type: ignore
         except Exception as exc:
             logger.debug("Load wait for %s skipped: %s", state, exc)
 
     def _extract_coordinates(
         self, payload: Dict[str, Any]
     ) -> Optional[Tuple[float, float]]:
-        coords = payload.get("coordinates") if isinstance(payload, dict) else None
+        coords: Any = payload.get("coordinates") if isinstance(payload, dict) else None
         if isinstance(coords, dict):
             for key in ("client", "page", "offset"):
-                point = coords.get(key)
+                point: Any = coords.get(key)
                 if self._is_valid_point(point):
                     return float(point["x"]), float(point["y"])
-            relative = coords.get("relative")
-            viewport = coords.get("viewport") or payload.get("viewport")
+            relative: Any = coords.get("relative")
+            viewport: Any = coords.get("viewport") or payload.get("viewport")
             if (
                 self._is_valid_point(relative)
                 and isinstance(viewport, dict)
@@ -259,32 +241,34 @@ class TaskStepExecutor:
                     float(relative["x"]) * float(viewport["width"]),
                     float(relative["y"]) * float(viewport["height"]),
                 )
-        x = payload.get("x") if isinstance(payload, dict) else None
-        y = payload.get("y") if isinstance(payload, dict) else None
+        x: Any = payload.get("x") if isinstance(payload, dict) else None
+        y: Any = payload.get("y") if isinstance(payload, dict) else None
         if isinstance(x, (int, float)) and isinstance(y, (int, float)):
             return float(x), float(y)
-        rect = payload.get("elementRect") if isinstance(payload, dict) else None
+        rect: Any = payload.get("elementRect") if isinstance(payload, dict) else None
         if isinstance(rect, dict):
-            left = rect.get("left")
-            top = rect.get("top")
-            width = rect.get("width", 0)
-            height = rect.get("height", 0)
+            left: Any = rect.get("left")
+            top: Any = rect.get("top")
+            width: Any = rect.get("width", 0)
+            height: Any = rect.get("height", 0)
             if isinstance(left, (int, float)) and isinstance(top, (int, float)):
                 return float(left + width / 2), float(top + height / 2)
         return None
 
     def _build_selector(self, payload: Dict[str, Any]) -> Optional[str]:
-        element_id = payload.get("id") if isinstance(payload, dict) else None
+        element_id: Any = payload.get("id") if isinstance(payload, dict) else None
         if element_id:
             return f"#{self._css_escape(str(element_id))}"
-        class_name = payload.get("className") if isinstance(payload, dict) else None
-        tag = payload.get("tag") if isinstance(payload, dict) else None
+        class_name: Any = (
+            payload.get("className") if isinstance(payload, dict) else None
+        )
+        tag: Any = payload.get("tag") if isinstance(payload, dict) else None
         if class_name:
-            classes = [
+            classes: list[str] = [
                 self._css_escape(part) for part in str(class_name).split() if part
             ]
             if classes:
-                prefix = (tag or "*").lower() if tag else "*"
+                prefix: str = (tag or "*").lower() if tag else "*"
                 return f"{prefix}{''.join('.' + cls for cls in classes)}"
         return None
 
