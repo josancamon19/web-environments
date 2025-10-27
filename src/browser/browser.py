@@ -206,22 +206,19 @@ class StealthBrowser:
         #     record_video_size={"width": 1280, "height": 720},
         # )
 
-        # TODO: The non persistent context, is not collecting local storage or indexedDB in storage_state.json, is that or using the HAR??
-        # review a different website than amazon
-        # - the HAR allows for pretty much the same as manual, and also, doesn't start with signed in cookies cached (manual does)
-        # - Still neither method is capable of matching POST requests perfectly seems like
-        # - is it already matching GET requests
-        # TODO: scrolls not happening in replay
-        # TODO: are there any obvious issues in replay?
-
-        # TODO: compare a run with the dataset from Cristian
+        # TODO: check a website that uses indexedDB, see if it's being collected
+        # TODO: should an env be launched with the storage state generated from capture? no right? that would avoid the need for signing in, it should probably launch clean
+        # TODO: post data obsfucation, to handle edge case matching or LM selection for POST requests?
+        # - Normalize JSON (remove volatile fields; sort keys) and hash; tolerate multipart boundary changes; ignore known nonce/timestamp params.
         # TODO: collect a couple of tasks this way
+        # TODO: refactor to use peewee ORM for db, to avoid random parsing and select bs everywhere
 
         # TODO: does the agent launch works?
         # TODO: does the agent when evaluated works on the environment?
         # TODO: improve launching and running the environment
 
         # TODO: SPA based changes pages work?
+        # TODO: difference between page event handler and handle page event here
 
         # ====== once this works well ======
 

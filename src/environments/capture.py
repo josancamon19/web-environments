@@ -123,7 +123,7 @@ class OfflineCaptureManager:
         if not self._storage_path or not self._context:
             raise ValueError("Storage path or context not set")
 
-        state = await self._context.storage_state()
+        state = await self._context.storage_state(indexed_db=True)
         (self._storage_path / "storage_state.json").write_text(
             json.dumps(state, indent=2, ensure_ascii=False),
             encoding="utf-8",
