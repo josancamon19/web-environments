@@ -52,7 +52,7 @@ def run_task_worker(
 
             task_manager = TaskManager.get_instance()
             new_task = CreateTaskDto(description, task_type, source, website)
-            task_id = task_manager.save_task(new_task)
+            task_id = task_manager.create_task(new_task)
             task = Task(task_id, description, task_type, source, website)
             task_manager.set_current_task(task)
             _send_safe(pipe, {"type": "task_started", "task_id": task_id})

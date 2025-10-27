@@ -45,7 +45,7 @@ async def main():
         task_manager = TaskManager.get_instance()
 
         new_task = CreateTaskDto(task_description, task_type, source, website)
-        task_id = task_manager.save_task(new_task)
+        task_id = task_manager.create_task(new_task)
         # Get the task we just created
         task_model = TaskModel.get_by_id(task_id)
         task_manager.set_current_task(task_model)
@@ -75,7 +75,7 @@ async def main():
         await stealth_browser.close()
 
         task_manager.end_current_task()
-        task_manager.save_task_video(task_manager.get_last_task_path())
+        task_manager.set_current_task_video_path(task_manager.get_last_task_path())
 
         print("✅ Browser closed and recording saved")
 
@@ -83,7 +83,7 @@ async def main():
         if task_type == "information_retrieval":
             print("\n" + "=" * 60)
             answer = await asyncio.to_thread(get_answer_from_user)
-            task_manager.save_task_answer(answer)
+            task_manager.set_current_task_answer(answer)
             print("=" * 60)
 
     except Exception as error:
