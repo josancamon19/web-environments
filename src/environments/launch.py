@@ -11,6 +11,7 @@ import typer
 from playwright.async_api import Browser, BrowserContext, Route
 
 from environments.replay import TaskStepExecutor
+from playwright.async_api import async_playwright
 
 
 logger = logging.getLogger(__name__)
@@ -268,8 +269,6 @@ async def _cli(
     allow_fallback: bool,
     run_human_trajectory: bool,
 ) -> None:
-    from playwright.async_api import async_playwright
-
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
     bundle = ReplayBundle(bundle_path)
 
@@ -299,6 +298,7 @@ async def _cli(
         start_url = bundle.guess_start_url() or "about:blank"
         logger.info("Opening %s", start_url)
         await page.goto(start_url)
+
         if trajectory_steps:
             executor = TaskStepExecutor(
                 trajectory=trajectory_steps,
@@ -316,7 +316,7 @@ def main(
     bundle: Path = typer.Argument(..., help="Path to the capture bundle directory"),
     headless: bool = typer.Option(False, help="Run browser in headless mode"),
     allow_network_fallback: bool = typer.Option(
-        True, help="Allow requests missing from the bundle to hit the live network"
+        False, help="Allow requests missing from the bundle to hit the live network"
     ),
     run_human_trajectory: bool = typer.Option(
         False, help="Replay timing with human-like pacing"
