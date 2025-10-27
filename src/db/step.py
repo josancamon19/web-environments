@@ -1,3 +1,6 @@
+import json
+from typing import Any, Dict
+
 from db.database import Database
 
 
@@ -64,6 +67,9 @@ class StepManager:
     def get_current_step(self):
         return self.current_step
 
+    def get_steps_by_task_id(self, task_id: int) -> list[Step]:
+        return self.step_repository.get_steps_by_task_id(task_id)
+
     def set_actual_step(self, step: Step):
         self.current_step = step
 
@@ -97,3 +103,38 @@ class StepRepository:
             step.screenshot_path,
         )
         return step_id
+
+    def get_steps_by_task_id(self, task_id: int) -> list[Step]:
+        db = Database.get_instance()
+        conn = db.get_connection()
+        assert conn is not None, "Database connection unavailable"
+
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, event_type, event_data, timestamp FROM steps WHERE task_id = ? ORDER BY id",
+            (task_id,),
+        )
+
+        steps: list[Step] = []
+        for row in cursor.fetchall():
+            raw_event_data = row[2]
+            parsed_event: Dict[str, Any] = {}
+            if raw_event_data:
+                try:
+                    parsed_event = json.loads(raw_event_data)
+                except json.JSONDecodeError:
+                    pass
+            steps.append(
+                Step(
+                    id=row[0],
+                    task_id=task_id,
+                    event_type=row[1] or "",
+                    event_data=parsed_event,
+                    timestamp=row[3],
+                    dom_snapshot=None,
+                    dom_snapshot_metadata=None,
+                    screenshot_path=None,
+                )
+            )
+
+        return steps

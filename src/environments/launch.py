@@ -6,11 +6,11 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from db.step import StepManager
 import typer
 from playwright.async_api import Browser, BrowserContext, Route
 
-from db.database import Database
-from environments.replay import StepEntry, TaskStepExecutor
+from environments.replay import TaskStepExecutor
 
 
 logger = logging.getLogger(__name__)
@@ -21,28 +21,21 @@ class ReplayBundle:
 
     def __init__(self, bundle_path: Path, log_dir: Optional[Path] = None):
         bundle_path = bundle_path.expanduser().resolve()
-
-        if bundle_path.is_file():
-            if bundle_path.name == "manifest.json":
-                bundle_path = bundle_path.parent
-            else:
-                raise FileNotFoundError(
-                    f"Bundle path points to unexpected file: {bundle_path}"
-                )
-
         manifest_path = self._resolve_manifest(bundle_path)
 
-        if not manifest_path.exists():
-            raise FileNotFoundError(f"No manifest found at {manifest_path}")
-
         self.bundle_path = manifest_path.parent
-        self.manifest_path = manifest_path
+        self.manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-        self.manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
-        self.resources = self.manifest.get("resources", [])
-        self.environment = self.manifest.get("environment", {})
-        self.task_info: Dict[str, Any] = self.manifest.get("task") or {}
-        self.task_id: Optional[int] = self.task_info.get("id")
+        if (
+            "resources" not in self.manifest
+            or "environment" not in self.manifest
+            or "task" not in self.manifest
+        ):
+            raise ValueError("Invalid manifest: missing required fields")
+
+        self.resources = self.manifest["resources"]
+        self.environment = self.manifest["environment"]
+        self.task_id: Optional[int] = self.manifest["task"]["id"]
         self._payloads: Dict[Tuple[str, str, str], list[Dict[str, Any]]] = defaultdict(
             list
         )
@@ -63,46 +56,6 @@ class ReplayBundle:
             len(self.resources),
         )
 
-    def load_steps(self) -> list[StepEntry]:
-        if not self.task_id:
-            logger.warning(
-                "Bundle manifest does not include a task id; skipping step replay"
-            )
-            return []
-
-        db = Database.get_instance()
-        conn = db.get_connection()
-        assert conn is not None, "Database connection unavailable"
-
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, event_type, event_data, timestamp FROM steps WHERE task_id = ? ORDER BY id",
-            (self.task_id,),
-        )
-
-        steps: list[StepEntry] = []
-        for row in cursor.fetchall():
-            raw_event_data = row[2]
-            parsed_event: Dict[str, Any] = {}
-            if raw_event_data:
-                try:
-                    parsed_event = json.loads(raw_event_data)
-                except json.JSONDecodeError:
-                    logger.debug("Failed to decode event data for step %s", row[0])
-            steps.append(
-                StepEntry(
-                    id=row[0],
-                    event_type=row[1] or "",
-                    event_data=parsed_event,
-                    timestamp=row[3],
-                )
-            )
-
-        logger.info(
-            "Loaded %d steps from database for task %s", len(steps), self.task_id
-        )
-        return steps
-
     def guess_start_url(self) -> Optional[str]:
         for resource in self.resources:
             if (
@@ -113,10 +66,7 @@ class ReplayBundle:
         return None
 
     async def build_context(
-        self,
-        browser: Browser,
-        *,
-        allow_network_fallback: bool = False,
+        self, browser: Browser, *, allow_network_fallback: bool = False
     ) -> BrowserContext:
         context_config = dict(self.environment.get("context_config") or {})
         storage_state_path = self._storage_state_path()
@@ -308,7 +258,7 @@ class ReplayBundle:
             if manifest.exists():
                 return manifest
 
-        return manifest  # fall back to initial attempt for error reporting
+        raise FileNotFoundError(f"No manifest found at {bundle_path}")
 
 
 async def _cli(
@@ -321,9 +271,13 @@ async def _cli(
     from playwright.async_api import async_playwright
 
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
-
     bundle = ReplayBundle(bundle_path)
-    steps = bundle.load_steps() if run_human_trajectory else []
+
+    trajectory_steps = (
+        StepManager.get_instance().get_steps_by_task_id(bundle.task_id)
+        if run_human_trajectory
+        else []
+    )
 
     async with async_playwright() as pw:
         launch_kwargs: Dict[str, Any] = {"headless": headless}
@@ -345,9 +299,10 @@ async def _cli(
         start_url = bundle.guess_start_url() or "about:blank"
         logger.info("Opening %s", start_url)
         await page.goto(start_url)
-        if steps:
+        if trajectory_steps:
             executor = TaskStepExecutor(
-                steps, run_human_trajectory=run_human_trajectory
+                trajectory=trajectory_steps,
+                run_human_trajectory=run_human_trajectory,
             )
             await executor.run(page)
         await asyncio.Event().wait()

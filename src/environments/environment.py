@@ -82,6 +82,8 @@ class SandboxEnvironment:
 
         env_headless = os.environ.get("SANDBOX_HEADLESS")
         env_safe_mode = os.environ.get("SANDBOX_SAFE_MODE")
+        # TODO: ignore this env vars bullshit
+        # TODO: some variables naming don't elicit anything
         if env_safe_mode is not None:
             self.safe_mode = env_safe_mode.lower() in {"1", "true", "yes", "on"}
 

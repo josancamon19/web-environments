@@ -1,25 +1,15 @@
 import asyncio
 import logging
-from dataclasses import dataclass
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, Optional, Tuple
+from db.step import Step
 
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class StepEntry:
-    id: int
-    event_type: str
-    event_data: Dict[str, Any]
-    timestamp: Optional[str] = None
-
-
 class TaskStepExecutor:
-    def __init__(
-        self, steps: Sequence[StepEntry], *, run_human_trajectory: bool = False
-    ):
-        self.steps = list(steps)
+    def __init__(self, trajectory: list[Step], *, run_human_trajectory: bool = False):
+        self.trajectory = trajectory
         self.run_human_trajectory = run_human_trajectory
         self._initial_navigation_done = False
 
@@ -27,7 +17,7 @@ class TaskStepExecutor:
         if page.url and page.url != "about:blank":
             self._initial_navigation_done = True
 
-        for step in self.steps:
+        for step in self.trajectory:
             try:
                 await self._run_step(page, step)
             except Exception as exc:
@@ -40,7 +30,7 @@ class TaskStepExecutor:
                 )
             await asyncio.sleep(0.2 if self.run_human_trajectory else 0.1)
 
-    async def _run_step(self, page, step: StepEntry) -> None:
+    async def _run_step(self, page, step: Step) -> None:
         category, subject, action = self._split_event_type(step.event_type)
 
         if category == "state":
@@ -120,7 +110,40 @@ class TaskStepExecutor:
         if value is None:
             return
         await page.evaluate(
-            "(data) => {\n                const lookup = (root) => {\n                    if (!data) return null;\n                    if (data.id) {\n                        const el = root.getElementById(data.id);\n                        if (el) return el;\n                    }\n                    if (data.className) {\n                        const classSelector = data.className\n                            .split(/\\s+/)\n                            .filter(Boolean)\n                            .map(cls => '.' + CSS.escape(cls))\n                            .join('');\n                        if (classSelector) {\n                            const tag = (data.tag || '*').toLowerCase();\n                            const found = root.querySelector(tag + classSelector);\n                            if (found) return found;\n                        }\n                    }\n                    return null;\n                };\n                let target = lookup(document);\n                if (!target) target = document.activeElement;\n                if (!target) return false;\n                if ('value' in target) {\n                    target.value = data.value;\n                    target.dispatchEvent(new Event('input', { bubbles: true }));\n                    target.dispatchEvent(new Event('change', { bubbles: true }));\n                    return true;\n                }\n                return false;\n            }",
+            """
+            (data) => {
+                const lookup = (root) => {
+                    if (!data) return null;
+                    if (data.id) {
+                        const el = root.getElementById(data.id);
+                        if (el) return el;
+                    }
+                    if (data.className) {
+                        const classSelector = data.className
+                            .split(/\\s+/)
+                            .filter(Boolean)
+                            .map(cls => '.' + CSS.escape(cls))
+                            .join('');
+                        if (classSelector) {
+                            const tag = (data.tag || '*').toLowerCase();
+                            const found = root.querySelector(tag + classSelector);
+                            if (found) return found;
+                        }
+                    }
+                    return null;
+                };
+                let target = lookup(document);
+                if (!target) target = document.activeElement;
+                if (!target) return false;
+                if ('value' in target) {
+                    target.value = data.value;
+                    target.dispatchEvent(new Event('input', { bubbles: true }));
+                    target.dispatchEvent(new Event('change', { bubbles: true }));
+                    return true;
+                }
+                return false;
+            }
+            """,
             payload,
         )
 
@@ -135,7 +158,43 @@ class TaskStepExecutor:
 
     async def _perform_submit(self, page, payload: Dict[str, Any]) -> None:
         await page.evaluate(
-            "(data) => {\n                const lookup = (root) => {\n                    if (!data) return null;\n                    if (data.id) {\n                        const el = root.getElementById(data.id);\n                        if (el) return el;\n                    }\n                    if (data.className) {\n                        const classSelector = data.className\n                            .split(/\\s+/)\n                            .filter(Boolean)\n                            .map(cls => '.' + CSS.escape(cls))\n                            .join('');\n                        if (classSelector) {\n                            const tag = (data.tag || 'form').toLowerCase();\n                            const el = root.querySelector(tag + classSelector);\n                            if (el) return el;\n                        }\n                    }\n                    return null;\n                };\n                let form = lookup(document);\n                if (!form) {\n                    const active = document.activeElement;\n                    if (active && active.form) form = active.form;\n                }\n                if (!form) form = document.querySelector('form');\n                if (!form) return false;\n                if (typeof form.requestSubmit === 'function') {\n                    form.requestSubmit();\n                } else {\n                    form.submit();\n                }\n                return true;\n            }",
+            """
+            (data) => {
+                const lookup = (root) => {
+                    if (!data) return null;
+                    if (data.id) {
+                        const el = root.getElementById(data.id);
+                        if (el) return el;
+                    }
+                    if (data.className) {
+                        const classSelector = data.className
+                            .split(/\\s+/)
+                            .filter(Boolean)
+                            .map(cls => '.' + CSS.escape(cls))
+                            .join('');
+                        if (classSelector) {
+                            const tag = (data.tag || 'form').toLowerCase();
+                            const el = root.querySelector(tag + classSelector);
+                            if (el) return el;
+                        }
+                    }
+                    return null;
+                };
+                let form = lookup(document);
+                if (!form) {
+                    const active = document.activeElement;
+                    if (active && active.form) form = active.form;
+                }
+                if (!form) form = document.querySelector('form');
+                if (!form) return false;
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+                return true;
+            }
+            """,
             payload,
         )
 
