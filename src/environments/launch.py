@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -14,7 +15,7 @@ from config.storage import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
-BLOCKED_PATTERNS = [
+IGNORED_PATTERNS = [
     "google-analytics",
     "googleads",
     "google-tag-manager",
@@ -28,11 +29,31 @@ BLOCKED_PATTERNS = [
     "googletagmanager.com",
     "amazon.com/1/events/",
     "amazon-adsystem.com",
-    "amazon.com/rd/uedata",
-    "amazon.com/ap/uedata",
-    "amazon.com/*/uedata",  # TODO: handle patterns instead
+    "amazon.com/*/uedata",
     "fls-na.amazon.com",
 ]
+
+_compiled_patterns = []
+for pattern in IGNORED_PATTERNS:
+    if "*" in pattern:
+        # Convert wildcard pattern to regex: * matches any characters except nothing
+        regex_pattern = re.escape(pattern).replace(r"\*", r"[^/]+")
+        _compiled_patterns.append(("regex", re.compile(regex_pattern, re.IGNORECASE)))
+    else:
+        _compiled_patterns.append(("substring", pattern.lower()))
+
+
+def should_ignore_url(url: str):
+    """Check if URL should be ignored based on IGNORED_PATTERNS (supports wildcards)."""
+    url_lower = url.lower()
+    for pattern_type, pattern in _compiled_patterns:
+        if pattern_type == "substring":
+            if pattern in url_lower:
+                return True
+        elif pattern_type == "regex":
+            if pattern.search(url_lower):
+                return True
+    return False
 
 
 class ReplayBundle:
@@ -71,10 +92,8 @@ class ReplayBundle:
         """Set up network event listeners to log requests not found in HAR."""
 
         async def log_request_failed(request):
-            url_lower = request.url.lower()
-            for pattern in BLOCKED_PATTERNS:
-                if pattern in url_lower:
-                    return
+            if should_ignore_url(request.url):
+                return
 
             logger.warning(
                 "⚠️  Request FAILED (not in HAR): %s %s [%s]",
@@ -224,8 +243,8 @@ class ReplayBundle:
     async def handle_routes_manually(self, route, request):
         # TODO: do we need to obsfucate in a more clever way?
         # - ?? Normalize JSON (remove volatile fields; sort keys) and hash; tolerate multipart boundary changes; ignore known nonce/timestamp params.
+        # TODO: what if the request is sent twice, we'll be selecting the first one all the time.
 
-        har_data = self._load_har_data()
         # TODO: this requires LM postprocessing selection of URL's to match or some dumb way for all POST? or smth
         urls_to_ignore_post_data = {
             "https://www.amazon.com/ax/claim",
@@ -233,55 +252,49 @@ class ReplayBundle:
             "https://www.amazon.com/ap/signin",
         }
 
-        url_lower = request.url.lower()
-        for pattern in BLOCKED_PATTERNS:
-            if pattern in url_lower:
-                await route.abort()
-                return
-
-        # Handle Amazon claim POST requests (ignore POST body, match by URL and method only)
-        if request.method == "POST":
-            for base_url in urls_to_ignore_post_data:
-                if request.url.startswith(base_url):
-                    for entry in har_data.get("log", {}).get("entries", []):
-                        req = entry.get("request", {})
-                        # TODO: do need to match to base_url or is fine if == request.url
-                        if (
-                            req.get("method") == "POST"
-                            and req.get("url") == request.url
-                        ):
-                            logger.info(
-                                "✅ Found matching HAR entry for %s", request.url
-                            )
-                            response = entry.get("response", {})
-
-                            # Extract response details
-                            status = response.get("status", 200)
-                            headers = {
-                                h["name"]: h["value"]
-                                for h in response.get("headers", [])
-                            }
-                            content = response.get("content", {})
-
-                            # Get body if available
-                            body = None
-                            if "text" in content:
-                                body = content["text"]
-
-                            # Fulfill the request with HAR response
-                            await route.fulfill(
-                                status=status, headers=headers, body=body
-                            )
-                            return
-
-            # If not found in HAR, abort it
-            logger.warning(
-                "⚠️  No matching HAR entry found for %s, aborting", request.url
-            )
+        if should_ignore_url(request.url):
             await route.abort()
-        else:
-            # Not a special request, fall back to HAR routing
+            return
+
+        if not request.method == "POST":
+            # TODO: should handle DELETE, PUT? everything that is not GET?
             await route.fallback()
+            return
+
+        for base_url in urls_to_ignore_post_data:
+            if not request.url.startswith(base_url):
+                continue
+            har_data = self._load_har_data()
+            har_entries = har_data.get("log", {}).get("entries", [])
+
+            entry = next(
+                (
+                    entry
+                    for entry in har_entries
+                    if entry.get("request", {}).get("method") == "POST"
+                    and entry.get("request", {}).get("url") == request.url
+                ),
+                None,
+            )
+            if not entry:
+                continue
+
+            logger.info(
+                "✅ Found matching HAR entry for %s",
+                request.url[:100] + "..." if len(request.url) > 100 else request.url,
+            )
+            response = entry.get("response", {})
+            status = response.get("status", 200)
+            headers = {h["name"]: h["value"] for h in response.get("headers", [])}
+            content = response.get("content", {})
+            body = None if "text" not in content else content["text"]
+            # TODO: is body provided properly? what about other body types
+            await route.fulfill(status=status, headers=headers, body=body)
+            return
+
+        # If not found in HAR, abort it
+        logger.warning("⚠️  No matching HAR entry found for %s, aborting", request.url)
+        await route.abort()
 
     def _storage_state_path(self) -> Optional[Path]:
         storage_dir = self.bundle_path / "storage"
