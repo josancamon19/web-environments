@@ -204,7 +204,7 @@ class ReplayBundle:
         # ?? Normalize JSON (remove volatile fields; sort keys) and hash; tolerate multipart boundary changes; ignore known nonce/timestamp params.
 
         # - Even this `FAILED (not in HAR): GET https://web-envs-agent.onrender.com/hotels [fetch]` is failing cause sec-fetch cors tokens differ
-        # TODO: substack doesn't even replicate properly, many GET requests are failing
+        # TODO: substack doesn't even replicate properly, many GET requests are failing (REPLAY issue, not when launched)
 
         async def handle_claim_post(route, request):
             """Handle the specific Amazon claim POST request from HAR, ignoring POST body."""

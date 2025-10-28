@@ -7,7 +7,7 @@ from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
 from config.browser_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
 from browser.recorder import Recorder, get_video_path
 from browser.page import ActualPage
-from browser.handlers.new_page_event import NewPageEvent
+from browser.handlers.new_page_event import PlaywrightPageEvent
 from db.task import TaskManager
 from browser.handlers.request_event import RequestEvent
 from browser.handlers.response_event import ResponseEvent
@@ -26,7 +26,8 @@ class StealthBrowser:
 
         self.request_event_handler = RequestEvent()
         self.response_event_handler = ResponseEvent()
-        self.page_event_handler = NewPageEvent()
+        # Handles non DOM change events, like page load, tab opened, tab closed, etc.
+        self.playwright_page_handler = PlaywrightPageEvent()
 
         self._binding_registered = False
         self._page_script_registered = False
@@ -44,9 +45,9 @@ class StealthBrowser:
         self.context.on("response", self.response_event_handler.listen)
 
         # Ensure bindings/scripts for any subsequent pages/documents
-        await self.setup_dom_listeners()
+        await self.setup_context_dom_listeners()
         self.page = await self.context.new_page()
-        await self.page_event_handler.attach_page(self.page)
+        await self.playwright_page_handler.attach(self.page)
 
         # Track new tab/page creation
         async def on_page_created(page):
@@ -65,8 +66,8 @@ class StealthBrowser:
                 },
                 omit_screenshot=True,
             )
-            await self.page_event_handler.attach_page(page)
-            await self._initialize_page_event_script(page)
+            await self.playwright_page_handler.attach(page)
+            await self.setup_per_page_dom_listeners(page)
 
         self.context.on("page", on_page_created)
 
@@ -87,7 +88,7 @@ class StealthBrowser:
         self.page.on("console", console_handler)
 
         await self.apply_stealth_techniques()
-        await self._initialize_page_event_script(self.page)
+        await self.setup_per_page_dom_listeners(self.page)
 
         return self.page
 
@@ -95,8 +96,8 @@ class StealthBrowser:
         """Apply stealth techniques to avoid detection"""
         await self.page.add_init_script(STEALTH_SCRIPT)
 
-    async def setup_dom_listeners(self):
-        """Setup DOM event listeners"""
+    async def setup_context_dom_listeners(self):
+        """Setup context-level DOM event listeners"""
         print("🔧 Setting up DOM listeners...")
 
         if not self._binding_registered:
@@ -107,7 +108,7 @@ class StealthBrowser:
                         f"[BINDING] _on_page_event called with event_type: {event_info.get('event_type', 'unknown')}"
                     )
                     page = getattr(source, "page", None)
-                    await self.handle_page_event(event_info, page)
+                    await self.handle_dom_change_event(event_info, page)
                 except Exception as e:
                     logger.error(
                         f"[BINDING] Error in _on_page_event: {e}", exc_info=True
@@ -124,7 +125,8 @@ class StealthBrowser:
 
         print("✅ DOM listeners setup complete")
 
-    async def _initialize_page_event_script(self, page):
+    async def setup_per_page_dom_listeners(self, page):
+        """Fallback to page-level binding if context-level binding is not available"""
         if not page:
             return
         try:
@@ -133,7 +135,7 @@ class StealthBrowser:
 
                 async def _page_binding(source, event_info):
                     p = getattr(source, "page", None)
-                    await self.handle_page_event(event_info, p)
+                    await self.handle_dom_change_event(event_info, p)
 
                 await page.expose_binding("onPageEvent", _page_binding)
             except Exception:
@@ -151,7 +153,7 @@ class StealthBrowser:
         except Exception as exc:
             logger.error("[PAGE_EVENT] Failed to initialize listener script: %s", exc)
 
-    async def handle_page_event(self, event_info, page=None):
+    async def handle_dom_change_event(self, event_info, page=None):
         """Handle page events from browser"""
         try:
             event_type = event_info.get("event_type", "unknown")
@@ -172,7 +174,7 @@ class StealthBrowser:
         """Close browser"""
         logger.info("[CLOSE] Starting browser close sequence...")
 
-        self.page_event_handler.detach_all_page_listeners()
+        self.playwright_page_handler.detach_all_page_listeners()
         self.context.remove_listener("request", self.request_event_handler.listen)
         self.context.remove_listener("response", self.response_event_handler.listen)
 
@@ -201,7 +203,6 @@ class StealthBrowser:
         ]
 
         # TODO: collect a couple of tasks this way
-        # TODO: difference between page event handler and handle page event here
         # TODO: cleanup capture.py if we are using only HAR collection
 
         # TODO: environment.py should be cleaned and reuse more of launch.py

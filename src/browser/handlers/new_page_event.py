@@ -4,12 +4,12 @@ from browser.recorder import Recorder
 logger = logging.getLogger(__name__)
 
 
-class NewPageEvent:
+class PlaywrightPageEvent:
     def __init__(self):
         self._page_event_handlers = {}
         self.recorder = Recorder()
 
-    async def attach_page(self, page):
+    async def attach(self, page):
         #  Guarantee that all resources of the page have been loaded
         await page.wait_for_load_state("load")
         # Treat the most recently seen page as the active page for screenshots/DOM
