@@ -11,21 +11,42 @@ This folder contains a Tkinter-based desktop application that mirrors the origin
 2. Install project dependencies if you have not already:
    ```bash
    python -m pip install -r requirements.txt
-   playwright install
+   playwright install chromium
    ```
-3. Start the desktop app:
+3. Start the desktop app using the launch script (recommended):
    ```bash
-   python desktop_app/task_collector_app.py
+   ./desktop_app/launch_task_collector.sh
+   ```
+   
+   Or manually with the correct PYTHONPATH:
+   ```bash
+   cd /path/to/web-environments
+   source .venv/bin/activate
+   PYTHONPATH="$(pwd)/src:$(pwd):$PYTHONPATH" python desktop_app/task_collector_app.py
    ```
 
 The GUI will prompt for the same inputs as the CLI (source, task type, description). After clicking **Launch Task**, a Chromium browser starts recording. When the task is done, click **Complete Task** to close the browser and persist recordings/answers.
 
 ## Building a distributable bundle (PyInstaller)
 
-The simplest way to ship the app to volunteers is to package it with [PyInstaller](https://pyinstaller.org/). Run the following from the project root on the platform you're building for (Mac builds on macOS, Windows builds on Windows, etc.):
+The simplest way to ship the app to collectors is to package it with [PyInstaller](https://pyinstaller.org/). Run the following from the project root on the platform you're building for (Mac builds on macOS, Windows builds on Windows, etc.):
 
 ```bash
 python -m pip install pyinstaller
+python desktop_app/build_release.py --target macos  # or --target windows
+```
+
+This script automatically:
+- Installs Playwright browsers into the bundle
+- Configures all necessary hidden imports
+- Packages everything into a ready-to-distribute ZIP file
+- Includes installation instructions for end users
+
+The final ZIP will be created in `desktop_app/dist/` and can be shared directly with collaborators.
+
+Alternatively, you can build manually with PyInstaller:
+
+```bash
 pyinstaller desktop_app/task_collector_app.py \
   --name TaskCollector \
   --windowed \

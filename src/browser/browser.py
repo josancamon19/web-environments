@@ -83,6 +83,8 @@ class StealthBrowser:
                 return
             if "Blocked script execution in" in text:
                 return
+            if "Failed to load resource: net::ERR_NAME_NOT_RESOLVED" in text:
+                return
             print(f"🌐 Browser console: {text}")
 
         self.page.on("console", console_handler)
@@ -211,7 +213,6 @@ class StealthBrowser:
 
         # TODO: collect env with further n steps depth, using replay to bypass auths sections
         # TODO: eval runs in parallel containers, or ran on kernel, hosting tunneled versions locally while it runs?
-        # TODO: Fix collection tool with new changes
         # TODO: websockets? like e.g. ChatGPT doesn't allow for collecting anything
 
         browser = await self.playwright.chromium.launch(

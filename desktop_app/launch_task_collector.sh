@@ -5,14 +5,14 @@
 cd "$(dirname "$0")/.."
 
 # Activate the virtual environment
-source venv/bin/activate
+source .venv/bin/activate
 
 # Set environment variables to prevent bus errors
 export DISPLAY=:0.0
 export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
 export PYTHON_COREAUDIO_ALLOW_INSECURE_REQUESTS=1
-# Set Python path to include the project root
-export PYTHONPATH="$(pwd):$PYTHONPATH"
+# Set Python path to include the project root and src directory
+export PYTHONPATH="$(pwd)/src:$(pwd):$PYTHONPATH"
 echo "PYTHONPATH: $PYTHONPATH"
 
 # Set Playwright browsers path

@@ -132,19 +132,25 @@ def build_with_pyinstaller(
         "multiprocessing.connection",
         # Hidden imports for src modules
         "--hidden-import",
-        "src.config.storage_config",
+        "config.storage",
         "--hidden-import",
-        "src.config.browser_config",
+        "config.browser_config",
         "--hidden-import",
-        "src.config.initial_tasks",
+        "config.start",
         "--hidden-import",
-        "src.browser.stealth_browser",
+        "browser.browser",
         "--hidden-import",
-        "src.source_data.database",
+        "browser.recorder",
         "--hidden-import",
-        "src.tasks.task",
+        "db.database",
+        "--hidden-import",
+        "db.task",
+        "--hidden-import",
+        "db.models",
         "--hidden-import",
         "desktop_app.task_worker",
+        "--hidden-import",
+        "peewee",
         # Collect all submodules
         "--collect-all",
         "google.cloud",
@@ -158,6 +164,15 @@ def build_with_pyinstaller(
         "greenlet",
         # macOS specific
     ]
+
+    # Add optional imports if available
+    if module_importable("google.cloud._storage_v2"):
+        cmd.extend(["--hidden-import", "google.cloud._storage_v2"])
+
+    if module_importable("grpc"):
+        cmd.extend(["--hidden-import", "grpc", "--collect-all", "grpc"])
+        if module_importable("grpc._cython.cygrpc"):
+            cmd.extend(["--hidden-import", "grpc._cython.cygrpc"])
 
     if target == "macos":
         cmd.extend(
@@ -302,10 +317,3 @@ if __name__ == "__main__":
     except BuildError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)
-    if module_importable("google.cloud._storage_v2"):
-        cmd.extend(["--hidden-import", "google.cloud._storage_v2"])
-
-    if module_importable("grpc"):
-        cmd.extend(["--hidden-import", "grpc", "--collect-all", "grpc"])
-        if module_importable("grpc._cython.cygrpc"):
-            cmd.extend(["--hidden-import", "grpc._cython.cygrpc"])

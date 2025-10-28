@@ -8,8 +8,10 @@ from multiprocessing.connection import Connection
 from typing import Any, Dict, Optional
 
 from browser.browser import StealthBrowser
+from browser.recorder import get_video_path
 from config.start import InitialTasks
-from src.db.task import CreateTaskDto, Task, TaskManager
+from db.task import CreateTaskDto, TaskManager
+from db.models import TaskModel
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +55,9 @@ def run_task_worker(
             task_manager = TaskManager.get_instance()
             new_task = CreateTaskDto(description, task_type, source, website)
             task_id = task_manager.create_task(new_task)
-            task = Task(task_id, description, task_type, source, website)
-            task_manager.set_current_task(task)
+            # Get the task we just created
+            task_model = TaskModel.get_by_id(task_id)
+            task_manager.set_current_task(task_model)
             _send_safe(pipe, {"type": "task_started", "task_id": task_id})
             _send_safe(
                 pipe,
@@ -90,7 +93,7 @@ def run_task_worker(
         finally:
             try:
                 if task_manager and answer_to_save is not None:
-                    task_manager.save_task_answer(answer_to_save)
+                    task_manager.set_current_task_answer(answer_to_save)
             except Exception as answer_error:  # pylint: disable=broad-except
                 logger.warning("Failed to persist task answer: %s", answer_error)
 
@@ -99,11 +102,9 @@ def run_task_worker(
                     current_task = task_manager.get_current_task()
                     if current_task:
                         # Save video path to database
-                        import os
-                        from config.storage import VIDEOS_DIR
-
-                        video_path = os.path.join(VIDEOS_DIR, f"task_{current_task.id}")
-                        task_manager.set_current_task_video_path(video_path)
+                        task_manager.set_current_task_video_path(
+                            get_video_path(current_task.id)
+                        )
                     task_manager.end_current_task()
                     task_manager.set_current_task(None)  # type: ignore[arg-type]
             except Exception as mgr_error:  # pylint: disable=broad-except

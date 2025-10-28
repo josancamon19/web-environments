@@ -241,10 +241,12 @@ class ReplayBundle:
         # TODO: do we need to obsfucate in a more clever way?
         # - ?? Normalize JSON (remove volatile fields; sort keys) and hash; tolerate multipart boundary changes; ignore known nonce/timestamp params.
         # TODO: what if the request is sent twice, we'll be selecting the first one all the time.
+        # semhash matching URL at times if they vary?
 
         # TODO: this requires LM postprocessing selection of URL's to match or some dumb way for all POST? or smth
         # TODO: why when collecting, increasing/decreasing cart stuff fails
         # TODO: some assets in GET are also dynamic?, bunch of js/stylesheets are not found in HAR
+
         urls_to_ignore_post_data = {
             "https://www.amazon.com/ax/claim",
             "https://www.amazon.com/aaut/verify/ap",
@@ -292,7 +294,7 @@ class ReplayBundle:
             return
 
         logger.warning(
-            "⚠️ No matching HAR entry found for %s, aborting",
+            "⚠️  No matching HAR entry found for %s, aborting",
             request.url[:100] + "..." if len(request.url) > 100 else request.url,
         )
         await route.abort()
