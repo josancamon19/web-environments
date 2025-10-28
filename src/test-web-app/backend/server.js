@@ -10,6 +10,7 @@ const PORT = process.env.PORT || 4000;
 const DATA_FILE = path.join(__dirname, 'data', 'hotels.json');
 const SESSIONS_FILE = path.join(__dirname, 'data', 'sessions.json');
 const USERS_FILE = path.join(__dirname, 'data', 'users.json');
+const isProduction = process.env.NODE_ENV === 'production';
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
   : [];
@@ -17,6 +18,13 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 let hotels = [];
 let sessions = {};
 let users = [];
+
+const cookieOptions = {
+  httpOnly: true,
+  sameSite: isProduction ? 'none' : 'lax',
+  secure: isProduction,
+  maxAge: 1000 * 60 * 60 * 12,
+};
 
 function ensureDataFile(filePath, defaultContent) {
   const dir = path.dirname(filePath);
@@ -144,7 +152,7 @@ app.post('/auth/login', (req, res) => {
   const token = crypto.randomUUID();
   sessions[token] = { email, createdAt: new Date().toISOString() };
   saveSessions();
-  res.cookie('sessionToken', token, { httpOnly: true, sameSite: 'lax', maxAge: 1000 * 60 * 60 * 12 });
+  res.cookie('sessionToken', token, cookieOptions);
   res.json({ email });
 });
 
@@ -160,7 +168,7 @@ app.post('/auth/logout', ensureAuthenticated, (req, res) => {
   const token = req.cookies.sessionToken;
   delete sessions[token];
   saveSessions();
-  res.clearCookie('sessionToken');
+  res.clearCookie('sessionToken', cookieOptions);
   res.json({ success: true });
 });
 
