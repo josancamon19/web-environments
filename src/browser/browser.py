@@ -1,4 +1,7 @@
+import asyncio
 import logging
+import os
+import sys
 from playwright.async_api import BrowserContext, async_playwright
 from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
 from config.browser_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
@@ -6,10 +9,8 @@ from browser.recorder import Recorder, get_video_path
 from browser.page import ActualPage
 from browser.handlers.new_page_event import NewPageEvent
 from db.task import TaskManager
-import sys
 from browser.handlers.request_event import RequestEvent
 from browser.handlers.response_event import ResponseEvent
-import os
 from environments.capture import OfflineCaptureManager
 
 logger = logging.getLogger(__name__)
@@ -169,10 +170,24 @@ class StealthBrowser:
 
     async def close(self):
         """Close browser"""
+        logger.info("[CLOSE] Starting browser close sequence...")
+
+        self.page_event_handler.detach_all_page_listeners()
+        self.context.remove_listener("request", self.request_event_handler.listen)
+        self.context.remove_listener("response", self.response_event_handler.listen)
+
+        for page in self.context.pages:
+            try:
+                await page.goto("about:blank", timeout=1000, wait_until="commit")
+            except Exception:
+                pass
+
+        await asyncio.sleep(0.5)
         await self.environment_capturer.stop()
         await self.context.close()
         await self.playwright.stop()
-        self.page_event_handler.detach_all_page_listeners()
+
+        logger.info("[CLOSE] Browser close sequence completed")
 
     async def launch_browser(self, task_id: int) -> BrowserContext:
         """Open browser context"""
@@ -199,6 +214,7 @@ class StealthBrowser:
         # TODO: collect env with further n steps depth, using replay to bypass auths sections
         # TODO: eval runs in parallel containers, or ran on kernel, hosting tunneled versions locally while it runs?
         # TODO: Fix collection tool with new changes
+        # TODO: websockets? like e.g. ChatGPT doesn't allow for collecting anything
 
         browser = await self.playwright.chromium.launch(
             channel=preferred_channel,

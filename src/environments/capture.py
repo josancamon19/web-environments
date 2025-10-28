@@ -45,6 +45,10 @@ class OfflineCaptureManager:
         self._environment: Dict[str, Any] = {}
         self._atexit_registered = False
 
+        # Store handler references for cleanup
+        self._response_handler = None
+        self._requestfailed_handler = None
+
     def _initialize_session_path(self, task_id: int) -> None:
         """Initialize session path. Called once before HAR recording starts."""
         if self._session_path:
@@ -96,15 +100,16 @@ class OfflineCaptureManager:
             "started_at": self._started_at,
         }
 
-        # Register listeners
-        context.on(
-            "response",
-            lambda response: asyncio.create_task(self._handle_response(response)),
+        # Register listeners and store references for cleanup
+        self._response_handler = lambda response: asyncio.create_task(
+            self._handle_response(response)
         )
-        context.on(
-            "requestfailed",
-            lambda request: asyncio.create_task(self._handle_request_failed(request)),
+        self._requestfailed_handler = lambda request: asyncio.create_task(
+            self._handle_request_failed(request)
         )
+
+        context.on("response", self._response_handler)
+        context.on("requestfailed", self._requestfailed_handler)
 
         if not self._atexit_registered:
             atexit.register(self._finalize_sync)
@@ -123,14 +128,29 @@ class OfflineCaptureManager:
         if not self._storage_path or not self._context:
             raise ValueError("Storage path or context not set")
 
-        state = await self._context.storage_state(indexed_db=True)
-        (self._storage_path / "storage_state.json").write_text(
-            json.dumps(state, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        # Remove event listeners FIRST to prevent new tasks during shutdown
+        try:
+            if self._response_handler:
+                self._context.remove_listener("response", self._response_handler)
+            if self._requestfailed_handler:
+                self._context.remove_listener(
+                    "requestfailed", self._requestfailed_handler
+                )
+        except Exception as e:
+            logger.warning(f"[CAPTURE] Error removing listeners: {e}")
+
+        self._active = False
+        await asyncio.sleep(0.2)
+        try:
+            state = await self._context.storage_state(indexed_db=True)
+            (self._storage_path / "storage_state.json").write_text(
+                json.dumps(state, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except Exception as e:
+            logger.warning(f"[CAPTURE] Error saving storage state: {e}")
 
         self._finalize_manifest()
-        self._active = False
         logger.info("[CAPTURE] Offline capture session finalized")
 
     async def _handle_request_failed(self, request: Request) -> None:
