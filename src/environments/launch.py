@@ -88,7 +88,7 @@ class ReplayBundle:
                 return resource.get("url")
         return None
 
-    def _setup_network_logging(self, context: BrowserContext) -> None:
+    def _setup_har_logging(self, context: BrowserContext) -> None:
         """Set up network event listeners to log requests not found in HAR."""
 
         async def log_request_failed(request):
@@ -216,18 +216,15 @@ class ReplayBundle:
                 context_config["storage_state"] = "{}"
 
         context = await browser.new_context(**context_config)
+        self._setup_har_logging(context)
 
-        # Set up network logging to track HAR replay issues
-        self._setup_network_logging(context)
-
-        # Use HAR replay first
         har_path = self.bundle_path / "recording.har"
         if not har_path.exists():
             raise FileNotFoundError(
                 f"HAR file not found at {har_path}. Cannot replay without HAR file."
             )
 
-        logger.info("Using HAR replay from %s", har_path)
+        logger.info("[HAR REPLAY] Using HAR replay from %s", har_path)
         await context.route_from_har(
             str(har_path),
             not_found="fallback" if allow_network_fallback else "abort",
@@ -246,6 +243,8 @@ class ReplayBundle:
         # TODO: what if the request is sent twice, we'll be selecting the first one all the time.
 
         # TODO: this requires LM postprocessing selection of URL's to match or some dumb way for all POST? or smth
+        # TODO: why when collecting, increasing/decreasing cart stuff fails
+        # TODO: some assets in GET are also dynamic?, bunch of js/stylesheets are not found in HAR
         urls_to_ignore_post_data = {
             "https://www.amazon.com/ax/claim",
             "https://www.amazon.com/aaut/verify/ap",
@@ -277,7 +276,7 @@ class ReplayBundle:
                 None,
             )
             if not entry:
-                continue
+                break
 
             logger.info(
                 "✅ Found matching HAR entry for %s",
@@ -292,8 +291,10 @@ class ReplayBundle:
             await route.fulfill(status=status, headers=headers, body=body)
             return
 
-        # If not found in HAR, abort it
-        logger.warning("⚠️  No matching HAR entry found for %s, aborting", request.url)
+        logger.warning(
+            "⚠️ No matching HAR entry found for %s, aborting",
+            request.url[:100] + "..." if len(request.url) > 100 else request.url,
+        )
         await route.abort()
 
     def _storage_state_path(self) -> Optional[Path]:
