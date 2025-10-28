@@ -300,15 +300,11 @@ async def run_task_with_agent(
                 safe_mode,
             )
 
-            # Set up log directory for tracking cached vs not-found URLs
-            log_dir = results_dir / "logs" / f"task_{task['task_id']}"
-
             sandbox = SandboxEnvironment(
                 sandbox_bundle,
                 allow_network_fallback=sandbox_allow_network,
                 headless=sandbox_headless,
                 safe_mode=safe_mode,
-                log_dir=log_dir,
             )
             try:
                 cdp_url = await sandbox.start()

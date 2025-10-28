@@ -194,17 +194,6 @@ class StealthBrowser:
             "--use-mock-keychain",
             "--password-store=basic",
         ]
-        # user_data_dir = os.path.join(DATA_DIR, "user-data") # Doesn't seem to be needed for anything right now
-        # self.context = await self.playwright.chromium.launch_persistent_context(
-        #     user_data_dir=user_data_dir,
-        #     channel=preferred_channel,
-        #     headless=False,
-        #     args=BROWSER_ARGS,
-        #     ignore_default_args=ignore_default_args,
-        #     bypass_csp=True,
-        #     record_video_dir=video_task_path,
-        #     record_video_size={"width": 1280, "height": 720},
-        # )
 
         # TODO: merge changes with existing PR's
 

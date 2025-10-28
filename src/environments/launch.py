@@ -1,63 +1,44 @@
 import asyncio
 import json
 import logging
-from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from db.step import StepManager
 import typer
-from playwright.async_api import Browser, BrowserContext, Route
+from playwright.async_api import Browser, BrowserContext, async_playwright
 
 from environments.replay import TaskStepExecutor
-from playwright.async_api import async_playwright
 
 
 logger = logging.getLogger(__name__)
 
 
 class ReplayBundle:
-    """Replay previously captured browsing resources."""
+    """Replay previously captured browsing resources using HAR files."""
 
-    def __init__(self, bundle_path: Path, log_dir: Optional[Path] = None):
+    def __init__(self, bundle_path: Path):
         bundle_path = bundle_path.expanduser().resolve()
         manifest_path = self._resolve_manifest(bundle_path)
 
         self.bundle_path = manifest_path.parent
         self.manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-        if (
-            "resources" not in self.manifest
-            or "environment" not in self.manifest
-            or "task" not in self.manifest
-        ):
+        if "environment" not in self.manifest or "task" not in self.manifest:
             raise ValueError("Invalid manifest: missing required fields")
 
-        self.resources = self.manifest["resources"]
         self.environment = self.manifest["environment"]
         self.task_id: Optional[int] = self.manifest["task"]["id"]
-        self._payloads: Dict[Tuple[str, str, str], list[Dict[str, Any]]] = defaultdict(
-            list
-        )
-        self._payload_indices: Dict[Tuple[str, str, str], int] = defaultdict(int)
-
-        # Set up logging for cached vs not-found URLs
-        self.log_dir = log_dir
-        self._cached_urls: set[str] = set()
-        self._not_found_urls: set[str] = set()
-
-        for resource in self.resources:
-            key = self._resource_key(resource)
-            self._payloads[key].append(resource)
 
         logger.info(
-            "Loaded bundle %s with %s recorded resources",
+            "Loaded bundle %s",
             bundle_path,
-            len(self.resources),
         )
 
     def guess_start_url(self) -> Optional[str]:
-        for resource in self.resources:
+        """Extract the initial navigation URL from the manifest resources."""
+        resources = self.manifest.get("resources", [])
+        for resource in resources:
             if (
                 resource.get("resource_type") == "document"
                 and resource.get("status", 200) < 400
@@ -70,9 +51,9 @@ class ReplayBundle:
         browser: Browser,
         *,
         allow_network_fallback: bool = False,
-        use_har: bool = False,
         include_storage_state: bool = False,
     ) -> BrowserContext:
+        """Build a browser context with HAR-based replay."""
         context_config = dict(self.environment.get("context_config") or {})
         if include_storage_state:
             storage_state_path = self._storage_state_path()
@@ -84,181 +65,26 @@ class ReplayBundle:
 
         context = await browser.new_context(**context_config)
 
-        # Choose replay mode: HAR or manual request handling
-        if use_har:
-            har_path = self.bundle_path / "recording.har"
-            if har_path.exists():
-                logger.info("Using HAR replay from %s", har_path)
-                # self._install_har_logging(
-                #     context, allow_network_fallback=allow_network_fallback
-                # )
-                await context.route_from_har(
-                    str(har_path),
-                    not_found="fallback" if allow_network_fallback else "abort",
-                    update=False,  # Don't update the HAR, just replay
-                )
-            else:
-                logger.warning(
-                    "HAR file not found at %s, falling back to manual replay", har_path
-                )
-                await self.attach(
-                    context, allow_network_fallback=allow_network_fallback
-                )
+        # Use HAR replay
+        har_path = self.bundle_path / "recording.har"
+        if har_path.exists():
+            logger.info("Using HAR replay from %s", har_path)
+            await context.route_from_har(
+                str(har_path),
+                not_found="fallback" if allow_network_fallback else "abort",
+                update=False,  # Don't update the HAR, just replay
+            )
         else:
-            logger.info("Using manual request replay from manifest")
-            await self.attach(context, allow_network_fallback=allow_network_fallback)
+            raise FileNotFoundError(
+                f"HAR file not found at {har_path}. Cannot replay without HAR file."
+            )
 
         return context
-
-    async def _fulfill(self, route: Route, *, allow_network_fallback: bool) -> None:
-        request = route.request
-        post_data = await self._safe_post_data(request)
-        # TODO: we can do some LM parsing here, to map to the correct URL, as some interactions might generate at times different URL combinations, maybe even POST data handling
-        key = (request.method, request.url, post_data or "")
-
-        entries = self._payloads.get(key)
-        payload: Optional[Dict[str, Any]] = None
-
-        if entries:
-            idx = self._payload_indices[key]
-            if idx < len(entries):
-                payload = entries[idx]
-                self._payload_indices[key] = idx + 1
-            elif request.method.upper() == "GET":
-                payload = entries[-1]
-                logger.debug(
-                    "Reusing cached GET response for %s (recorded %d uses)",
-                    request.url,
-                    len(entries),
-                )
-            else:
-                payload = entries[-1]
-                logger.info(
-                    "Reusing last response for %s %s beyond recorded count",
-                    request.method,
-                    request.url,
-                )
-
-        if payload:
-            if self.log_dir and request.url not in self._cached_urls:
-                self._cached_urls.add(request.url)
-
-            body_bytes = self._load_body(payload)
-            headers = dict(payload.get("response_headers") or {})
-            if body_bytes is not None:
-                has_length = any(k.lower() == "content-length" for k in headers)
-                if not has_length:
-                    headers["content-length"] = str(len(body_bytes))
-
-            status = payload.get("status") or 200
-            # if request.method == "POST":
-            #     logger.info(f"Fulfilled POST {request.url} with cached payload")
-            #     logger.info(f"Headers: {headers}")
-            #     logger.info(f"Status: {status}")
-            await route.fulfill(status=status, headers=headers, body=body_bytes)
-            return
-
-        # Log not-found URL
-        if self.log_dir and request.url not in self._not_found_urls:
-            self._not_found_urls.add(request.url)
-
-        if allow_network_fallback:
-            await route.continue_()
-            return
-
-        message = f"Offline bundle missing resource for {request.method} {request.url}"
-        # logger.warning(message)
-        await route.fulfill(status=504, body=message)
-
-    def flush_logs(self) -> None:
-        """Write cached and not-found URLs to log files."""
-        if not self.log_dir:
-            return
-
-        self.log_dir.mkdir(parents=True, exist_ok=True)
-
-        if self._cached_urls:
-            cached_log_path = self.log_dir / "cached.log"
-            with open(cached_log_path, "w", encoding="utf-8") as f:
-                for url in sorted(self._cached_urls):
-                    f.write(f"{url}\n")
-            logger.info(
-                "Wrote %d cached URLs to %s", len(self._cached_urls), cached_log_path
-            )
-
-        if self._not_found_urls:
-            not_found_log_path = self.log_dir / "not-found.log"
-            with open(not_found_log_path, "w", encoding="utf-8") as f:
-                for url in sorted(self._not_found_urls):
-                    f.write(f"{url}\n")
-            logger.info(
-                "Wrote %d not-found URLs to %s",
-                len(self._not_found_urls),
-                not_found_log_path,
-            )
-
-    def _load_body(self, payload: Dict[str, Any]) -> Optional[bytes]:
-        body_path = payload.get("body_path")
-        if not body_path:
-            size = payload.get("body_size")
-            if size:
-                logger.debug(
-                    "Recorded size without body path for %s", payload.get("url")
-                )
-            return b"" if size == 0 else None
-
-        target = self.bundle_path / body_path
-        if not target.exists():
-            logger.warning("Missing body file %s", target)
-            return None
-
-        return target.read_bytes()
 
     def _storage_state_path(self) -> Optional[Path]:
         storage_dir = self.bundle_path / "storage"
         storage_state = storage_dir / "storage_state.json"
         return storage_state if storage_state.exists() else None
-
-    async def _safe_post_data(self, request) -> Optional[str]:
-        """Safely extract POST data, handling both text and binary payloads."""
-        try:
-            # Try post_data_buffer first (returns bytes)
-            buffer_accessor = getattr(request, "post_data_buffer", None)
-            if callable(buffer_accessor):
-                try:
-                    data_bytes = await buffer_accessor()
-                except TypeError:
-                    data_bytes = buffer_accessor()
-
-                if data_bytes:
-                    try:
-                        # Try UTF-8 decode for text data
-                        return data_bytes.decode("utf-8")
-                    except UnicodeDecodeError:
-                        # For binary data, base64 encode it
-                        import base64
-
-                        return base64.b64encode(data_bytes).decode("ascii")
-                return None
-
-            # Fallback: try accessing post_data property (may fail on binary)
-            # We can't use getattr because it triggers the property getter
-            # which may throw UnicodeDecodeError
-            try:
-                post_data = request.post_data
-                return post_data
-            except (UnicodeDecodeError, AttributeError):
-                return None
-        except Exception:
-            return None
-
-    @staticmethod
-    def _resource_key(resource: Dict[str, Any]) -> Tuple[str, str, str]:
-        return (
-            resource.get("method") or "GET",
-            resource.get("url") or "",
-            resource.get("post_data") or "",
-        )
 
     @staticmethod
     def _resolve_manifest(bundle_path: Path) -> Path:
@@ -293,7 +119,6 @@ async def _cli(
     headless: bool,
     allow_fallback: bool,
     run_human_trajectory: bool,
-    use_har: bool,
     exit_on_completion: bool,
     include_storage_state: bool,
 ) -> None:
@@ -312,7 +137,6 @@ async def _cli(
         context = await bundle.build_context(
             browser,
             allow_network_fallback=allow_fallback,
-            use_har=use_har,
             include_storage_state=include_storage_state,
         )
         page = await context.new_page()
@@ -343,11 +167,8 @@ def main(
     headless: bool = typer.Option(False, help="Run browser in headless mode"),
     # Default to chrome channel for consistent behavior with recording
     channel: str = typer.Option("chrome", help="Browser channel to use for replay"),
-    use_har: bool = typer.Option(
-        True, help="Use HAR replay instead of manual request handling"
-    ),
     allow_network_fallback: bool = typer.Option(
-        False, help="Allow requests missing from the bundle to hit the live network"
+        False, help="Allow requests missing from the HAR to hit the live network"
     ),
     exit_on_completion: bool = typer.Option(
         False, help="Exit the program after completing the replay"
@@ -360,7 +181,7 @@ def main(
         False, help="Replay timing with human-like pacing"
     ),
 ):
-    """Replay a captured browser bundle offline."""
+    """Replay a captured browser bundle offline using HAR files."""
     asyncio.run(
         _cli(
             bundle.expanduser().resolve(),
@@ -368,7 +189,6 @@ def main(
             channel=channel,
             allow_fallback=allow_network_fallback,
             run_human_trajectory=run_human_trajectory,
-            use_har=use_har,
             exit_on_completion=exit_on_completion,
             include_storage_state=include_storage_state,
         )
