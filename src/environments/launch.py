@@ -29,6 +29,8 @@ BLOCKED_PATTERNS = [
     "amazon.com/1/events/",
     "amazon-adsystem.com",
     "amazon.com/rd/uedata",
+    "amazon.com/ap/uedata",
+    "amazon.com/*/uedata",  # TODO: handle patterns instead
     "fls-na.amazon.com",
 ]
 
@@ -213,44 +215,37 @@ class ReplayBundle:
             update=False,  # Don't update the HAR, just replay
         )
 
-        # LIFO order, will process this first
-        CLAIM_URL_BASE = "https://www.amazon.com/ax/claim?policy_handle"
+        # Add custom route handler AFTER HAR routing (so it gets priority - LIFO)
+        await context.route(
+            "**/*", lambda route, request: self.handle_routes_manually(route, request)
+        )
+        return context
 
-        # TODO: next steps
-        # - we can either obsfucate POST data with some clever way
-        # - or we can just ignore the POST body and match the request by URL and method only
-        # - but this method requires some postprocessing and LM selection to identify the requests that require this
-        # - we can try first with all POST requests just match by URL and method
-        # - - then more clever selection if it contains some fields in the POST data
-        # - - then if this is matching when it shouldn't, LM judge preprocessing and selection of the URL's too match
-        # TODO: let's make amazon work first, (email already, let's do password now)
-        # ?? Normalize JSON (remove volatile fields; sort keys) and hash; tolerate multipart boundary changes; ignore known nonce/timestamp params.
+    async def handle_routes_manually(self, route, request):
+        # TODO: do we need to obsfucate in a more clever way?
+        # - ?? Normalize JSON (remove volatile fields; sort keys) and hash; tolerate multipart boundary changes; ignore known nonce/timestamp params.
 
-        # - Even this `FAILED (not in HAR): GET https://web-envs-agent.onrender.com/hotels [fetch]` is failing cause sec-fetch cors tokens differ
-        # TODO: substack doesn't even replicate properly, many GET requests are failing (REPLAY issue, not when launched)
+        har_data = self._load_har_data()
+        # TODO: this requires LM postprocessing selection of URL's to match or some dumb way for all POST? or smth
+        urls_to_ignore_post_data = {
+            "https://www.amazon.com/ax/claim",
+            "https://www.amazon.com/aaut/verify/ap",
+            "https://www.amazon.com/ap/signin",
+        }
 
-        # Tracking and analytics domains to block for cleaner logs
+        url_lower = request.url.lower()
+        for pattern in BLOCKED_PATTERNS:
+            if pattern in url_lower:
+                await route.abort()
+                return
 
-        async def handle_routes_manually(route, request):
-            url_lower = request.url.lower()
-            for pattern in BLOCKED_PATTERNS:
-                if pattern in url_lower:
-                    await route.abort()
-                    return
-
-            # Handle Amazon claim POST requests (ignore POST body, match by URL and method only)
-            if request.method == "POST" and request.url.startswith(CLAIM_URL_BASE):
-                logger.info(
-                    "🔧 MANUAL ROUTE: Intercepted %s (ignoring POST body)",
-                    request.url,
-                )
-
-                # Load HAR data
-                har_data = self._load_har_data()
-                if har_data:
-                    # Find matching entry by URL and method only
+        # Handle Amazon claim POST requests (ignore POST body, match by URL and method only)
+        if request.method == "POST":
+            for base_url in urls_to_ignore_post_data:
+                if request.url.startswith(base_url):
                     for entry in har_data.get("log", {}).get("entries", []):
                         req = entry.get("request", {})
+                        # TODO: do need to match to base_url or is fine if == request.url
                         if (
                             req.get("method") == "POST"
                             and req.get("url") == request.url
@@ -279,20 +274,14 @@ class ReplayBundle:
                             )
                             return
 
-                # If not found in HAR, abort it
-                logger.warning(
-                    "⚠️  No matching HAR entry found for %s, aborting", request.url
-                )
-                await route.abort()
-            else:
-                # Not a special request, fall back to HAR routing
-                await route.fallback()
-
-        # Add custom route handler AFTER HAR routing (so it gets priority - LIFO)
-        # Use **/* to catch all requests for tracking blocking and special handling
-        await context.route("**/*", handle_routes_manually)
-
-        return context
+            # If not found in HAR, abort it
+            logger.warning(
+                "⚠️  No matching HAR entry found for %s, aborting", request.url
+            )
+            await route.abort()
+        else:
+            # Not a special request, fall back to HAR routing
+            await route.fallback()
 
     def _storage_state_path(self) -> Optional[Path]:
         storage_dir = self.bundle_path / "storage"
