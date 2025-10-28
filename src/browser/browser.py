@@ -195,9 +195,6 @@ class StealthBrowser:
             "--password-store=basic",
         ]
 
-        # TODO: merge changes with existing PR's
-
-        # TODO: why even if sign in fails in amazon, still we end up signed in?
         # TODO: post data obsfucation, to handle edge case matching or LM selection for POST requests?
         # - Normalize JSON (remove volatile fields; sort keys) and hash; tolerate multipart boundary changes; ignore known nonce/timestamp params.
         # TODO: Playwright warns that HAR replay never serves requests intercepted by service workers; those requests bypass the HAR entirely (docs/src/mock.md:417), consider blocking sw

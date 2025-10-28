@@ -29,13 +29,14 @@ class TaskStepExecutor:
             try:
                 await self._run_step(page, step)
             except Exception as exc:
-                logger.warning(
-                    "Failed to execute step %s (%s): %s",
+                logger.error(
+                    "Failed to execute step %s (%s): %s. Stopping trajectory replay.",
                     step.id,
                     step.event_type,
                     exc,
                     exc_info=True,
                 )
+                return
             base_delay: float = 0.2 if self.run_human_trajectory else 0.1
             await asyncio.sleep(base_delay)
 
@@ -97,9 +98,17 @@ class TaskStepExecutor:
                     # Use locator for better reliability and auto-waiting
                     await page.locator(selector).click(timeout=5000)
                 except PlaywrightTimeoutError:
-                    logger.warning(
-                        "Failed to click element with selector: %s", selector
+                    logger.error(
+                        "Failed to click element with selector: %s",
+                        selector,
+                        exc_info=True,
                     )
+                    raise
+            else:
+                logger.error(
+                    "Cannot perform click: no coordinates or selector available"
+                )
+                raise Exception("No coordinates or selector available for click")
             return
         x, y = coords
         await page.mouse.move(x, y)
@@ -161,15 +170,24 @@ class TaskStepExecutor:
                 await locator.fill(value, timeout=5000)
                 return
             except PlaywrightTimeoutError:
-                logger.warning("Failed to fill element with selector: %s", selector)
+                logger.error("Failed to fill element with selector: %s", selector)
 
         # Fallback to focused element
         try:
             focused_locator: Locator = page.locator(":focus")
             if await focused_locator.count() > 0:
                 await focused_locator.fill(value, timeout=2000)
+                return
         except Exception as exc:
-            logger.warning("Failed to fill focused element: %s", exc)
+            logger.error("Failed to fill focused element: %s", exc)
+
+        # If we get here, both attempts failed
+        logger.error(
+            "Input failed: could not fill value '%s' using selector '%s' or focused element",
+            value,
+            selector,
+        )
+        raise Exception("Input operation failed")
 
     async def _perform_keydown(self, page: Page, payload: Dict[str, Any]) -> None:
         key: Optional[str] = payload.get("key") if isinstance(payload, dict) else None
@@ -204,13 +222,20 @@ class TaskStepExecutor:
             focused: Locator = page.locator(":focus")
             if await focused.count() > 0:
                 await focused.press("Enter", timeout=2000)
-            else:
-                # Last resort: press Enter on the first form
-                first_form: Locator = page.locator("form").first
-                if await first_form.count() > 0:
-                    await first_form.press("Enter", timeout=2000)
+                return
+
+            # Last resort: press Enter on the first form
+            first_form: Locator = page.locator("form").first
+            if await first_form.count() > 0:
+                await first_form.press("Enter", timeout=2000)
+                return
+
+            # If we reach here, no submit method worked
+            logger.error("Submit failed: no form element found to submit")
+            raise Exception("Submit operation failed")
         except Exception as exc:
-            logger.warning("Failed to submit form: %s", exc)
+            logger.error("Failed to submit form: %s", exc, exc_info=True)
+            raise
 
     async def _safe_goto(self, page: Page, url: str) -> None:
         try:
