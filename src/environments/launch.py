@@ -1,15 +1,16 @@
 import asyncio
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from db.step import StepManager
 import typer
-from playwright.async_api import Browser, BrowserContext, async_playwright
+from playwright.async_api import Browser, BrowserContext, Request, async_playwright
 
 from environments.replay import TaskStepExecutor
-
+from config.storage import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,113 @@ class ReplayBundle:
                 return resource.get("url")
         return None
 
+    def _setup_network_logging(self, context: BrowserContext) -> None:
+        """Set up network event listeners to log requests not found in HAR."""
+
+        async def log_request_failed(request):
+            logger.warning(
+                "⚠️  Request FAILED (not in HAR): %s %s [%s]",
+                request.method,
+                request.url,
+                request.resource_type,
+            )
+
+            # Capture full request details to file for debugging
+            await self._save_failed_request_to_file(request)
+
+        async def log_request_finished(request):
+            response = await request.response()
+            if response:
+                if response.from_service_worker:
+                    logger.info("Request served from service worker: %s", request.url)
+            else:
+                logger.warning(
+                    "⚠️  Request completed but no response: %s %s",
+                    request.method,
+                    request.url,
+                )
+
+        # Set up event listeners for network monitoring
+        # context.on("request", lambda req: logger.info("→ Request: %s %s", req.method, req.url))
+        context.on("requestfailed", log_request_failed)
+        context.on("requestfinished", log_request_finished)
+
+    async def _save_failed_request_to_file(self, request: Request) -> None:
+        """Save failed request details to a temporary file for comparison."""
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            filename = f"failed_request_{timestamp}.txt"
+            # Extract task_id from bundle_path, assumed structure like data/captures/task_1
+            filepath = Path(DATA_DIR) / "debug" / f"task_{self.task_id}" / filename
+            filepath.parent.mkdir(parents=True, exist_ok=True)
+
+            # Collect all request details
+            details = {
+                "timestamp": timestamp,
+                "url": request.url,
+                "method": request.method,
+                "resource_type": request.resource_type,
+                "headers": dict(request.headers),
+                "post_data": None,
+                "failure": request.failure,
+            }
+
+            # Try to get POST data if available
+            try:
+                post_data = request.post_data
+                if post_data:
+                    details["post_data"] = post_data
+                    details["post_data_length"] = len(post_data)
+            except Exception:
+                pass
+
+            # Format as readable text
+            content_lines = [
+                "=" * 80,
+                f"FAILED REQUEST DETAILS - {timestamp}",
+                "=" * 80,
+                "",
+                f"URL: {details['url']}",
+                f"Method: {details['method']}",
+                f"Resource Type: {details['resource_type']}",
+                f"Failure: {details['failure']}",
+                "",
+                "HEADERS:",
+                "-" * 80,
+            ]
+
+            for key, value in details["headers"].items():
+                content_lines.append(f"{key}: {value}")
+
+            if details["post_data"]:
+                content_lines.extend(
+                    [
+                        "",
+                        "POST DATA:",
+                        "-" * 80,
+                        f"Length: {details['post_data_length']} bytes",
+                        "",
+                        details["post_data"],
+                    ]
+                )
+
+            content_lines.extend(["", "=" * 80, ""])
+
+            filepath.write_text("\n".join(content_lines))
+
+        except Exception as exc:
+            logger.error(f"Failed to save request details: {exc}")
+
+    def _load_har_data(self) -> Optional[Dict]:
+        """Load and cache HAR file data."""
+        if not hasattr(self, "_har_data"):
+            har_path = self.bundle_path / "recording.har"
+            if har_path.exists():
+                self._har_data = json.loads(har_path.read_text(encoding="utf-8"))
+            else:
+                self._har_data = None
+        return self._har_data
+
     async def build_context(
         self,
         browser: Browser,
@@ -65,19 +173,87 @@ class ReplayBundle:
 
         context = await browser.new_context(**context_config)
 
-        # Use HAR replay
+        # Set up network logging to track HAR replay issues
+        self._setup_network_logging(context)
+
+        # Use HAR replay first
         har_path = self.bundle_path / "recording.har"
-        if har_path.exists():
-            logger.info("Using HAR replay from %s", har_path)
-            await context.route_from_har(
-                str(har_path),
-                not_found="fallback" if allow_network_fallback else "abort",
-                update=False,  # Don't update the HAR, just replay
-            )
-        else:
+        if not har_path.exists():
             raise FileNotFoundError(
                 f"HAR file not found at {har_path}. Cannot replay without HAR file."
             )
+
+        logger.info("Using HAR replay from %s", har_path)
+        await context.route_from_har(
+            str(har_path),
+            not_found="fallback" if allow_network_fallback else "abort",
+            update=False,  # Don't update the HAR, just replay
+        )
+
+        # LIFO order, will process this first
+        CLAIM_URL_BASE = "https://www.amazon.com/ax/claim?policy_handle"
+
+        # TODO: next steps
+        # - we can either obsfucate POST data with some clever way
+        # - or we can just ignore the POST body and match the request by URL and method only
+        # - but this method requires some postprocessing and LM selection to identify the requests that require this
+        # - we can try first with all POST requests just match by URL and method
+        # - - then more clever selection if it contains some fields in the POST data
+        # - - then if this is matching when it shouldn't, LM judge preprocessing and selection of the URL's too match
+
+        async def handle_claim_post(route, request):
+            """Handle the specific Amazon claim POST request from HAR, ignoring POST body."""
+            if request.method == "POST" and request.url.startswith(CLAIM_URL_BASE):
+                logger.info(
+                    "🔧 MANUAL ROUTE: Intercepted %s (ignoring POST body)",
+                    request.url,
+                )
+
+                # Load HAR data
+                har_data = self._load_har_data()
+                if har_data:
+                    # Find matching entry by URL and method only
+                    for entry in har_data.get("log", {}).get("entries", []):
+                        req = entry.get("request", {})
+                        if (
+                            req.get("method") == "POST"
+                            and req.get("url") == request.url
+                        ):
+                            logger.info(
+                                "✅ Found matching HAR entry for %s", request.url
+                            )
+                            response = entry.get("response", {})
+
+                            # Extract response details
+                            status = response.get("status", 200)
+                            headers = {
+                                h["name"]: h["value"]
+                                for h in response.get("headers", [])
+                            }
+                            content = response.get("content", {})
+
+                            # Get body if available
+                            body = None
+                            if "text" in content:
+                                body = content["text"]
+
+                            # Fulfill the request with HAR response
+                            await route.fulfill(
+                                status=status, headers=headers, body=body
+                            )
+                            return
+
+                # If not found in HAR, abort it
+                logger.warning(
+                    "⚠️  No matching HAR entry found for %s, aborting", request.url
+                )
+                await route.abort()
+            else:
+                # Not our target request, fall back to HAR routing
+                await route.fallback()
+
+        # Add custom route handler AFTER HAR routing (so it gets priority - LIFO)
+        await context.route("**/ax/claim?policy_handle*", handle_claim_post)
 
         return context
 
