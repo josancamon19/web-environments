@@ -86,6 +86,9 @@ function saveUsers() {
 
 function ensureAuthenticated(req, res, next) {
   const token = req.cookies.sessionToken;
+  console.log('token', token);
+  console.log('sessions', sessions[token]);
+  console.log(token && sessions[token]);
   if (!token || !sessions[token]) {
     return res.status(401).json({ message: 'Unauthorized' });
   }
