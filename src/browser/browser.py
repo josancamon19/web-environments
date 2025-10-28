@@ -204,17 +204,6 @@ class StealthBrowser:
             "--password-store=basic",
         ]
 
-        # TODO: environment.py should be cleaned and reuse more of launch.py
-        # TODO: does the agent launch works?
-        # TODO: does the agent when evaluated works on the environment?
-        # TODO: improve launching and running the environment
-
-        # ====== once this works well ======
-
-        # TODO: collect env with further n steps depth, using replay to bypass auths sections
-        # TODO: eval runs in parallel containers, or ran on kernel, hosting tunneled versions locally while it runs?
-        # TODO: websockets? like e.g. ChatGPT doesn't allow for collecting anything
-
         browser = await self.playwright.chromium.launch(
             channel=preferred_channel,
             headless=False,

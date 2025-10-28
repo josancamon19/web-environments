@@ -8,7 +8,13 @@ from typing import Any, Dict, Optional
 
 from db.step import StepManager
 import typer
-from playwright.async_api import Browser, BrowserContext, Request, async_playwright
+from playwright.async_api import (
+    Browser,
+    BrowserContext,
+    Request,
+    Route,
+    async_playwright,
+)
 
 from environments.replay import TaskStepExecutor
 from config.storage import DATA_DIR
@@ -206,7 +212,21 @@ class ReplayBundle:
         include_storage_state: bool = False,
     ) -> BrowserContext:
         """Build a browser context with HAR-based replay."""
+        context_config = self.get_context_config(
+            include_storage_state=include_storage_state
+        )
+        context = await browser.new_context(**context_config)
+        await self.configure_context(
+            context, allow_network_fallback=allow_network_fallback
+        )
+        return context
+
+    def get_context_config(
+        self, *, include_storage_state: bool = False
+    ) -> Dict[str, Any]:
+        """Prepare context configuration, optionally including storage state."""
         context_config = dict(self.environment.get("context_config") or {})
+
         if include_storage_state:
             storage_state_path = self._storage_state_path()
             if storage_state_path:
@@ -215,7 +235,15 @@ class ReplayBundle:
                 logger.warning("Storage state file not found, using empty state")
                 context_config["storage_state"] = "{}"
 
-        context = await browser.new_context(**context_config)
+        return context_config
+
+    async def configure_context(
+        self,
+        context: BrowserContext,
+        *,
+        allow_network_fallback: bool = False,
+    ) -> None:
+        """Configure an existing browser context with HAR replay and routing."""
         self._setup_har_logging(context)
 
         har_path = self.bundle_path / "recording.har"
@@ -235,9 +263,8 @@ class ReplayBundle:
         await context.route(
             "**/*", lambda route, request: self.handle_routes_manually(route, request)
         )
-        return context
 
-    async def handle_routes_manually(self, route, request):
+    async def handle_routes_manually(self, route: Route, request: Request) -> None:
         # TODO: do we need to obsfucate in a more clever way?
         # - ?? Normalize JSON (remove volatile fields; sort keys) and hash; tolerate multipart boundary changes; ignore known nonce/timestamp params.
         # TODO: what if the request is sent twice, we'll be selecting the first one all the time.
@@ -246,6 +273,7 @@ class ReplayBundle:
         # TODO: this requires LM postprocessing selection of URL's to match or some dumb way for all POST? or smth
         # TODO: why when collecting, increasing/decreasing cart stuff fails
         # TODO: some assets in GET are also dynamic?, bunch of js/stylesheets are not found in HAR
+        # TODO: websockets? like e.g. ChatGPT doesn't allow for collecting anything
 
         urls_to_ignore_post_data = {
             "https://www.amazon.com/ax/claim",

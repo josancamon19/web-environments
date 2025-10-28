@@ -239,7 +239,6 @@ async def run_task_with_agent(
     sandbox_bundle: Optional[Path] = None,
     sandbox_allow_network: bool = False,
     sandbox_headless: bool = True,
-    sandbox_safe_mode: bool = False,
 ) -> Dict[str, Any]:
     """Run a single task with the Browser-Use agent and capture all data."""
 
@@ -285,14 +284,9 @@ async def run_task_with_agent(
 
     try:
         sandbox_start_error: Optional[Exception] = None
-        sandbox_modes = []
-        if sandbox_bundle:
-            if sandbox_safe_mode:
-                sandbox_modes = [True]
-            else:
-                sandbox_modes = [False, True]
+        for safe_mode in [False, True]:
+            # try first antidetection and performance, if fails, try safe mode
 
-        for safe_mode in sandbox_modes:
             logger.info(
                 "Starting sandbox for task %s at %s (safe_mode=%s)",
                 task["task_id"],
@@ -461,7 +455,6 @@ async def process_single_task(
     sandbox_root: Optional[Path],
     sandbox_allow_network: bool,
     sandbox_headless: bool,
-    sandbox_safe_mode: bool,
     semaphore: Optional[asyncio.Semaphore] = None,
 ):
     """Process a single task and write results to individual JSON file"""
@@ -495,7 +488,6 @@ async def process_single_task(
                 sandbox_bundle=sandbox_bundle,
                 sandbox_allow_network=sandbox_allow_network,
                 sandbox_headless=sandbox_headless,
-                sandbox_safe_mode=sandbox_safe_mode,
             )
 
             # Write result to individual JSON file
@@ -534,7 +526,6 @@ async def process_all_tasks(
     sandbox_root: Optional[Path],
     sandbox_allow_network: bool,
     sandbox_headless: bool,
-    sandbox_safe_mode: bool,
 ):
     """Process all tasks and save to individual JSON files, skipping already completed ones"""
     # Cleanup all active Kernel browser sessions before starting
@@ -593,7 +584,6 @@ async def process_all_tasks(
                 sandbox_root=sandbox_root,
                 sandbox_allow_network=sandbox_allow_network,
                 sandbox_headless=sandbox_headless,
-                sandbox_safe_mode=sandbox_safe_mode,
                 semaphore=semaphore,
             )
         )
@@ -620,19 +610,12 @@ async def main(args: argparse.Namespace) -> None:
             )
 
     sandbox_headless = not args.sandbox_headed
-    sandbox_safe_mode = args.sandbox_safe_mode
-    if sandbox_safe_mode and args.sandbox_headed:
-        logger.warning(
-            "Sandbox safe mode forces headless Chromium; ignoring --sandbox-headed"
-        )
-        sandbox_headless = True
 
     results_dir = await process_all_tasks(
         args.model,
         sandbox_root=sandbox_root,
         sandbox_allow_network=args.sandbox_allow_network,
         sandbox_headless=sandbox_headless,
-        sandbox_safe_mode=sandbox_safe_mode,
     )
     print(f"\nAll results saved to: {results_dir}")
 
@@ -657,11 +640,6 @@ def parse_args() -> argparse.Namespace:
         "--sandbox-headed",
         action="store_true",
         help="Launch sandbox Chromium with a visible window",
-    )
-    parser.add_argument(
-        "--sandbox-safe-mode",
-        action="store_true",
-        help="Use a reduced argument set and headless Chromium for stability",
     )
     return parser.parse_args()
 

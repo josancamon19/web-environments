@@ -2,7 +2,6 @@ import asyncio
 import http.client
 import json
 import logging
-import os
 import socket
 from pathlib import Path
 from typing import List, Optional
@@ -11,7 +10,7 @@ from playwright.async_api import Browser as PlaywrightBrowser
 from playwright.async_api import BrowserContext, BrowserType, async_playwright
 
 from environments.launch import ReplayBundle
-from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
+from config.browser_config import BROWSER_ARGS
 
 
 logger = logging.getLogger(__name__)
@@ -71,41 +70,28 @@ class SandboxEnvironment:
         bundle_path: Path,
         *,
         allow_network_fallback: bool = False,
-        headless: Optional[bool] = None,
-        browser_args: Optional[List[str]] = None,
+        headless: bool = False,
         safe_mode: bool = False,
+        browser_args: Optional[List[str]] = None,
+        include_storage_state: bool = False,
     ) -> None:
         self.bundle = ReplayBundle(bundle_path)
         self.allow_network_fallback = allow_network_fallback
         self.safe_mode = safe_mode
-
-        # TODO: what is this needed for?
-        env_headless = os.environ.get("SANDBOX_HEADLESS")
-        env_safe_mode = os.environ.get("SANDBOX_SAFE_MODE")
-        # TODO: ignore this env vars bullshit
-        # TODO: some variables naming don't elicit anything
-        if env_safe_mode is not None:
-            self.safe_mode = env_safe_mode.lower() in {"1", "true", "yes", "on"}
-
-        # Determine headless setting (allow override even in safe mode)
-        if env_headless is not None:
-            self.headless = env_headless.lower() in {"1", "true", "yes", "on"}
-        else:
-            self.headless = headless if headless is not None else False
+        self.headless = headless
+        self.include_storage_state = include_storage_state
 
         # Set browser args based on mode
         if self.safe_mode:
-            base_args = SAFE_BROWSER_ARGS
+            self.browser_args = SAFE_BROWSER_ARGS
+        elif browser_args is not None:
+            self.browser_args = browser_args
         else:
-            base_args = browser_args if browser_args is not None else BROWSER_ARGS
-
-        if browser_args is not None and self.safe_mode:
-            base_args = browser_args
-
-        self.browser_args = list(base_args) if base_args else []
+            self.browser_args = BROWSER_ARGS
 
         self._playwright = None
         self._browser: Optional[PlaywrightBrowser] = None
+        # TODO: a list of contexts seem like an overkill
         self._contexts: list[BrowserContext] = []
         self._ws_endpoint: Optional[str] = None
         self._debug_port: Optional[int] = None
@@ -135,11 +121,7 @@ class SandboxEnvironment:
             self.headless,
         )
 
-        launch_kwargs = {
-            "headless": self.headless,
-            "args": launch_args,
-        }
-
+        launch_kwargs = {"headless": self.headless, "args": launch_args}
         self._browser = await browser_type.launch(**launch_kwargs)
         self._browser.on(
             "context",
@@ -148,7 +130,11 @@ class SandboxEnvironment:
 
         # Ensure at least one context exists for routing
         if not self._browser.contexts:
-            context = await self._browser.new_context(**CONTEXT_CONFIG)
+            # TODO: or should use **CONTEXT_CONFIG?
+            context_config = self.bundle.get_context_config(
+                include_storage_state=self.include_storage_state
+            )
+            context = await self._browser.new_context(**context_config)
             await self._configure_context(context)
         else:
             for context in list(self._browser.contexts):
@@ -205,35 +191,26 @@ class SandboxEnvironment:
         raise RuntimeError("Timed out waiting for Chrome debugger endpoint")
 
     async def _configure_context(self, context: BrowserContext) -> None:
+        """Configure a context with HAR replay using the bundle's configuration."""
         if context in self._contexts:
             return
         self._contexts.append(context)
 
-        # Configure HAR-based replay
-        har_path = self.bundle.bundle_path / "recording.har"
-        if har_path.exists():
-            logger.info("[SANDBOX] Using HAR replay from %s", har_path)
-            await context.route_from_har(
-                str(har_path),
-                not_found="fallback" if self.allow_network_fallback else "abort",
-                update=False,
-            )
-        else:
-            raise FileNotFoundError(
-                f"[SANDBOX] HAR file not found at {har_path}. Cannot replay without HAR file."
-            )
+        # Delegate to the bundle's configure_context method for DRY
+        await self.bundle.configure_context(
+            context,
+            allow_network_fallback=self.allow_network_fallback,
+        )
 
     async def close(self) -> None:
-        if self._browser:
-            try:
-                await self._browser.close()
-            except Exception:
-                pass
-        if self._playwright:
-            try:
-                await self._playwright.stop()
-            except Exception:
-                pass
+        try:
+            await self._browser.close()
+        except Exception:
+            pass
+        try:
+            await self._playwright.stop()
+        except Exception:
+            pass
 
         self._browser = None
         self._playwright = None
