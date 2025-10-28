@@ -497,6 +497,26 @@ function App() {
               </div>
             </section>
 
+            <section className="video-highlight">
+              <div className="video-copy">
+                <h2>Take a quick tour</h2>
+                <p>See how StayScout surfaces boutique stays, compares prices, and keeps your favorites in sync.</p>
+                <ul>
+                  <li>Highlights curated properties across cities</li>
+                  <li>Add new listings with a simple owner workflow</li>
+                  <li>Favorite hotels and review them later from any device</li>
+                </ul>
+              </div>
+              <div className="video-frame">
+                <iframe
+                  title="StayScout intro"
+                  src="https://www.youtube.com/watch?v=aFHji91unN4"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  loading="lazy"
+                />
+              </div>
+            </section>
+
             <section className="search-section">
               <div className="search-box">
                 <label>

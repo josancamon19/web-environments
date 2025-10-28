@@ -602,6 +602,48 @@ footer span {
   margin: 0;
 }
 
+.video-highlight {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: clamp(1.5rem, 4vw, 3rem);
+  background: white;
+  border-radius: 24px;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
+  align-items: center;
+}
+
+.video-copy {
+  display: grid;
+  gap: 1rem;
+  color: #0f172a;
+}
+
+.video-copy ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: #475569;
+}
+
+.video-frame {
+  position: relative;
+  padding-bottom: 56.25%;
+  height: 0;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
+}
+
+.video-frame iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 20px;
+}
+
 @media (max-width: 960px) {
   .content-grid {
     grid-template-columns: 1fr;
