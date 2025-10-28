@@ -202,9 +202,6 @@ class StealthBrowser:
             "--password-store=basic",
         ]
 
-        # TODO: collect a couple of tasks this way
-        # TODO: cleanup capture.py if we are using only HAR collection
-
         # TODO: environment.py should be cleaned and reuse more of launch.py
         # TODO: does the agent launch works?
         # TODO: does the agent when evaluated works on the environment?

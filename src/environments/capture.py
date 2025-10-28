@@ -18,6 +18,7 @@ from utils.get_iso_datetime import get_iso_datetime
 logger = logging.getLogger(__name__)
 
 
+# TODO: cleanup capture.py if we are using only HAR collection
 class OfflineCaptureManager:
     """Collect all artifacts required to replay a browsing session offline."""
 

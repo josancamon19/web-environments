@@ -14,6 +14,24 @@ from config.storage import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
+BLOCKED_PATTERNS = [
+    "google-analytics",
+    "googleads",
+    "google-tag-manager",
+    "doubleclick.net",
+    "mixpanel",
+    "ingest.sentry.io",
+    "facebook.com/privacy_sandbox/pixel",
+    "cloudflareinsights.com",
+    "google.com/ccm/collect",
+    "facebook.com/tr/",
+    "googletagmanager.com",
+    "amazon.com/1/events/",
+    "amazon-adsystem.com",
+    "amazon.com/rd/uedata",
+    "fls-na.amazon.com",
+]
+
 
 class ReplayBundle:
     """Replay previously captured browsing resources using HAR files."""
@@ -51,10 +69,15 @@ class ReplayBundle:
         """Set up network event listeners to log requests not found in HAR."""
 
         async def log_request_failed(request):
+            url_lower = request.url.lower()
+            for pattern in BLOCKED_PATTERNS:
+                if pattern in url_lower:
+                    return
+
             logger.warning(
                 "⚠️  Request FAILED (not in HAR): %s %s [%s]",
                 request.method,
-                request.url,
+                request.url[:100] + "..." if len(request.url) > 100 else request.url,
                 request.resource_type,
             )
 
@@ -206,8 +229,16 @@ class ReplayBundle:
         # - Even this `FAILED (not in HAR): GET https://web-envs-agent.onrender.com/hotels [fetch]` is failing cause sec-fetch cors tokens differ
         # TODO: substack doesn't even replicate properly, many GET requests are failing (REPLAY issue, not when launched)
 
-        async def handle_claim_post(route, request):
-            """Handle the specific Amazon claim POST request from HAR, ignoring POST body."""
+        # Tracking and analytics domains to block for cleaner logs
+
+        async def handle_routes_manually(route, request):
+            url_lower = request.url.lower()
+            for pattern in BLOCKED_PATTERNS:
+                if pattern in url_lower:
+                    await route.abort()
+                    return
+
+            # Handle Amazon claim POST requests (ignore POST body, match by URL and method only)
             if request.method == "POST" and request.url.startswith(CLAIM_URL_BASE):
                 logger.info(
                     "🔧 MANUAL ROUTE: Intercepted %s (ignoring POST body)",
@@ -254,11 +285,12 @@ class ReplayBundle:
                 )
                 await route.abort()
             else:
-                # Not our target request, fall back to HAR routing
+                # Not a special request, fall back to HAR routing
                 await route.fallback()
 
         # Add custom route handler AFTER HAR routing (so it gets priority - LIFO)
-        await context.route("**/ax/claim?policy_handle*", handle_claim_post)
+        # Use **/* to catch all requests for tracking blocking and special handling
+        await context.route("**/*", handle_routes_manually)
 
         return context
 
