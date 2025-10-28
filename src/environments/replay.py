@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from typing import Any, Dict, Optional, Tuple
+from urllib.parse import urlparse
 from playwright.async_api import Page, Locator, TimeoutError as PlaywrightTimeoutError
 from db.models import StepModel
 
@@ -58,7 +59,11 @@ class TaskStepExecutor:
             if not url or url == "about:blank":
                 return
             if not self._initial_navigation_done or self._urls_differ(page.url, url):
-                await self._safe_goto(page, url)
+                # Check if this is a SPA route change vs real navigation
+                if await self._is_spa_route_change(page, url):
+                    await self._perform_spa_navigation(page, url)
+                else:
+                    await self._safe_goto(page, url)
                 self._initial_navigation_done = True
             return
 
@@ -236,6 +241,83 @@ class TaskStepExecutor:
         except Exception as exc:
             logger.error("Failed to submit form: %s", exc, exc_info=True)
             raise
+
+    async def _is_spa_route_change(self, page: Page, target_url: str) -> bool:
+        """
+        Detect if a navigation is likely a SPA client-side route change.
+
+        A navigation is considered a SPA route change if:
+        1. Same origin as current page
+        2. Only hash differs, OR
+        3. Path/query differs but it's on the same domain (likely client-side routing)
+        """
+        current_url = page.url
+        if not current_url or current_url == "about:blank":
+            return False
+
+        try:
+            current = urlparse(current_url)
+            target = urlparse(target_url)
+
+            # Different origins = real navigation
+            if current.scheme != target.scheme or current.netloc != target.netloc:
+                return False
+
+            # Same origin navigation
+            # If only hash differs, it's definitely a SPA route change
+            if (
+                current.scheme == target.scheme
+                and current.netloc == target.netloc
+                and current.path == target.path
+                and current.query == target.query
+            ):
+                return True  # Only hash differs
+
+            # For same-origin path changes, assume it's SPA if:
+            # - The path doesn't end with .html, .htm, .php, etc.
+            # - The current page is already loaded (not the initial navigation)
+            static_extensions = {".html", ".htm", ".php", ".asp", ".jsp"}
+            target_path = target.path.lower()
+
+            if any(target_path.endswith(ext) for ext in static_extensions):
+                return False  # Likely a real document
+
+            # Assume same-origin path change without static extension is SPA
+            return True
+
+        except Exception as exc:
+            logger.warning("Error checking SPA route change: %s", exc)
+            return False
+
+    async def _perform_spa_navigation(self, page: Page, url: str) -> None:
+        """
+        Perform client-side navigation for SPA routes using History API.
+        This avoids triggering a full page load.
+        """
+        try:
+            logger.info("SPA navigation to %s (using History API)", url)
+
+            # Use History API to change URL without reloading
+            await page.evaluate(
+                """(url) => {
+                window.history.pushState({}, '', url);
+                // Trigger popstate event in case the SPA listens to it
+                window.dispatchEvent(new PopStateEvent('popstate', { state: {} }));
+                // Also trigger hashchange if hash changed
+                window.dispatchEvent(new HashChangeEvent('hashchange'));
+            }""",
+                url,
+            )
+
+            # Give the SPA time to react to the route change
+            await asyncio.sleep(0.3)
+
+        except Exception as exc:
+            logger.warning(
+                "Failed SPA navigation to %s: %s, falling back to goto", url, exc
+            )
+            # Fallback to regular navigation if SPA navigation fails
+            await self._safe_goto(page, url)
 
     async def _safe_goto(self, page: Page, url: str) -> None:
         try:

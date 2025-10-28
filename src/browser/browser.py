@@ -185,18 +185,14 @@ class StealthBrowser:
             "--password-store=basic",
         ]
 
-        # TODO: post data obsfucation, to handle edge case matching or LM selection for POST requests?
-        # - Normalize JSON (remove volatile fields; sort keys) and hash; tolerate multipart boundary changes; ignore known nonce/timestamp params.
         # TODO: collect a couple of tasks this way
-        # TODO: SPA based changes pages work? in replay, and collection
+        # TODO: difference between page event handler and handle page event here
+        # TODO: cleanup capture.py if we are using only HAR collection
 
         # TODO: environment.py should be cleaned and reuse more of launch.py
         # TODO: does the agent launch works?
         # TODO: does the agent when evaluated works on the environment?
         # TODO: improve launching and running the environment
-
-        # TODO: difference between page event handler and handle page event here
-        # TODO: cleanup capture.py if we are using only HAR collection
 
         # ====== once this works well ======
 

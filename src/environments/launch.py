@@ -200,6 +200,8 @@ class ReplayBundle:
         # - we can try first with all POST requests just match by URL and method
         # - - then more clever selection if it contains some fields in the POST data
         # - - then if this is matching when it shouldn't, LM judge preprocessing and selection of the URL's too match
+        # TODO: let's make amazon work first, (email already, let's do password now)
+        # ?? Normalize JSON (remove volatile fields; sort keys) and hash; tolerate multipart boundary changes; ignore known nonce/timestamp params.
 
         async def handle_claim_post(route, request):
             """Handle the specific Amazon claim POST request from HAR, ignoring POST body."""
