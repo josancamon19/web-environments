@@ -12,12 +12,7 @@ const SESSIONS_FILE = path.join(__dirname, 'data', 'sessions.json');
 const USERS_FILE = path.join(__dirname, 'data', 'users.json');
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : [
-      'http://localhost:5173',
-      'http://127.0.0.1:5173',
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-    ];
+  : [];
 
 let hotels = [];
 let sessions = {};
@@ -88,15 +83,7 @@ loadHotels();
 
 app.use(
   cors({
-    origin(origin, callback) {
-      if (!origin) {
-        return callback(null, true);
-      }
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      return callback(new Error('Not allowed by CORS'));
-    },
+    origin: allowedOrigins.length ? allowedOrigins : true,
     credentials: true,
   }),
 );
