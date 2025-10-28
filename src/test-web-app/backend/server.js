@@ -18,8 +18,19 @@ let hotels = [];
 let sessions = {};
 let users = [];
 
+function ensureDataFile(filePath, defaultContent) {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  if (!fs.existsSync(filePath)) {
+    fs.writeFileSync(filePath, defaultContent);
+  }
+}
+
 function loadHotels() {
   try {
+    ensureDataFile(DATA_FILE, '[]');
     const content = fs.readFileSync(DATA_FILE, 'utf-8');
     hotels = JSON.parse(content);
   } catch (error) {
@@ -28,11 +39,13 @@ function loadHotels() {
 }
 
 function saveHotels() {
+  ensureDataFile(DATA_FILE, '[]');
   fs.writeFileSync(DATA_FILE, JSON.stringify(hotels, null, 2));
 }
 
 function loadSessions() {
   try {
+    ensureDataFile(SESSIONS_FILE, '{}');
     const content = fs.readFileSync(SESSIONS_FILE, 'utf-8');
     sessions = JSON.parse(content);
   } catch (error) {
@@ -41,6 +54,7 @@ function loadSessions() {
 }
 
 function saveSessions() {
+  ensureDataFile(SESSIONS_FILE, '{}');
   fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2));
 }
 
@@ -57,6 +71,7 @@ function removeSessionsByEmail(email) {
 
 function loadUsers() {
   try {
+    ensureDataFile(USERS_FILE, '[]');
     const content = fs.readFileSync(USERS_FILE, 'utf-8');
     users = JSON.parse(content);
   } catch (error) {
@@ -65,6 +80,7 @@ function loadUsers() {
 }
 
 function saveUsers() {
+  ensureDataFile(USERS_FILE, '[]');
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
