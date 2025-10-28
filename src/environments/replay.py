@@ -6,6 +6,11 @@ from db.models import StepModel
 
 
 logger = logging.getLogger(__name__)
+# TODO: potential fixes to debug if failing
+# - is the CSS scaping enough given our usecase?
+# - is URLs differ to simple given the purpose of this? which is replicating a set of human trajectory steps from the DB
+# - are wait and page timeouts set properly?
+# - are we handling scroll offsets properly?
 
 
 class TaskStepExecutor:

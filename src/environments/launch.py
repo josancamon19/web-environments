@@ -89,6 +89,9 @@ class ReplayBundle:
             har_path = self.bundle_path / "recording.har"
             if har_path.exists():
                 logger.info("Using HAR replay from %s", har_path)
+                # self._install_har_logging(
+                #     context, allow_network_fallback=allow_network_fallback
+                # )
                 await context.route_from_har(
                     str(har_path),
                     not_found="fallback" if allow_network_fallback else "abort",
@@ -106,17 +109,6 @@ class ReplayBundle:
             await self.attach(context, allow_network_fallback=allow_network_fallback)
 
         return context
-
-    async def attach(
-        self,
-        context: BrowserContext,
-        *,
-        allow_network_fallback: bool = False,
-    ) -> None:
-        async def _handler(route: Route):
-            await self._fulfill(route, allow_network_fallback=allow_network_fallback)
-
-        await context.route("**/*", _handler)
 
     async def _fulfill(self, route: Route, *, allow_network_fallback: bool) -> None:
         request = route.request
