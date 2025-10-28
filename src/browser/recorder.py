@@ -8,10 +8,26 @@ from utils.get_iso_datetime import get_iso_datetime
 from db.task import TaskManager
 from browser.page import ActualPage
 from db.step import StepManager
-from utils.get_screenshot_path import get_screenshot_path
 from db.models import StepModel
+from config.storage import SCREENSHOTS_DIR, VIDEOS_DIR
+import time
+import os
 
 logger = logging.getLogger(__name__)
+
+
+def get_screenshot_path(task_id: int, event_name: str):
+    timestamp = int(time.time() * 1000)
+    task_dir = os.path.join(SCREENSHOTS_DIR, f"task_{task_id}")
+    os.makedirs(task_dir, exist_ok=True)
+    filename = f"{timestamp}_{event_name}.png"
+    return os.path.join(task_dir, filename)
+
+
+def get_video_path(task_id: int):
+    task_dir = os.path.join(VIDEOS_DIR, f"task_{task_id}")
+    os.makedirs(task_dir, exist_ok=True)
+    return task_dir
 
 
 class Recorder:

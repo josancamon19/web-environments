@@ -46,7 +46,7 @@ class OfflineCaptureManager:
         self._atexit_registered = False
 
     def _initialize_session_path(self, task_id: int) -> None:
-        """Initialize session path and timestamp. Called once before HAR recording starts."""
+        """Initialize session path. Called once before HAR recording starts."""
         if self._session_path:
             return  # Already initialized
 
@@ -54,8 +54,7 @@ class OfflineCaptureManager:
             self._started_at = get_iso_datetime()
 
         base_path = Path(DATA_DIR) / "captures"
-        timestamp_slug = self._started_at.replace(":", "-")
-        self._session_path = base_path / f"task_{task_id}" / timestamp_slug
+        self._session_path = base_path / f"task_{task_id}"
         self._resources_path = self._session_path / "resources"
         self._storage_path = self._session_path / "storage"
         self._manifest_path = self._session_path / "manifest.json"

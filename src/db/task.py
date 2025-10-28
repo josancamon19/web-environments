@@ -43,7 +43,6 @@ class TaskManager:
         """Initialize the singleton (only once)."""
         if not self._initialized:
             self.current_task = None
-            self.last_task_path = None
             # Ensure database is initialized
             Database.get_instance()
             TaskManager._initialized = True
@@ -79,12 +78,6 @@ class TaskManager:
             print(f"Answer saved for task {self.current_task.id}")
         else:
             logger.warning("No active task to save answer for")
-
-    def get_last_task_path(self) -> str:
-        return self.last_task_path
-
-    def set_last_task_path(self, path: str):
-        self.last_task_path = path
 
     def end_current_task(self):
         if self.current_task:

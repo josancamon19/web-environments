@@ -2,10 +2,9 @@ import logging
 from playwright.async_api import BrowserContext, async_playwright
 from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
 from config.browser_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
-from browser.recorder import Recorder
+from browser.recorder import Recorder, get_video_path
 from browser.page import ActualPage
 from browser.handlers.new_page_event import NewPageEvent
-from utils.get_tasks_video_path import get_tasks_video_path
 from db.task import TaskManager
 import sys
 from browser.handlers.request_event import RequestEvent
@@ -35,16 +34,10 @@ class StealthBrowser:
         """Launch stealth browser"""
         self.playwright = await async_playwright().start()
 
-        VIDEO_TASK_PATH = get_tasks_video_path()
-
         task_manager = TaskManager()
-        task_manager.set_last_task_path(VIDEO_TASK_PATH)
-
-        # Get HAR path for this task before starting capture
         task = task_manager.get_current_task()
-        har_path = self.environment_capturer.get_har_path(task.id)
 
-        self.context = await self.launch_browser(VIDEO_TASK_PATH, har_path)
+        self.context = await self.launch_browser(task.id)
         await self.environment_capturer.start(self.context)
         self.context.on("request", self.request_event_handler.listen)
         self.context.on("response", self.response_event_handler.listen)
@@ -181,14 +174,11 @@ class StealthBrowser:
         await self.playwright.stop()
         self.page_event_handler.detach_all_page_listeners()
 
-    async def launch_browser(
-        self, video_task_path: str, har_path: str
-    ) -> BrowserContext:
+    async def launch_browser(self, task_id: int) -> BrowserContext:
         """Open browser context"""
         preferred_channel = (
             os.environ.get("RECORDER_BROWSER_CHANNEL", "chrome").strip() or None
         )
-        # args = ["--disable-blink-features=AutomationControlled"]
         ignore_default_args = [
             "--enable-automation",
             "--use-mock-keychain",
@@ -197,9 +187,8 @@ class StealthBrowser:
 
         # TODO: post data obsfucation, to handle edge case matching or LM selection for POST requests?
         # - Normalize JSON (remove volatile fields; sort keys) and hash; tolerate multipart boundary changes; ignore known nonce/timestamp params.
-        # TODO: Playwright warns that HAR replay never serves requests intercepted by service workers; those requests bypass the HAR entirely (docs/src/mock.md:417), consider blocking sw
         # TODO: collect a couple of tasks this way
-        # TODO: SPA based changes pages work?
+        # TODO: SPA based changes pages work? in replay, and collection
 
         # TODO: environment.py should be cleaned and reuse more of launch.py
         # TODO: does the agent launch works?
@@ -207,6 +196,7 @@ class StealthBrowser:
         # TODO: improve launching and running the environment
 
         # TODO: difference between page event handler and handle page event here
+        # TODO: cleanup capture.py if we are using only HAR collection
 
         # ====== once this works well ======
 
@@ -224,9 +214,9 @@ class StealthBrowser:
         self.context = await browser.new_context(
             **CONTEXT_CONFIG,
             bypass_csp=True,
-            record_video_dir=video_task_path,
+            record_video_dir=get_video_path(task_id),
             record_video_size={"width": 1280, "height": 720},
-            record_har_path=har_path,
+            record_har_path=self.environment_capturer.get_har_path(task_id),
             record_har_mode="full",
         )
         return self.context
@@ -234,8 +224,8 @@ class StealthBrowser:
     async def manual_browser_close(self):
         logger.info("Browser closed manually")
         task_manager = TaskManager()
+        task = task_manager.get_current_task()
+        task_manager.set_current_task_video_path(get_video_path(task.id))
         task_manager.end_current_task()
-        last_task_path = task_manager.get_last_task_path()
-        logger.info(f"Last task path: {last_task_path}")
         await self.close()
         sys.exit(0)

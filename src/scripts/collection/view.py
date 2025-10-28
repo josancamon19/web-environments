@@ -80,10 +80,10 @@ def delete_task(db_path: Path, task_id: int, data_dir: Path) -> tuple[bool, str]
             deleted_dirs.append(f"doms/task_{task_id}")
 
         # Delete screenshots directory
-        screenshots_dir = data_dir / "screenshots" / f"task{task_id}"
+        screenshots_dir = data_dir / "screenshots" / f"task_{task_id}"
         if screenshots_dir.exists():
             shutil.rmtree(screenshots_dir)
-            deleted_dirs.append(f"screenshots/task{task_id}")
+            deleted_dirs.append(f"screenshots/task_{task_id}")
 
         # Delete captures directory
         captures_dir = data_dir / "captures" / f"task_{task_id}"
@@ -91,15 +91,11 @@ def delete_task(db_path: Path, task_id: int, data_dir: Path) -> tuple[bool, str]
             shutil.rmtree(captures_dir)
             deleted_dirs.append(f"captures/task_{task_id}")
 
-        # Delete video directory (search for task{id}_* pattern)
-        videos_dir = data_dir / "videos"
+        # Delete video directory
+        videos_dir = data_dir / "videos" / f"task_{task_id}"
         if videos_dir.exists():
-            for video_folder in videos_dir.iterdir():
-                if video_folder.is_dir() and video_folder.name.startswith(
-                    f"task{task_id}_"
-                ):
-                    shutil.rmtree(video_folder)
-                    deleted_dirs.append(f"videos/{video_folder.name}")
+            shutil.rmtree(videos_dir)
+            deleted_dirs.append(f"videos/task_{task_id}")
 
         dirs_msg = f" (deleted: {', '.join(deleted_dirs)})" if deleted_dirs else ""
         return True, f"Task {task_id} deleted successfully{dirs_msg}"

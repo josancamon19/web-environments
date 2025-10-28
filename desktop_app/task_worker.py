@@ -96,10 +96,15 @@ def run_task_worker(
 
             try:
                 if task_manager:
+                    current_task = task_manager.get_current_task()
+                    if current_task:
+                        # Save video path to database
+                        import os
+                        from config.storage import VIDEOS_DIR
+
+                        video_path = os.path.join(VIDEOS_DIR, f"task_{current_task.id}")
+                        task_manager.set_current_task_video_path(video_path)
                     task_manager.end_current_task()
-                    last_path = task_manager.get_last_task_path()
-                    if last_path:
-                        task_manager.save_task_video(last_path)
                     task_manager.set_current_task(None)  # type: ignore[arg-type]
             except Exception as mgr_error:  # pylint: disable=broad-except
                 logger.warning("Failed to finalise task metadata: %s", mgr_error)

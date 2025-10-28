@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from browser.browser import StealthBrowser
+from browser.recorder import get_video_path
 from config.start import InitialTasks
 from db.task import TaskManager, CreateTaskDto
 from db.models import TaskModel
@@ -74,8 +75,10 @@ async def main():
         # Close browser cleanly - this will capture storage state and stop logging
         await stealth_browser.close()
 
+        # Save video path to database
+        task = task_manager.get_current_task()
+        task_manager.set_current_task_video_path(get_video_path(task.id))
         task_manager.end_current_task()
-        task_manager.set_current_task_video_path(task_manager.get_last_task_path())
 
         print("✅ Browser closed and recording saved")
 
