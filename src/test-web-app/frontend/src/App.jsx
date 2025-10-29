@@ -374,7 +374,23 @@ function App() {
           <p>Hotels made simple, with a touch of Zillow inspiration.</p>
         </div>
         <nav>
-          <a href="#featured">Featured</a>
+          <a
+            href="#featured"
+            className={route.name === ROUTES.HOME ? 'active' : ''}
+            onClick={(event) => {
+              event.preventDefault()
+              navigate(ROUTES.HOME)
+              requestAnimationFrame(() => {
+                window.location.hash = 'featured'
+                const target = document.getElementById('featured')
+                if (target) {
+                  target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }
+              })
+            }}
+          >
+            Featured
+          </a>
           <a
             href="/favorites"
             className={route.name === ROUTES.FAVORITES ? 'active' : ''}
