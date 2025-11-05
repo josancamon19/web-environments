@@ -41,6 +41,7 @@ IGNORED_PATTERNS = [
     "amazon.com/*/uedata",
     "fls-na.amazon.com",
     "amazon.com/empty.gif",
+    "advertising.amazon.dev",
 ]
 
 _compiled_patterns = []
@@ -270,6 +271,8 @@ class ReplayBundle:
         )
 
     async def _handle_post_requests(self, route: Route, request: Request) -> None:
+        # TODO: this requires LM postprocessing selection of URL's to match or some dumb way for all POST? or smth
+        # TODO: does this also require fuzzy matching?
         urls_to_ignore_post_data = {
             "https://www.amazon.com/ax/claim",
             "https://www.amazon.com/aaut/verify/ap",
@@ -292,26 +295,26 @@ class ReplayBundle:
             shorter_url = (
                 request.url[:100] + "..." if len(request.url) > 100 else request.url
             )
-            if entry:
-                logger.info(
-                    "✅ Found matching HAR entry (POST, URL-only) for %s",
-                    shorter_url,
+            if not entry:
+                logger.warning(
+                    "⚠️  No matching HAR entry found for POST %s, aborting", shorter_url
                 )
-
-                response = entry.get("response", {})
-                headers = {h["name"]: h["value"] for h in response.get("headers", [])}
-                content = response.get("content", {})
-                body = None if "text" not in content else content["text"]
-
-                await route.fulfill(
-                    status=response.get("status", 200), headers=headers, body=body
-                )
+                await route.fallback()
                 return
 
-            logger.warning(
-                "⚠️  No matching HAR entry found for POST %s, aborting", shorter_url
+            logger.info(
+                "✅ Found matching HAR entry (POST, URL-only) for %s",
+                shorter_url,
             )
-            await route.abort()
+
+            response = entry.get("response", {})
+            headers = {h["name"]: h["value"] for h in response.get("headers", [])}
+            content = response.get("content", {})
+            body = None if "text" not in content else content["text"]
+
+            await route.fulfill(
+                status=response.get("status", 200), headers=headers, body=body
+            )
             return
 
         await route.fallback()
@@ -322,8 +325,7 @@ class ReplayBundle:
         # font: .woff vs .woff2 differences
         # image: responsive image sizes, cache busters
         # stylesheet/script: bundled resources with dynamic names
-        # Note: xhr/fetch excluded - they need exact matches or should fail
-        fuzzy_match_types = {"stylesheet", "script", "image", "font"}
+        fuzzy_match_types = {"stylesheet", "script", "image", "font", "media"}
 
         if request.resource_type not in fuzzy_match_types:
             await route.fallback()
@@ -343,8 +345,10 @@ class ReplayBundle:
             await route.fallback()
             return
 
-        idx, entry = match_result
-        self._consumed_har_indices.add(idx)
+        if not match_result.allow_reuse:
+            self._consumed_har_indices.add(match_result.index)
+
+        entry = match_result.entry
 
         response = entry.get("response", {})
         status = response.get("status", 200)
@@ -369,8 +373,9 @@ class ReplayBundle:
         shorter_har_url = har_url[:100] + "..." if len(har_url) > 100 else har_url
         if har_url != request.url:
             logger.info(
-                "✅ Fuzzy matched HAR entry for %s [%s] -> %s",
+                "✅ Fuzzy matched HAR entry for %s via %s [%s] -> %s",
                 request.resource_type,
+                match_result.reason,
                 shorter_url,
                 shorter_har_url,
             )
@@ -379,12 +384,7 @@ class ReplayBundle:
         return
 
     async def handle_routes_manually(self, route: Route, request: Request) -> None:
-        # TODO: do we need to obsfucate in a more clever way?
-        # - ?? Normalize JSON (remove volatile fields; sort keys) and hash; tolerate multipart boundary changes; ignore known nonce/timestamp params.
-
-        # TODO: this requires LM postprocessing selection of URL's to match or some dumb way for all POST? or smth
         # TODO: why when collecting, increasing/decreasing cart stuff fails
-        # TODO: some assets in GET are also dynamic?, bunch of js/stylesheets are not found in HAR
         # TODO: websockets? like e.g. ChatGPT doesn't allow for collecting anything
 
         # 1. make amazon sign in work seamless
@@ -403,6 +403,8 @@ class ReplayBundle:
             return await self._handle_post_requests(route, request)
 
         # 3. Handle GET requests with fuzzy URL matching for static assets
+        # TODO: what to do with fails xhr/fetch?
+        # TODO: is this replicating default HAR matching playwright? headers needed? or anything missing?
         if request.method == "GET":
             return await self._handle_fuzzy_get_requests(route, request)
 
