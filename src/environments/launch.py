@@ -4,7 +4,7 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set
 
 from db.step import StepManager
 import typer
@@ -18,6 +18,9 @@ from playwright.async_api import (
 
 from environments.replay import TaskStepExecutor
 from config.storage import DATA_DIR
+from environments.fuzzy_match import (
+    find_fuzzy_har_match,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +40,7 @@ IGNORED_PATTERNS = [
     "amazon-adsystem.com",
     "amazon.com/*/uedata",
     "fls-na.amazon.com",
+    "amazon.com/empty.gif",
 ]
 
 _compiled_patterns = []
@@ -77,6 +81,9 @@ class ReplayBundle:
 
         self.environment = self.manifest["environment"]
         self.task_id: Optional[int] = self.manifest["task"]["id"]
+
+        # Track consumed HAR entries to avoid reusing them (important for sequential requests)
+        self._consumed_har_indices: Set[int] = set()
 
         logger.info(
             "Loaded bundle %s",
@@ -201,7 +208,8 @@ class ReplayBundle:
             if har_path.exists():
                 self._har_data = json.loads(har_path.read_text(encoding="utf-8"))
             else:
-                self._har_data = None
+                raise FileNotFoundError(f"HAR file not found at {har_path}")
+
         return self._har_data
 
     async def build_context(
@@ -275,6 +283,13 @@ class ReplayBundle:
         # TODO: some assets in GET are also dynamic?, bunch of js/stylesheets are not found in HAR
         # TODO: websockets? like e.g. ChatGPT doesn't allow for collecting anything
 
+        # 1. make amazon sign in work seamless
+        # 2. make add to cart, remove from cart work as well
+        # 3. make other interactions work well here,
+
+        # - try any URL not body matching, but use them only once, so cache the ones consumed already.
+        # - are we getting different URLs even? when it should be the same?
+
         urls_to_ignore_post_data = {
             "https://www.amazon.com/ax/claim",
             "https://www.amazon.com/aaut/verify/ap",
@@ -285,47 +300,110 @@ class ReplayBundle:
             await route.abort()
             return
 
-        if not request.method == "POST":
-            # TODO: should handle DELETE, PUT? everything that is not GET?
+        har_data = self._load_har_data()
+
+        # 2. Handle POST requests with special URL-only matching (no fuzzy matching)
+        if request.method == "POST":
+            # Check if this is a POST endpoint where we should ignore body differences
+            for base_url in urls_to_ignore_post_data:
+                if not request.url.startswith(base_url):
+                    continue
+                har_entries = har_data.get("log", {}).get("entries", [])
+                # TODO: consume the index, and ignore next time
+                entry = next(
+                    (
+                        entry
+                        for entry in har_entries
+                        if entry.get("request", {}).get("method") == "POST"
+                        and entry.get("request", {}).get("url") == request.url
+                    ),
+                    None,
+                )
+                shorter_url = (
+                    request.url[:100] + "..." if len(request.url) > 100 else request.url
+                )
+                if entry:
+                    logger.info(
+                        "✅ Found matching HAR entry (POST, URL-only) for %s",
+                        shorter_url,
+                    )
+
+                    response = entry.get("response", {})
+                    headers = {
+                        h["name"]: h["value"] for h in response.get("headers", [])
+                    }
+                    content = response.get("content", {})
+                    body = None if "text" not in content else content["text"]
+
+                    await route.fulfill(
+                        status=response.get("status", 200), headers=headers, body=body
+                    )
+                    return
+
+                logger.warning(
+                    "⚠️  No matching HAR entry found for POST %s, aborting", shorter_url
+                )
+                await route.abort()
+                return
+
             await route.fallback()
             return
 
-        for base_url in urls_to_ignore_post_data:
-            if not request.url.startswith(base_url):
-                continue
-            har_data = self._load_har_data()
-            har_entries = har_data.get("log", {}).get("entries", [])
+        # 3. Handle GET requests with fuzzy URL matching for static assets
+        if request.method == "GET":
+            # Only apply fuzzy matching to static assets where variations are expected
+            # font: .woff vs .woff2 differences
+            # image: responsive image sizes, cache busters
+            # stylesheet/script: bundled resources with dynamic names
+            # Note: xhr/fetch excluded - they need exact matches or should fail
+            fuzzy_match_types = {"stylesheet", "script", "image", "font"}
 
-            entry = next(
-                (
-                    entry
-                    for entry in har_entries
-                    if entry.get("request", {}).get("method") == "POST"
-                    and entry.get("request", {}).get("url") == request.url
-                ),
-                None,
-            )
-            if not entry:
-                break
+            if request.resource_type in fuzzy_match_types:
+                # First check if HAR replay will handle it (exact match exists)
+                # We do this by attempting fuzzy match which tries exact first
+                match_result = find_fuzzy_har_match(
+                    har_data,
+                    self._consumed_har_indices,
+                    request.url,
+                    "GET",
+                    request.resource_type,
+                )
 
-            logger.info(
-                "✅ Found matching HAR entry for %s",
-                request.url[:100] + "..." if len(request.url) > 100 else request.url,
-            )
-            response = entry.get("response", {})
-            status = response.get("status", 200)
-            headers = {h["name"]: h["value"] for h in response.get("headers", [])}
-            content = response.get("content", {})
-            body = None if "text" not in content else content["text"]
-            # TODO: is body provided properly? what about other body types
-            await route.fulfill(status=status, headers=headers, body=body)
-            return
+                if match_result:
+                    idx, entry = match_result
+                    self._consumed_har_indices.add(idx)
 
-        logger.warning(
-            "⚠️  No matching HAR entry found for %s, aborting",
-            request.url[:100] + "..." if len(request.url) > 100 else request.url,
-        )
-        await route.abort()
+                    response = entry.get("response", {})
+                    status = response.get("status", 200)
+
+                    # Only fulfill if it was a successful response
+                    if status < 400:
+                        headers = {
+                            h["name"]: h["value"] for h in response.get("headers", [])
+                        }
+                        content = response.get("content", {})
+
+                        # Handle different content encodings
+                        body = None
+                        if "text" in content:
+                            body = content["text"]
+
+                        har_url = entry.get("request", {}).get("url", "")
+                        if har_url != request.url:
+                            logger.info(
+                                "✅ Fuzzy matched HAR entry for %s [%s] -> %s",
+                                request.resource_type,
+                                request.url[:80] + "..."
+                                if len(request.url) > 80
+                                else request.url,
+                                har_url[:80] + "..." if len(har_url) > 80 else har_url,
+                            )
+
+                        await route.fulfill(status=status, headers=headers, body=body)
+                        return
+
+        # 4. Fallback to HAR replay for everything else (including xhr/fetch)
+        await route.fallback()
 
     def _storage_state_path(self) -> Optional[Path]:
         storage_dir = self.bundle_path / "storage"
