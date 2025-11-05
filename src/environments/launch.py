@@ -84,6 +84,7 @@ class ReplayBundle:
 
         # Track consumed HAR entries to avoid reusing them (important for sequential requests)
         self._consumed_har_indices: Set[int] = set()
+        self._har_data: Dict = self._load_har_data()
 
         logger.info(
             "Loaded bundle %s",
@@ -201,16 +202,12 @@ class ReplayBundle:
         except Exception as exc:
             logger.error(f"Failed to save request details: {exc}")
 
-    def _load_har_data(self) -> Optional[Dict]:
-        """Load and cache HAR file data."""
-        if not hasattr(self, "_har_data"):
-            har_path = self.bundle_path / "recording.har"
-            if har_path.exists():
-                self._har_data = json.loads(har_path.read_text(encoding="utf-8"))
-            else:
-                raise FileNotFoundError(f"HAR file not found at {har_path}")
-
-        return self._har_data
+    def _load_har_data(self) -> Dict:
+        """Load HAR file data."""
+        har_path = self.bundle_path / "recording.har"
+        if not har_path.exists():
+            raise FileNotFoundError(f"HAR file not found at {har_path}")
+        return json.loads(har_path.read_text(encoding="utf-8"))
 
     async def build_context(
         self,
@@ -300,15 +297,13 @@ class ReplayBundle:
             await route.abort()
             return
 
-        har_data = self._load_har_data()
-
         # 2. Handle POST requests with special URL-only matching (no fuzzy matching)
         if request.method == "POST":
             # Check if this is a POST endpoint where we should ignore body differences
             for base_url in urls_to_ignore_post_data:
                 if not request.url.startswith(base_url):
                     continue
-                har_entries = har_data.get("log", {}).get("entries", [])
+                har_entries = self._har_data.get("log", {}).get("entries", [])
                 # TODO: consume the index, and ignore next time
                 entry = next(
                     (
@@ -362,7 +357,7 @@ class ReplayBundle:
                 # First check if HAR replay will handle it (exact match exists)
                 # We do this by attempting fuzzy match which tries exact first
                 match_result = find_fuzzy_har_match(
-                    har_data,
+                    self._har_data,
                     self._consumed_har_indices,
                     request.url,
                     "GET",
