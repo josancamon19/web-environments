@@ -1,12 +1,13 @@
 import asyncio
+import base64
 import json
 import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, Set
+from urllib.parse import urlparse, parse_qsl
+from typing import Any, Dict, List, Optional
 
-from db.step import StepManager
 import typer
 from playwright.async_api import (
     Browser,
@@ -15,6 +16,7 @@ from playwright.async_api import (
     Route,
     async_playwright,
 )
+from db.step import StepManager
 
 from environments.replay import TaskStepExecutor
 from config.storage import DATA_DIR
@@ -67,6 +69,39 @@ def should_ignore_url(url: str):
     return False
 
 
+def url_match(ref: str, target: str) -> bool:
+    """Check if the URLs bases are the same"""
+    ref_url = urlparse(ref)
+    target_url = urlparse(target)
+    return ref_url.scheme == target_url.scheme and ref_url.netloc == target_url.netloc and ref_url.path == target_url.path
+
+def param_overlap_count(entry_url: str, request_url: str) -> int:
+    """Count the number of overlapping query parameters between two URLs"""
+    entry_parts = urlparse(entry_url)
+    request_parts = urlparse(request_url)
+    entry_params = dict(parse_qsl(entry_parts.query))
+    request_params = dict(parse_qsl(request_parts.query))
+    overlap = sum(1 for k in request_params if k in entry_params and entry_params[k] == request_params[k])
+    return overlap
+
+def fragment_overlap_count(entry_url: str, request_url: str) -> int:
+    """Count the number of overlapping fragment parameters between two URLs"""
+    entry_parts = urlparse(entry_url)
+    request_parts = urlparse(request_url)
+    entry_params = dict(parse_qsl(entry_parts.fragment))
+    request_params = dict(parse_qsl(request_parts.fragment))
+    overlap = sum(1 for k in request_params if k in entry_params and entry_params[k] == request_params[k])
+    return overlap
+
+def most_relevant_entry(entries: List[dict], request_url: str) -> dict:
+    """Find the most relevant entry based on the number of overlapping parameters"""
+    overlap_entries = [
+        (entry, param_overlap_count(entry.get("request", {}).get("url", ""), request_url) + fragment_overlap_count(entry.get("request", {}).get("url", ""), request_url))
+        for entry in entries
+    ]
+    overlap_entries.sort(key=lambda x: x[1], reverse=True)
+    return overlap_entries[0][0]
+    
 class ReplayBundle:
     """Replay previously captured browsing resources using HAR files."""
 
@@ -267,58 +302,64 @@ class ReplayBundle:
 
         # Add custom route handler AFTER HAR routing (so it gets priority - LIFO)
         await context.route(
-            "**/*", lambda route, request: self.handle_routes_manually(route, request)
+            "**/*", lambda route, request: self.handle_requests(route, request)
         )
 
-    async def _handle_post_requests(self, route: Route, request: Request) -> None:
+    async def handle_requests(self, route: Route, request: Request) -> None:
         # TODO: this requires LM postprocessing selection of URL's to match or some dumb way for all POST? or smth
-        # TODO: does this also require fuzzy matching?
-        urls_to_ignore_post_data = {
-            "https://www.amazon.com/ax/claim",
-            "https://www.amazon.com/aaut/verify/ap",
-            "https://www.amazon.com/ap/signin",
-        }
-        for base_url in urls_to_ignore_post_data:
-            if not request.url.startswith(base_url):
-                continue
-            har_entries = self._har_data.get("log", {}).get("entries", [])
-            # TODO: consume the index, and ignore next time
-            entry = next(
-                (
-                    entry
-                    for entry in har_entries
-                    if entry.get("request", {}).get("method") == "POST"
-                    and entry.get("request", {}).get("url") == request.url
-                ),
-                None,
-            )
-            shorter_url = (
-                request.url[:100] + "..." if len(request.url) > 100 else request.url
-            )
-            if not entry:
-                logger.warning(
-                    "⚠️  No matching HAR entry found for POST %s, aborting", shorter_url
-                )
-                await route.fallback()
-                return
+        # TODO: why when collecting, increasing/decreasing cart stuff fails
+        # TODO: some assets in GET are also dynamic?, bunch of js/stylesheets are not found in HAR
+        # TODO: websockets? like e.g. ChatGPT doesn't allow for collecting anything
 
-            logger.info(
-                "✅ Found matching HAR entry (POST, URL-only) for %s",
-                shorter_url,
-            )
-
-            response = entry.get("response", {})
-            headers = {h["name"]: h["value"] for h in response.get("headers", [])}
-            content = response.get("content", {})
-            body = None if "text" not in content else content["text"]
-
-            await route.fulfill(
-                status=response.get("status", 200), headers=headers, body=body
-            )
+        if should_ignore_url(request.url):
+            await route.abort()
             return
 
-        await route.fallback()
-        return
+        har_data = self._load_har_data()
+        har_entries = har_data.get("log", {}).get("entries", [])
+
+        # Look for those entries that match the request method and URL
+        relevant_entries = [entry for entry in har_entries if entry.get("request", {}).get("method") == request.method and url_match(entry.get("request", {}).get("url"), request.url)]
+
+        if not relevant_entries:
+            logger.warning(
+                "⚠️  No matching HAR entry found for %s, aborting", request.url)
+            await route.abort()
+            return
+
+        # Extract the most relevant entry
+        entry = most_relevant_entry(relevant_entries, request.url)
+        
+        response = entry.get("response", {})
+        status = response.get("status", 200)
+        headers = {h["name"]: h["value"] for h in response.get("headers", [])}
+        content = response.get("content", {})
+
+        # Handle different response body types
+        body = None
+        if "text" in content:
+            text = content["text"]
+            encoding = content.get("encoding", "")
+
+            if encoding == "base64":
+                # Decode base64 to bytes for binary content
+                try:
+                    body = base64.b64decode(text)
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to decode base64 body for %s: %s", request.url, exc)
+                    await route.abort()
+                    return
+            else:
+                # Use text as-is for text responses
+                body = text
+
+        await route.fulfill(
+            status=status,
+            headers=headers,
+            body=body,
+            content_type=content.get("mimeType"),
+        )
 
     async def _handle_fuzzy_get_requests(self, route: Route, request: Request) -> None:
         # Only apply fuzzy matching to static assets where variations are expected
@@ -382,34 +423,6 @@ class ReplayBundle:
 
         await route.fulfill(status=status, headers=headers, body=body)
         return
-
-    async def handle_routes_manually(self, route: Route, request: Request) -> None:
-        # TODO: why when collecting, increasing/decreasing cart stuff fails
-        # TODO: websockets? like e.g. ChatGPT doesn't allow for collecting anything
-
-        # 1. make amazon sign in work seamless
-        # 2. make add to cart, remove from cart work as well
-        # 3. make other interactions work well here,
-
-        # - try any URL not body matching, but use them only once, so cache the ones consumed already.
-        # - are we getting different URLs even? when it should be the same?
-
-        if should_ignore_url(request.url):
-            await route.abort()
-            return
-
-        # 2. Handle POST requests with special URL-only matching (no fuzzy matching)
-        if request.method == "POST":
-            return await self._handle_post_requests(route, request)
-
-        # 3. Handle GET requests with fuzzy URL matching for static assets
-        # TODO: what to do with fails xhr/fetch?
-        # TODO: is this replicating default HAR matching playwright? headers needed? or anything missing?
-        if request.method == "GET":
-            return await self._handle_fuzzy_get_requests(route, request)
-
-        # 4. Fallback to HAR replay for everything else
-        await route.fallback()
 
     def _storage_state_path(self) -> Optional[Path]:
         storage_dir = self.bundle_path / "storage"
