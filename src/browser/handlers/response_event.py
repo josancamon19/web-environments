@@ -27,8 +27,6 @@ class ResponseEvent:
     async def listen(self, response):
         try:
             req = response.request
-            if req.resource_type not in ("xhr", "fetch", "document"):
-                return
         except Exception:
             return
 
