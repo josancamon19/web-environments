@@ -53,9 +53,6 @@ class RequestEvent:
             return None
 
     def listen(self, request):
-        if not request or request.resource_type not in ("xhr", "fetch", "document"):
-            return
-
         self.request_step_counter += 1
         request_uid = f"req_{self.request_step_counter}"
 

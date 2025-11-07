@@ -1,12 +1,13 @@
 import asyncio
+import base64
 import json
 import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, Set
+from urllib.parse import urlparse, parse_qsl
+from typing import Any, Dict, List, Optional, Set
 
-from db.step import StepManager
 import typer
 from playwright.async_api import (
     Browser,
@@ -15,6 +16,7 @@ from playwright.async_api import (
     Route,
     async_playwright,
 )
+from db.step import StepManager
 
 from environments.replay import TaskStepExecutor
 from config.storage import DATA_DIR
@@ -67,6 +69,44 @@ def should_ignore_url(url: str):
     return False
 
 
+def most_relevant_entry(entries: List[dict], request_url: str) -> dict:
+    """Find the most relevant entry based on the number of overlapping parameters."""
+    if not entries:
+        raise ValueError("entries list cannot be empty")
+
+    if len(entries) == 1:
+        return entries[0]
+
+    # Parse request URL once for reuse
+    request_parsed = urlparse(request_url)
+    request_params = dict(parse_qsl(request_parsed.query))
+    request_fragment_params = dict(parse_qsl(request_parsed.fragment))
+
+    overlap_entries = []
+    for entry in entries:
+        entry_url = entry.get("request", {}).get("url", "")
+        entry_parsed = urlparse(entry_url)
+        entry_params = dict(parse_qsl(entry_parsed.query))
+        entry_fragment_params = dict(parse_qsl(entry_parsed.fragment))
+
+        # Count overlapping query parameters
+        param_overlap = sum(
+            1 for k in request_params
+            if k in entry_params and entry_params[k] == request_params[k]
+        )
+
+        # Count overlapping fragment parameters
+        fragment_overlap = sum(
+            1 for k in request_fragment_params
+            if k in entry_fragment_params and entry_fragment_params[k] == request_fragment_params[k]
+        )
+
+        overlap_entries.append((entry, param_overlap + fragment_overlap))
+
+    overlap_entries.sort(key=lambda x: x[1], reverse=True)
+    return overlap_entries[0][0]
+
+
 class ReplayBundle:
     """Replay previously captured browsing resources using HAR files."""
 
@@ -87,9 +127,15 @@ class ReplayBundle:
         self._consumed_har_indices: Set[int] = set()
         self._har_data: Dict = self._load_har_data()
 
+        # Build index for fast lookup: (method, url_base) -> list of entries
+        # url_base is scheme + netloc + path (without query/fragment for indexing)
+        self._har_index: Dict[tuple[str, str], List[tuple[int, dict]]] = {}
+        self._build_har_index()
+
         logger.info(
-            "Loaded bundle %s",
+            "Loaded bundle %s with %d HAR entries",
             bundle_path,
+            len(self._har_data.get("log", {}).get("entries", [])),
         )
 
     def guess_start_url(self) -> Optional[str]:
@@ -210,6 +256,32 @@ class ReplayBundle:
             raise FileNotFoundError(f"HAR file not found at {har_path}")
         return json.loads(har_path.read_text(encoding="utf-8"))
 
+    def _build_har_index(self) -> None:
+        """Build an index of HAR entries for fast lookup by method and URL base."""
+        har_entries = self._har_data.get("log", {}).get("entries", [])
+
+        for idx, entry in enumerate(har_entries):
+            request = entry.get("request", {})
+            method = request.get("method", "GET").upper()
+            url = request.get("url", "")
+
+            if not url:
+                continue
+
+            # Parse URL once and extract base (scheme + netloc + path)
+            parsed = urlparse(url)
+            url_base = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+
+            # Index by (method, url_base)
+            key = (method, url_base)
+            if key not in self._har_index:
+                self._har_index[key] = []
+            # Store index and entry for later reference
+            self._har_index[key].append((idx, entry))
+
+        logger.debug(
+            "Built HAR index with %d unique (method, url_base) keys", len(self._har_index))
+
     async def build_context(
         self,
         browser: Browser,
@@ -259,66 +331,100 @@ class ReplayBundle:
             )
 
         logger.info("[HAR REPLAY] Using HAR replay from %s", har_path)
-        await context.route_from_har(
-            str(har_path),
-            not_found="fallback" if allow_network_fallback else "abort",
-            update=False,  # Don't update the HAR, just replay
-        )
 
-        # Add custom route handler AFTER HAR routing (so it gets priority - LIFO)
-        await context.route(
-            "**/*", lambda route, request: self.handle_routes_manually(route, request)
-        )
+        # Set up HAR replay first - this will handle most requests
+        # Disabled to handle all requests with custom matching logic
+        # await context.route_from_har(
+        #     str(har_path),
+        #     not_found="fallback" if allow_network_fallback else "abort",
+        #     update=False,  # Don't update the HAR, just replay
+        # )
 
-    async def _handle_post_requests(self, route: Route, request: Request) -> None:
+        # Add custom route handler for all HTTP methods (GET, POST, DELETE, PUT, PATCH, etc.)
+        # that need special URL matching. This handler runs first (LIFO), but falls back
+        # to HAR replay for requests it doesn't handle
+        async def custom_route_handler(route: Route, request: Request) -> None:
+            # Handle all HTTP methods with custom matching logic
+            await self.handle_requests(route, request, allow_network_fallback)
+
+        await context.route("**/*", custom_route_handler)
+
+    async def handle_requests(self, route: Route, request: Request, allow_network_fallback: bool = False,) -> None:
         # TODO: this requires LM postprocessing selection of URL's to match or some dumb way for all POST? or smth
-        # TODO: does this also require fuzzy matching?
-        urls_to_ignore_post_data = {
-            "https://www.amazon.com/ax/claim",
-            "https://www.amazon.com/aaut/verify/ap",
-            "https://www.amazon.com/ap/signin",
-        }
-        for base_url in urls_to_ignore_post_data:
-            if not request.url.startswith(base_url):
-                continue
-            har_entries = self._har_data.get("log", {}).get("entries", [])
-            # TODO: consume the index, and ignore next time
-            entry = next(
-                (
-                    entry
-                    for entry in har_entries
-                    if entry.get("request", {}).get("method") == "POST"
-                    and entry.get("request", {}).get("url") == request.url
-                ),
-                None,
-            )
-            shorter_url = (
-                request.url[:100] + "..." if len(request.url) > 100 else request.url
-            )
-            if not entry:
-                logger.warning(
-                    "⚠️  No matching HAR entry found for POST %s, aborting", shorter_url
-                )
-                await route.fallback()
-                return
+        # TODO: why when collecting, increasing/decreasing cart stuff fails
+        # TODO: some assets in GET are also dynamic?, bunch of js/stylesheets are not found in HAR
+        # TODO: websockets? like e.g. ChatGPT doesn't allow for collecting anything
 
-            logger.info(
-                "✅ Found matching HAR entry (POST, URL-only) for %s",
-                shorter_url,
-            )
-
-            response = entry.get("response", {})
-            headers = {h["name"]: h["value"] for h in response.get("headers", [])}
-            content = response.get("content", {})
-            body = None if "text" not in content else content["text"]
-
-            await route.fulfill(
-                status=response.get("status", 200), headers=headers, body=body
-            )
+        if should_ignore_url(request.url):
+            await route.abort()
             return
 
-        await route.fallback()
-        return
+        # Use cached HAR data instead of reloading
+        method = request.method.upper()
+
+        # Parse request URL once
+        request_parsed = urlparse(request.url)
+        request_url_base = f"{request_parsed.scheme}://{request_parsed.netloc}{request_parsed.path}"
+
+        # Look up candidates in index using (method, url_base)
+        # Candidates already match scheme + netloc + path by construction
+        index_key = (method, request_url_base)
+        candidate_entries = self._har_index.get(index_key, [])
+
+        if not candidate_entries:
+            logger.warning(
+                "⚠️  No matching HAR entry found for %s %s, falling back to HAR replay",
+                method, request.url[:100]
+            )
+            if allow_network_fallback:
+                await route.fallback()
+            else:
+                await route.abort()
+            return
+
+        # Extract entries from (index, entry) tuples
+        # All candidates already match the URL base, so we can use them directly
+        relevant_entries = [entry for _, entry in candidate_entries]
+
+        # If multiple entries match, find the most relevant based on parameter overlap
+        if len(relevant_entries) == 1:
+            entry = relevant_entries[0]
+        else:
+            entry = most_relevant_entry(relevant_entries, request.url)
+
+        response = entry.get("response", {})
+        status = response.get("status", 200)
+        headers = {h["name"]: h["value"] for h in response.get("headers", [])}
+        content = response.get("content", {})
+
+        # Handle different response body types
+        body = None
+        if "text" in content:
+            text = content["text"]
+            encoding = content.get("encoding", "")
+
+            if encoding == "base64":
+                # Decode base64 to bytes for binary content
+                try:
+                    body = base64.b64decode(text)
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to decode base64 body for %s: %s, falling back to HAR replay", request.url, exc)
+                    if allow_network_fallback:
+                        await route.fallback()
+                    else:
+                        await route.abort()
+                    return
+            else:
+                # Use text as-is for text responses
+                body = text
+
+        await route.fulfill(
+            status=status,
+            headers=headers,
+            body=body,
+            content_type=content.get("mimeType"),
+        )
 
     async def _handle_fuzzy_get_requests(self, route: Route, request: Request) -> None:
         # Only apply fuzzy matching to static assets where variations are expected
@@ -382,34 +488,6 @@ class ReplayBundle:
 
         await route.fulfill(status=status, headers=headers, body=body)
         return
-
-    async def handle_routes_manually(self, route: Route, request: Request) -> None:
-        # TODO: why when collecting, increasing/decreasing cart stuff fails
-        # TODO: websockets? like e.g. ChatGPT doesn't allow for collecting anything
-
-        # 1. make amazon sign in work seamless
-        # 2. make add to cart, remove from cart work as well
-        # 3. make other interactions work well here,
-
-        # - try any URL not body matching, but use them only once, so cache the ones consumed already.
-        # - are we getting different URLs even? when it should be the same?
-
-        if should_ignore_url(request.url):
-            await route.abort()
-            return
-
-        # 2. Handle POST requests with special URL-only matching (no fuzzy matching)
-        if request.method == "POST":
-            return await self._handle_post_requests(route, request)
-
-        # 3. Handle GET requests with fuzzy URL matching for static assets
-        # TODO: what to do with fails xhr/fetch?
-        # TODO: is this replicating default HAR matching playwright? headers needed? or anything missing?
-        if request.method == "GET":
-            return await self._handle_fuzzy_get_requests(route, request)
-
-        # 4. Fallback to HAR replay for everything else
-        await route.fallback()
 
     def _storage_state_path(self) -> Optional[Path]:
         storage_dir = self.bundle_path / "storage"
