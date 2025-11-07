@@ -6,7 +6,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse, parse_qsl
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import typer
 from playwright.async_api import (
@@ -69,39 +69,44 @@ def should_ignore_url(url: str):
     return False
 
 
-def url_match(ref: str, target: str) -> bool:
-    """Check if the URLs bases are the same"""
-    ref_url = urlparse(ref)
-    target_url = urlparse(target)
-    return ref_url.scheme == target_url.scheme and ref_url.netloc == target_url.netloc and ref_url.path == target_url.path
-
-def param_overlap_count(entry_url: str, request_url: str) -> int:
-    """Count the number of overlapping query parameters between two URLs"""
-    entry_parts = urlparse(entry_url)
-    request_parts = urlparse(request_url)
-    entry_params = dict(parse_qsl(entry_parts.query))
-    request_params = dict(parse_qsl(request_parts.query))
-    overlap = sum(1 for k in request_params if k in entry_params and entry_params[k] == request_params[k])
-    return overlap
-
-def fragment_overlap_count(entry_url: str, request_url: str) -> int:
-    """Count the number of overlapping fragment parameters between two URLs"""
-    entry_parts = urlparse(entry_url)
-    request_parts = urlparse(request_url)
-    entry_params = dict(parse_qsl(entry_parts.fragment))
-    request_params = dict(parse_qsl(request_parts.fragment))
-    overlap = sum(1 for k in request_params if k in entry_params and entry_params[k] == request_params[k])
-    return overlap
-
 def most_relevant_entry(entries: List[dict], request_url: str) -> dict:
-    """Find the most relevant entry based on the number of overlapping parameters"""
-    overlap_entries = [
-        (entry, param_overlap_count(entry.get("request", {}).get("url", ""), request_url) + fragment_overlap_count(entry.get("request", {}).get("url", ""), request_url))
-        for entry in entries
-    ]
+    """Find the most relevant entry based on the number of overlapping parameters."""
+    if not entries:
+        raise ValueError("entries list cannot be empty")
+
+    if len(entries) == 1:
+        return entries[0]
+
+    # Parse request URL once for reuse
+    request_parsed = urlparse(request_url)
+    request_params = dict(parse_qsl(request_parsed.query))
+    request_fragment_params = dict(parse_qsl(request_parsed.fragment))
+
+    overlap_entries = []
+    for entry in entries:
+        entry_url = entry.get("request", {}).get("url", "")
+        entry_parsed = urlparse(entry_url)
+        entry_params = dict(parse_qsl(entry_parsed.query))
+        entry_fragment_params = dict(parse_qsl(entry_parsed.fragment))
+
+        # Count overlapping query parameters
+        param_overlap = sum(
+            1 for k in request_params
+            if k in entry_params and entry_params[k] == request_params[k]
+        )
+
+        # Count overlapping fragment parameters
+        fragment_overlap = sum(
+            1 for k in request_fragment_params
+            if k in entry_fragment_params and entry_fragment_params[k] == request_fragment_params[k]
+        )
+
+        overlap_entries.append((entry, param_overlap + fragment_overlap))
+
     overlap_entries.sort(key=lambda x: x[1], reverse=True)
     return overlap_entries[0][0]
-    
+
+
 class ReplayBundle:
     """Replay previously captured browsing resources using HAR files."""
 
@@ -122,9 +127,15 @@ class ReplayBundle:
         self._consumed_har_indices: Set[int] = set()
         self._har_data: Dict = self._load_har_data()
 
+        # Build index for fast lookup: (method, url_base) -> list of entries
+        # url_base is scheme + netloc + path (without query/fragment for indexing)
+        self._har_index: Dict[tuple[str, str], List[tuple[int, dict]]] = {}
+        self._build_har_index()
+
         logger.info(
-            "Loaded bundle %s",
+            "Loaded bundle %s with %d HAR entries",
             bundle_path,
+            len(self._har_data.get("log", {}).get("entries", [])),
         )
 
     def guess_start_url(self) -> Optional[str]:
@@ -245,6 +256,32 @@ class ReplayBundle:
             raise FileNotFoundError(f"HAR file not found at {har_path}")
         return json.loads(har_path.read_text(encoding="utf-8"))
 
+    def _build_har_index(self) -> None:
+        """Build an index of HAR entries for fast lookup by method and URL base."""
+        har_entries = self._har_data.get("log", {}).get("entries", [])
+
+        for idx, entry in enumerate(har_entries):
+            request = entry.get("request", {})
+            method = request.get("method", "GET").upper()
+            url = request.get("url", "")
+
+            if not url:
+                continue
+
+            # Parse URL once and extract base (scheme + netloc + path)
+            parsed = urlparse(url)
+            url_base = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+
+            # Index by (method, url_base)
+            key = (method, url_base)
+            if key not in self._har_index:
+                self._har_index[key] = []
+            # Store index and entry for later reference
+            self._har_index[key].append((idx, entry))
+
+        logger.debug(
+            "Built HAR index with %d unique (method, url_base) keys", len(self._har_index))
+
     async def build_context(
         self,
         browser: Browser,
@@ -294,18 +331,25 @@ class ReplayBundle:
             )
 
         logger.info("[HAR REPLAY] Using HAR replay from %s", har_path)
-        await context.route_from_har(
-            str(har_path),
-            not_found="fallback" if allow_network_fallback else "abort",
-            update=False,  # Don't update the HAR, just replay
-        )
 
-        # Add custom route handler AFTER HAR routing (so it gets priority - LIFO)
-        await context.route(
-            "**/*", lambda route, request: self.handle_requests(route, request)
-        )
+        # Set up HAR replay first - this will handle most requests
+        # Disabled to handle all requests with custom matching logic
+        # await context.route_from_har(
+        #     str(har_path),
+        #     not_found="fallback" if allow_network_fallback else "abort",
+        #     update=False,  # Don't update the HAR, just replay
+        # )
 
-    async def handle_requests(self, route: Route, request: Request) -> None:
+        # Add custom route handler for all HTTP methods (GET, POST, DELETE, PUT, PATCH, etc.)
+        # that need special URL matching. This handler runs first (LIFO), but falls back
+        # to HAR replay for requests it doesn't handle
+        async def custom_route_handler(route: Route, request: Request) -> None:
+            # Handle all HTTP methods with custom matching logic
+            await self.handle_requests(route, request, allow_network_fallback)
+
+        await context.route("**/*", custom_route_handler)
+
+    async def handle_requests(self, route: Route, request: Request, allow_network_fallback: bool = False,) -> None:
         # TODO: this requires LM postprocessing selection of URL's to match or some dumb way for all POST? or smth
         # TODO: why when collecting, increasing/decreasing cart stuff fails
         # TODO: some assets in GET are also dynamic?, bunch of js/stylesheets are not found in HAR
@@ -315,21 +359,39 @@ class ReplayBundle:
             await route.abort()
             return
 
-        har_data = self._load_har_data()
-        har_entries = har_data.get("log", {}).get("entries", [])
+        # Use cached HAR data instead of reloading
+        method = request.method.upper()
 
-        # Look for those entries that match the request method and URL
-        relevant_entries = [entry for entry in har_entries if entry.get("request", {}).get("method") == request.method and url_match(entry.get("request", {}).get("url"), request.url)]
+        # Parse request URL once
+        request_parsed = urlparse(request.url)
+        request_url_base = f"{request_parsed.scheme}://{request_parsed.netloc}{request_parsed.path}"
 
-        if not relevant_entries:
+        # Look up candidates in index using (method, url_base)
+        # Candidates already match scheme + netloc + path by construction
+        index_key = (method, request_url_base)
+        candidate_entries = self._har_index.get(index_key, [])
+
+        if not candidate_entries:
             logger.warning(
-                "⚠️  No matching HAR entry found for %s, aborting", request.url)
-            await route.abort()
+                "⚠️  No matching HAR entry found for %s %s, falling back to HAR replay",
+                method, request.url[:100]
+            )
+            if allow_network_fallback:
+                await route.fallback()
+            else:
+                await route.abort()
             return
 
-        # Extract the most relevant entry
-        entry = most_relevant_entry(relevant_entries, request.url)
-        
+        # Extract entries from (index, entry) tuples
+        # All candidates already match the URL base, so we can use them directly
+        relevant_entries = [entry for _, entry in candidate_entries]
+
+        # If multiple entries match, find the most relevant based on parameter overlap
+        if len(relevant_entries) == 1:
+            entry = relevant_entries[0]
+        else:
+            entry = most_relevant_entry(relevant_entries, request.url)
+
         response = entry.get("response", {})
         status = response.get("status", 200)
         headers = {h["name"]: h["value"] for h in response.get("headers", [])}
@@ -347,8 +409,11 @@ class ReplayBundle:
                     body = base64.b64decode(text)
                 except Exception as exc:
                     logger.warning(
-                        "Failed to decode base64 body for %s: %s", request.url, exc)
-                    await route.abort()
+                        "Failed to decode base64 body for %s: %s, falling back to HAR replay", request.url, exc)
+                    if allow_network_fallback:
+                        await route.fallback()
+                    else:
+                        await route.abort()
                     return
             else:
                 # Use text as-is for text responses
