@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qsl
 from typing import Any, Dict, List, Optional, Set
 
+from environments.lm_match import get_lm_match
 import typer
 from playwright.async_api import (
     Browser,
@@ -130,6 +131,8 @@ class ReplayBundle:
         # Build index for fast lookup: (method, url_base) -> list of entries
         # url_base is scheme + netloc + path (without query/fragment for indexing)
         self._har_index: Dict[tuple[str, str], List[tuple[int, dict]]] = {}
+        self._har_full_index: Dict[tuple[str, str], List[tuple[int, dict]]] = {}
+        self._har_method_index: Dict[str, List[tuple[int, dict]]] = {}
         self._build_har_index()
 
         logger.info(
@@ -279,9 +282,16 @@ class ReplayBundle:
             # Store index and entry for later reference
             self._har_index[key].append((idx, entry))
 
+            # Also index by full URL for exact matching
+            full_key = (method, url)
+            if full_key not in self._har_full_index:
+                self._har_full_index[full_key] = []
+            self._har_full_index[full_key].append((idx, entry))
+
         logger.debug(
-            "Built HAR index with %d unique (method, url_base) keys",
+            "Built HAR index with %d unique (method, url_base) keys and %d full URL keys",
             len(self._har_index),
+            len(self._har_full_index),
         )
 
     async def build_context(
@@ -324,7 +334,7 @@ class ReplayBundle:
         allow_network_fallback: bool = False,
     ) -> None:
         """Configure an existing browser context with HAR replay and routing."""
-        self._setup_har_logging(context)
+        # self._setup_har_logging(context)
 
         har_path = self.bundle_path / "recording.har"
         if not har_path.exists():
@@ -336,11 +346,6 @@ class ReplayBundle:
 
         # Set up HAR replay first - this will handle most requests
         # Disabled to handle all requests with custom matching logic
-        # await context.route_from_har(
-        #     str(har_path),
-        #     not_found="fallback" if allow_network_fallback else "abort",
-        #     update=False,  # Don't update the HAR, just replay
-        # )
 
         # Add custom route handler for all HTTP methods (GET, POST, DELETE, PUT, PATCH, etc.)
         # that need special URL matching. This handler runs first (LIFO), but falls back
@@ -351,57 +356,70 @@ class ReplayBundle:
 
         await context.route("**/*", custom_route_handler)
 
+        await context.route_from_har(
+            str(har_path),
+            not_found="fallback",  # so goes to custom handler if not found
+            update=False,
+        )
+
     async def handle_requests(
         self,
         route: Route,
         request: Request,
         allow_network_fallback: bool = False,
     ) -> None:
-        # TODO: this requires LM postprocessing selection of URL's to match or some dumb way for all POST? or smth
-        # TODO: why when collecting, increasing/decreasing cart stuff fails
-        # TODO: some assets in GET are also dynamic?, bunch of js/stylesheets are not found in HAR
-        # TODO: websockets? like e.g. ChatGPT doesn't allow for collecting anything
-
         if should_ignore_url(request.url):
             await route.abort()
             return
 
-        # Use cached HAR data instead of reloading
         method = request.method.upper()
-
-        # Parse request URL once
-        request_parsed = urlparse(request.url)
+        full_url = request.url
+        shorter_url = full_url[:100] + "..." if len(full_url) > 100 else full_url
+        request_parsed = urlparse(full_url)
         request_url_base = (
             f"{request_parsed.scheme}://{request_parsed.netloc}{request_parsed.path}"
         )
 
-        # Look up candidates in index using (method, url_base)
-        # Candidates already match scheme + netloc + path by construction
         index_key = (method, request_url_base)
         candidate_entries = self._har_index.get(index_key, [])
 
         if not candidate_entries:
-            logger.warning(
-                "⚠️  No matching HAR entry found for %s %s, falling back to HAR replay",
-                method,
-                request.url[:100],
-            )
-            if allow_network_fallback:
-                await route.fallback()
-            else:
+            ignore_log = [".woff", ".jpg", ".gif", ".png", ".svg", ".ico"]
+            if any(ignore_pattern in request.url for ignore_pattern in ignore_log):
                 await route.abort()
+                return
+
+            logger.warning(
+                f"No matching HAR entry found for {method} {shorter_url}, aborting",
+            )
+            await (route.fallback() if allow_network_fallback else route.abort())
             return
 
-        # Extract entries from (index, entry) tuples
-        # All candidates already match the URL base, so we can use them directly
-        relevant_entries = [entry for _, entry in candidate_entries]
+        entries = [entry for _, entry in candidate_entries]
 
-        # If multiple entries match, find the most relevant based on parameter overlap
-        if len(relevant_entries) == 1:
-            entry = relevant_entries[0]
+        if len(entries) > 1:
+            logger.info(
+                f"Multiple HAR candidates ({len(entries)}) found for {method} {shorter_url}, using LM matching",
+            )
+
+            # TODO: if min params URL difference,
+            # TODO: if same URL method, but 1 of them with just different post data
+            try:
+                post_data = request.post_data
+            except Exception:
+                post_data = None
+
+            entry = None
+            idx = get_lm_match(
+                target_request=request.__dict__, candidates=entries, post_data=post_data
+            )
+            entry = entries[idx]
         else:
-            entry = most_relevant_entry(relevant_entries, request.url)
+            entry = entries[0]
+            logger.debug("✓ Single HAR candidate found for %s %s", method, shorter_url)
 
+        # Step 4: Fulfill the request with the selected entry
+        # TODO: ensure this matches as expected
         response = entry.get("response", {})
         status = response.get("status", 200)
         headers = {h["name"]: h["value"] for h in response.get("headers", [])}
@@ -419,7 +437,7 @@ class ReplayBundle:
                     body = base64.b64decode(text)
                 except Exception as exc:
                     logger.warning(
-                        "Failed to decode base64 body for %s: %s, falling back to HAR replay",
+                        "Failed to decode base64 body for %s: %s, falling back",
                         request.url,
                         exc,
                     )
