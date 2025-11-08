@@ -20,9 +20,6 @@ from db.step import StepManager
 
 from environments.replay import TaskStepExecutor
 from config.storage import DATA_DIR
-from environments.fuzzy_match import (
-    find_fuzzy_har_match,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -91,14 +88,17 @@ def most_relevant_entry(entries: List[dict], request_url: str) -> dict:
 
         # Count overlapping query parameters
         param_overlap = sum(
-            1 for k in request_params
+            1
+            for k in request_params
             if k in entry_params and entry_params[k] == request_params[k]
         )
 
         # Count overlapping fragment parameters
         fragment_overlap = sum(
-            1 for k in request_fragment_params
-            if k in entry_fragment_params and entry_fragment_params[k] == request_fragment_params[k]
+            1
+            for k in request_fragment_params
+            if k in entry_fragment_params
+            and entry_fragment_params[k] == request_fragment_params[k]
         )
 
         overlap_entries.append((entry, param_overlap + fragment_overlap))
@@ -280,7 +280,9 @@ class ReplayBundle:
             self._har_index[key].append((idx, entry))
 
         logger.debug(
-            "Built HAR index with %d unique (method, url_base) keys", len(self._har_index))
+            "Built HAR index with %d unique (method, url_base) keys",
+            len(self._har_index),
+        )
 
     async def build_context(
         self,
@@ -349,7 +351,12 @@ class ReplayBundle:
 
         await context.route("**/*", custom_route_handler)
 
-    async def handle_requests(self, route: Route, request: Request, allow_network_fallback: bool = False,) -> None:
+    async def handle_requests(
+        self,
+        route: Route,
+        request: Request,
+        allow_network_fallback: bool = False,
+    ) -> None:
         # TODO: this requires LM postprocessing selection of URL's to match or some dumb way for all POST? or smth
         # TODO: why when collecting, increasing/decreasing cart stuff fails
         # TODO: some assets in GET are also dynamic?, bunch of js/stylesheets are not found in HAR
@@ -364,7 +371,9 @@ class ReplayBundle:
 
         # Parse request URL once
         request_parsed = urlparse(request.url)
-        request_url_base = f"{request_parsed.scheme}://{request_parsed.netloc}{request_parsed.path}"
+        request_url_base = (
+            f"{request_parsed.scheme}://{request_parsed.netloc}{request_parsed.path}"
+        )
 
         # Look up candidates in index using (method, url_base)
         # Candidates already match scheme + netloc + path by construction
@@ -374,7 +383,8 @@ class ReplayBundle:
         if not candidate_entries:
             logger.warning(
                 "⚠️  No matching HAR entry found for %s %s, falling back to HAR replay",
-                method, request.url[:100]
+                method,
+                request.url[:100],
             )
             if allow_network_fallback:
                 await route.fallback()
@@ -409,7 +419,10 @@ class ReplayBundle:
                     body = base64.b64decode(text)
                 except Exception as exc:
                     logger.warning(
-                        "Failed to decode base64 body for %s: %s, falling back to HAR replay", request.url, exc)
+                        "Failed to decode base64 body for %s: %s, falling back to HAR replay",
+                        request.url,
+                        exc,
+                    )
                     if allow_network_fallback:
                         await route.fallback()
                     else:
@@ -425,69 +438,6 @@ class ReplayBundle:
             body=body,
             content_type=content.get("mimeType"),
         )
-
-    async def _handle_fuzzy_get_requests(self, route: Route, request: Request) -> None:
-        # Only apply fuzzy matching to static assets where variations are expected
-        # font: .woff vs .woff2 differences
-        # image: responsive image sizes, cache busters
-        # stylesheet/script: bundled resources with dynamic names
-        fuzzy_match_types = {"stylesheet", "script", "image", "font", "media"}
-
-        if request.resource_type not in fuzzy_match_types:
-            await route.fallback()
-            return
-
-        # First check if HAR replay will handle it (exact match exists)
-        # We do this by attempting fuzzy match which tries exact first
-        match_result = find_fuzzy_har_match(
-            self._har_data,
-            self._consumed_har_indices,
-            request.url,
-            "GET",
-            request.resource_type,
-        )
-
-        if not match_result:
-            await route.fallback()
-            return
-
-        if not match_result.allow_reuse:
-            self._consumed_har_indices.add(match_result.index)
-
-        entry = match_result.entry
-
-        response = entry.get("response", {})
-        status = response.get("status", 200)
-
-        # Only fulfill if it was a successful response
-        if status >= 400:
-            await route.fallback()
-            return
-
-        headers = {h["name"]: h["value"] for h in response.get("headers", [])}
-        content = response.get("content", {})
-
-        # Handle different content encodings
-        body = None
-        if "text" in content:
-            body = content["text"]
-
-        har_url = entry.get("request", {}).get("url", "")
-        shorter_url = (
-            request.url[:100] + "..." if len(request.url) > 100 else request.url
-        )
-        shorter_har_url = har_url[:100] + "..." if len(har_url) > 100 else har_url
-        if har_url != request.url:
-            logger.info(
-                "✅ Fuzzy matched HAR entry for %s via %s [%s] -> %s",
-                request.resource_type,
-                match_result.reason,
-                shorter_url,
-                shorter_har_url,
-            )
-
-        await route.fulfill(status=status, headers=headers, body=body)
-        return
 
     def _storage_state_path(self) -> Optional[Path]:
         storage_dir = self.bundle_path / "storage"
