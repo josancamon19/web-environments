@@ -1,12 +1,14 @@
 import asyncio
 import logging
 from typing import Any, Dict, Optional, Tuple
-from urllib.parse import urlparse
 from playwright.async_api import Page, Locator, TimeoutError as PlaywrightTimeoutError
 from db.models import StepModel
 
 
 logger = logging.getLogger(__name__)
+# NOTE: This executor replays user actions (clicks, inputs, submits, etc.) from recorded trajectories.
+# Navigations are triggered naturally by user actions (clicks, submits) rather than being replayed directly.
+# Only the initial navigation is performed to set up the starting state.
 # TODO: potential fixes to debug if failing
 # - is the CSS scaping enough given our usecase?
 # - is URLs differ to simple given the purpose of this? which is replicating a set of human trajectory steps from the DB
@@ -55,16 +57,14 @@ class TaskStepExecutor:
         self, page: Page, subject: str, action: str, payload: Dict[str, Any]
     ) -> None:
         if subject == "browser" and action == "navigated":
-            url = payload.get("url") if isinstance(payload, dict) else None
-            if not url or url == "about:blank":
-                return
-            if not self._initial_navigation_done or self._urls_differ(page.url, url):
-                # Check if this is a SPA route change vs real navigation
-                if await self._is_spa_route_change(page, url):
-                    await self._perform_spa_navigation(page, url)
-                else:
+            # Only perform the initial navigation to get to the starting URL
+            # After that, let user actions (clicks, submits) trigger navigations naturally
+            if not self._initial_navigation_done:
+                url = payload.get("url") if isinstance(payload, dict) else None
+                if url and url != "about:blank":
                     await self._safe_goto(page, url)
-                self._initial_navigation_done = True
+                    self._initial_navigation_done = True
+            # Skip subsequent navigation events - they should happen via user actions
             return
 
         if subject == "page":
@@ -242,192 +242,6 @@ class TaskStepExecutor:
             logger.error("Failed to submit form: %s", exc, exc_info=True)
             raise
 
-    async def _is_spa_route_change(self, page: Page, target_url: str) -> bool:
-        """
-        Detect if a navigation is likely a SPA client-side route change.
-
-        A navigation is considered a SPA route change if:
-        1. Same origin as current page
-        2. Only hash differs, OR
-        3. Path/query differs but it's on the same domain (likely client-side routing)
-        """
-        current_url = page.url
-        if not current_url or current_url == "about:blank":
-            return False
-
-        try:
-            current = urlparse(current_url)
-            target = urlparse(target_url)
-
-            # Different origins = real navigation
-            if current.scheme != target.scheme or current.netloc != target.netloc:
-                return False
-
-            # Same origin navigation
-            # If only hash differs, it's definitely a SPA route change
-            if (
-                current.scheme == target.scheme
-                and current.netloc == target.netloc
-                and current.path == target.path
-                and current.query == target.query
-            ):
-                return True  # Only hash differs
-
-            # For same-origin path changes, assume it's SPA if:
-            # - The path doesn't end with .html, .htm, .php, etc.
-            # - The current page is already loaded (not the initial navigation)
-            static_extensions = {".html", ".htm", ".php", ".asp", ".jsp"}
-            target_path = target.path.lower()
-
-            if any(target_path.endswith(ext) for ext in static_extensions):
-                return False  # Likely a real document
-
-            # Assume same-origin path change without static extension is SPA
-            return True
-
-        except Exception as exc:
-            logger.warning("Error checking SPA route change: %s", exc)
-            return False
-
-    async def _perform_spa_navigation(self, page: Page, url: str) -> None:
-        """
-        Perform client-side navigation for SPA routes using History API.
-        This avoids triggering a full page load. If SPA navigation fails,
-        falls back to regular navigation.
-        """
-        try:
-            logger.info("SPA navigation to %s (using History API)", url)
-
-            # Capture initial state to detect if content actually changes
-            initial_state = await page.evaluate(
-                """() => ({
-                    bodyHTML: document.body ? document.body.innerHTML.substring(0, 1000) : '',
-                    bodyTextLength: document.body ? document.body.innerText.length : 0,
-                    title: document.title,
-                    url: window.location.href
-                })"""
-            )
-
-            # Use History API to change URL without reloading
-            await page.evaluate(
-                """(url) => {
-                window.history.pushState({}, '', url);
-                // Trigger popstate event in case the SPA listens to it
-                window.dispatchEvent(new PopStateEvent('popstate', { state: {} }));
-                // Also trigger hashchange if hash changed
-                window.dispatchEvent(new HashChangeEvent('hashchange'));
-            }""",
-                url,
-            )
-
-            # Give the SPA time to react to the route change
-            # Wait for a bit, then check if there are pending network requests
-            await asyncio.sleep(0.3)
-
-            # Try to wait for network idle, but don't fail if it times out
-            try:
-                await page.wait_for_load_state("networkidle", timeout=2000)
-            except Exception:
-                # Network didn't go idle quickly, that's ok - some SPAs have ongoing requests
-                pass
-
-            # Check if content actually changed after SPA navigation
-            final_state = await page.evaluate(
-                """() => ({
-                    bodyHTML: document.body ? document.body.innerHTML.substring(0, 1000) : '',
-                    bodyTextLength: document.body ? document.body.innerText.length : 0,
-                    title: document.title,
-                    url: window.location.href
-                })"""
-            )
-
-            # Determine if SPA navigation succeeded
-            spa_worked = await self._verify_spa_navigation(
-                initial_state, final_state, url
-            )
-
-            if not spa_worked:
-                logger.warning(
-                    "SPA navigation to %s appears to have failed (content didn't change), falling back to goto",
-                    url,
-                )
-                await self._safe_goto(page, url)
-
-        except Exception as exc:
-            logger.warning(
-                "Failed SPA navigation to %s: %s, falling back to goto", url, exc
-            )
-            # Fallback to regular navigation if SPA navigation fails
-            await self._safe_goto(page, url)
-
-    async def _verify_spa_navigation(
-        self,
-        initial_state: dict,
-        final_state: dict,
-        target_url: str,
-    ) -> bool:
-        """
-        Verify if SPA navigation actually worked by checking if content changed.
-
-        Returns True if navigation appears successful, False otherwise.
-        """
-        try:
-            # Check if URL changed correctly
-            if final_state.get("url", "").rstrip("/") != target_url.rstrip("/"):
-                logger.debug("SPA nav failed: URL didn't change correctly")
-                return False
-
-            # Check if page is empty or minimal (indication of failed SPA nav)
-            body_text_length = final_state.get("bodyTextLength", 0)
-            if body_text_length < 100:  # Less than 100 chars suggests empty page
-                logger.debug(
-                    "SPA nav failed: page appears empty (text length: %d)",
-                    body_text_length,
-                )
-                return False
-
-            # Check if content actually changed (for non-hash-only changes)
-            initial_html = initial_state.get("bodyHTML", "")
-            final_html = final_state.get("bodyHTML", "")
-
-            # If HTML is identical, check if this was a hash-only change
-            from urllib.parse import urlparse
-
-            initial_url = urlparse(initial_state.get("url", ""))
-            final_url = urlparse(target_url)
-
-            # For hash-only changes, identical HTML is okay
-            is_hash_only = (
-                initial_url.scheme == final_url.scheme
-                and initial_url.netloc == final_url.netloc
-                and initial_url.path == final_url.path
-                and initial_url.query == final_url.query
-            )
-
-            if not is_hash_only and initial_html == final_html:
-                # For path changes, if content is identical, the SPA didn't react
-                logger.debug("SPA nav failed: content didn't change for path change")
-                return False
-
-            # Check if title changed (optional, but a good indicator)
-            # Many SPAs update the title on route change
-            initial_title = initial_state.get("title", "")
-            final_title = final_state.get("title", "")
-
-            logger.debug(
-                "SPA nav check: text_length=%d, title_changed=%s, hash_only=%s",
-                body_text_length,
-                initial_title != final_title,
-                is_hash_only,
-            )
-
-            # SPA navigation appears successful
-            return True
-
-        except Exception as exc:
-            logger.warning("Error verifying SPA navigation: %s", exc)
-            return False
-
     async def _safe_goto(self, page: Page, url: str) -> None:
         try:
             logger.info("Navigating to %s", url)
@@ -513,12 +327,6 @@ class TaskStepExecutor:
         if len(parts) == 2:
             return parts[0], parts[1], ""
         return parts[0], parts[1], parts[2]
-
-    @staticmethod
-    def _urls_differ(current: Optional[str], target: str) -> bool:
-        if not current:
-            return True
-        return current.rstrip("/") != target.rstrip("/")
 
 
 # Escape characters for CSS selectors
