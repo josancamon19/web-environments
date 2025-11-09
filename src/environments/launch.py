@@ -364,9 +364,6 @@ class ReplayBundle:
         index_key = (method, request_url_base)
         candidate_entries = self._har_index.get(index_key, [])
 
-        # TODO: try again, are we matching better? why gpt-5-nano rate limit
-        # - is amazon handling requests even with different constructed paths given a single endpoint
-
         if not candidate_entries:
             ignore_log = [".woff", ".jpg", ".gif", ".png", ".svg", ".ico"]
             if any(ignore_pattern in request.url for ignore_pattern in ignore_log):
@@ -449,19 +446,13 @@ class ReplayBundle:
         except Exception:
             post_data = None
 
-        # TODO: any obvious way to simplify and call less this? any heuristics? check the LM reasoning response.
-        # TODO: add some caching here in a JSON of matches that can be distributed later
-        # - how accurate is this? should barely fail
-        # ----- 1)
-        # TODO: now what websites are manual navigation failing? or collection
-        # TODO: coursera input for email changes?
-        # TODO: shouldn't replay be just making click, not handling navigations themselves?
-
-        # 1. ignore.py
-        # 2. lm match, traces, and find basic heuristics
-
+        candidates = [entry.get("request", {}) for entry in entries]
+        # TODO: cache matches
+        # TODO: consider consumed indices
+        # TODO: why is this blocker to get other requests going on? in parallel? # https://www.amazon.com/ref=ap_frn_logo
+        # TODO: doesn't seem to be failing when I explore a new website that was not recorded
         idx = retrieve_best_request_match(
-            target_request=request.__dict__, candidates=entries, post_data=post_data
+            target_request=request.__dict__, candidates=candidates, post_data=post_data
         )
         return entries[idx]
 
