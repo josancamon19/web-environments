@@ -325,6 +325,7 @@ class ReplayBundle:
                 route, request, allow_network_fallback
             )
 
+        await context.set_offline(True)
         await context.route("**/*", custom_route_handler)
         await context.route_from_har(str(har_path), not_found="fallback", update=False)
         await context.set_offline(True)
@@ -353,7 +354,7 @@ class ReplayBundle:
 
     async def _obtain_request_candidates(
         self, request: Request, route: Route, allow_network_fallback: bool = False
-    ) -> List[dict] | None:
+    ) -> tuple[List[dict], str, str] | None:
         method = request.method.upper()
         full_url = request.url
         shorter_url = full_url[:100] + "..." if len(full_url) > 100 else full_url
@@ -470,6 +471,8 @@ class ReplayBundle:
                 return idx
         return None
 
+    # *********** Caching LM select best entry ***********
+
     async def _select_best_entry(
         self, request: Request, entries: List[dict], method: str, shorter_url: str
     ) -> dict:
@@ -503,15 +506,28 @@ class ReplayBundle:
 
         candidates = [entry.get("request", {}) for entry in entries]
 
-        # TODO: consider consumed indices (?)
         # TODO: doesn't seem to be failing when I explore a route that was not recorded
-        # TODO: more scenarios in amazon, reddit, github, gitlab, eventbrite, qatarairways, and overall mind2web websites.
+        # - cause it's always trying to find a match
+
         # TODO: what if 2FA, it should still work, right?
         # TODO: do websites that require sign in, like spotify, gmail, etc.
+
+        # Reddit
+        # - fails on collection (says "retry", "failed", etc)
+        # - triggers RateLimits OpenAI API.
+        # Github
+        # - When opening a file details, it says return to repo overview
+        # - when refreshing the page, then works, and shows the file
+        # Eventbrite works great, just a bunch of tracking bs
+        # Qatar airways
+        # Gitlab
+
+        # TODO: sometimes selector returns JSON instead of website contents, this should be handled.
 
         idx = await retrieve_best_request_match(
             target_request=request.__dict__, candidates=candidates, post_data=post_data
         )
+        # NOTE: consider consumed indices (?)
         selected_entry = entries[idx]
 
         # Save to cache

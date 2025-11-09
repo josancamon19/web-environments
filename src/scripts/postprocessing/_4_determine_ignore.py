@@ -7,34 +7,11 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from src.config.storage import DATA_DIR
 
-IGNORED_PATTERNS = [
-    "google-analytics",
-    "googleads",
-    "google-tag-manager",
-    "doubleclick.net",
-    "mixpanel",
-    "ingest.sentry.io",
-    "facebook.com/privacy_sandbox/pixel",
-    "cloudflareinsights.com",
-    "google.com/ccm/collect",
-    "facebook.com/tr/",
-    "googletagmanager.com",
-    "amazon.com/1/events/",
-    "amazon-adsystem.com",
-    "amazon.com/*/uedata",
-    "fls-na.amazon.com",
-    "amazon.com/empty.gif",
-    "advertising.amazon.dev",
-    "analytics.google.com",
-    "adtrafficquality.google",
-    "googlesyndication.com",
-    "googletagservices.com",
-    # TODO: need to find all of this that don't mean anything to match
-    # TODO: need to collect traces for LM matching, to amnually check where to expand.
-    "coursera.org/api/rest/v1/eventing/infobatch",
-    "bam-cell.nr-data.net",
-    "amazon.com/hz/primenavigation/primeflyout",
-]
+from src.scripts.postprocessing._ignore_patterns import IGNORED_PATTERNS
+
+
+# TODO: need to find all of this that don't mean anything to match
+# TODO: need to collect traces for LM matching, to amnually check where to expand.
 no_ignore_patterns = [
     ".png",
     ".jpg",
@@ -54,8 +31,8 @@ no_ignore_patterns = [
 _compiled_patterns = []
 for pattern in IGNORED_PATTERNS:
     if "*" in pattern:
-        # Convert wildcard pattern to regex: * matches any characters except nothing
-        regex_pattern = re.escape(pattern).replace(r"\*", r"[^/]+")
+        # Convert wildcard pattern to regex: * matches zero or more characters (except /)
+        regex_pattern = re.escape(pattern).replace(r"\*", r"[^/]*")
         _compiled_patterns.append(("regex", re.compile(regex_pattern, re.IGNORECASE)))
     else:
         _compiled_patterns.append(("substring", pattern.lower()))
