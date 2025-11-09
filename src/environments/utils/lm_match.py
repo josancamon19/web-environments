@@ -40,13 +40,13 @@ class JudgeCompletion(dspy.Signature):
     )
 
 
-def retrieve_best_request_match(
+async def retrieve_best_request_match(
     target_request: dict[str, Any],
     post_data: str | None,
     candidates: list[dict[str, Any]],
 ) -> int:
     completion = dspy.Predict(JudgeCompletion)
-    result = completion(
+    result = await completion.acall(
         target_request=target_request, post_data=post_data, candidates=candidates
     )
     return result.selected_match

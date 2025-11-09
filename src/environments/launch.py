@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import hashlib
 import json
 import logging
 from datetime import datetime
@@ -345,7 +346,7 @@ class ReplayBundle:
             return
 
         entries, method, shorter_url = data
-        entry = self._select_best_entry(request, entries, method, shorter_url)
+        entry = await self._select_best_entry(request, entries, method, shorter_url)
         await self._fulfill_request_with_entry_found(
             request, entry, route, allow_network_fallback
         )
@@ -432,29 +433,93 @@ class ReplayBundle:
         top_candidates = same_domain_candidates[:top_k]
         return [(c["idx"], c["entry"]) for c in top_candidates]
 
-    def _select_best_entry(
+    # *********** Caching LM select best entry ***********
+
+    def _load_matches_cache(self) -> Dict[str, int]:
+        """Load the matches cache from matches.json."""
+        cache_path = self.bundle_path / "matches.json"
+        if cache_path.exists():
+            try:
+                return json.loads(cache_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                logger.warning(f"Failed to load matches cache: {exc}")
+        return {}
+
+    def _save_to_matches_cache(self, cache_key: str, har_index: int) -> None:
+        """Save a match to the matches cache."""
+        cache_path = self.bundle_path / "matches.json"
+        cache = self._load_matches_cache()
+        cache[cache_key] = har_index
+        try:
+            cache_path.write_text(json.dumps(cache, indent=2), encoding="utf-8")
+        except Exception as exc:
+            logger.warning(f"Failed to save to matches cache: {exc}")
+
+    def _get_cache_key(self, method: str, url: str, post_data: Optional[str]) -> str:
+        """Generate cache key in format: {method}-{URL}-{bodyhashshort}."""
+        body_hash = ""
+        if post_data:
+            body_hash = hashlib.md5(post_data.encode()).hexdigest()[:16]
+        return f"{method}-{url}-{body_hash}"
+
+    def _find_entry_index_in_har(self, entry: dict) -> Optional[int]:
+        """Find the index of an entry in the original HAR entries."""
+        har_entries = self._har_data.get("log", {}).get("entries", [])
+        for idx, har_entry in enumerate(har_entries):
+            if har_entry is entry or har_entry == entry:
+                return idx
+        return None
+
+    async def _select_best_entry(
         self, request: Request, entries: List[dict], method: str, shorter_url: str
     ) -> dict:
         if len(entries) == 1:
             return entries[0]
 
-        logger.info(
-            f"Multiple HAR candidates ({len(entries)}) found for {method} {shorter_url}, using LM matching",
-        )
+        # Get post data for cache key
         try:
             post_data = request.post_data
         except Exception:
             post_data = None
 
+        # Check cache first
+        cache_key = self._get_cache_key(method, request.url, post_data)
+        cache = self._load_matches_cache()
+
+        if cache_key in cache:
+            cached_har_index = cache[cache_key]
+            har_entries = self._har_data.get("log", {}).get("entries", [])
+            if 0 <= cached_har_index < len(har_entries):
+                cached_entry = har_entries[cached_har_index]
+                # Verify it's in our candidates
+                for entry in entries:
+                    if entry is cached_entry or entry == cached_entry:
+                        logger.info(f"Using cached match for {method} {shorter_url}")
+                        return entry
+
+        logger.info(
+            f"Multiple HAR candidates ({len(entries)}) found for {method} {shorter_url}, using LM matching",
+        )
+
         candidates = [entry.get("request", {}) for entry in entries]
-        # TODO: cache matches
-        # TODO: consider consumed indices
-        # TODO: why is this blocker to get other requests going on? in parallel? # https://www.amazon.com/ref=ap_frn_logo
-        # TODO: doesn't seem to be failing when I explore a new website that was not recorded
-        idx = retrieve_best_request_match(
+
+        # TODO: consider consumed indices (?)
+        # TODO: doesn't seem to be failing when I explore a route that was not recorded
+        # TODO: more scenarios in amazon, reddit, github, gitlab, eventbrite, qatarairways, and overall mind2web websites.
+        # TODO: what if 2FA, it should still work, right?
+        # TODO: do websites that require sign in, like spotify, gmail, etc.
+
+        idx = await retrieve_best_request_match(
             target_request=request.__dict__, candidates=candidates, post_data=post_data
         )
-        return entries[idx]
+        selected_entry = entries[idx]
+
+        # Save to cache
+        har_index = self._find_entry_index_in_har(selected_entry)
+        if har_index is not None:
+            self._save_to_matches_cache(cache_key, har_index)
+
+        return selected_entry
 
     async def _fulfill_request_with_entry_found(
         self,
