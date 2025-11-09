@@ -2,13 +2,15 @@ import asyncio
 import base64
 import json
 import logging
-import re
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse, parse_qsl
 from typing import Any, Dict, List, Optional, Set
 
-from environments.lm_match import get_lm_match
+from environments.utils.lm_match import retrieve_best_request_match
+
+# TODO: replace for proper matching reading from ignored.json
+from scripts.postprocessing._4_determine_ignore import should_ignore_url
 import typer
 from playwright.async_api import (
     Browser,
@@ -23,48 +25,6 @@ from environments.replay import TaskStepExecutor
 from config.storage import DATA_DIR
 
 logger = logging.getLogger(__name__)
-
-IGNORED_PATTERNS = [
-    "google-analytics",
-    "googleads",
-    "google-tag-manager",
-    "doubleclick.net",
-    "mixpanel",
-    "ingest.sentry.io",
-    "facebook.com/privacy_sandbox/pixel",
-    "cloudflareinsights.com",
-    "google.com/ccm/collect",
-    "facebook.com/tr/",
-    "googletagmanager.com",
-    "amazon.com/1/events/",
-    "amazon-adsystem.com",
-    "amazon.com/*/uedata",
-    "fls-na.amazon.com",
-    "amazon.com/empty.gif",
-    "advertising.amazon.dev",
-]
-
-_compiled_patterns = []
-for pattern in IGNORED_PATTERNS:
-    if "*" in pattern:
-        # Convert wildcard pattern to regex: * matches any characters except nothing
-        regex_pattern = re.escape(pattern).replace(r"\*", r"[^/]+")
-        _compiled_patterns.append(("regex", re.compile(regex_pattern, re.IGNORECASE)))
-    else:
-        _compiled_patterns.append(("substring", pattern.lower()))
-
-
-def should_ignore_url(url: str):
-    """Check if URL should be ignored based on IGNORED_PATTERNS (supports wildcards)."""
-    url_lower = url.lower()
-    for pattern_type, pattern in _compiled_patterns:
-        if pattern_type == "substring":
-            if pattern in url_lower:
-                return True
-        elif pattern_type == "regex":
-            if pattern.search(url_lower):
-                return True
-    return False
 
 
 def most_relevant_entry(entries: List[dict], request_url: str) -> dict:
@@ -344,23 +304,12 @@ class ReplayBundle:
 
         logger.info("[HAR REPLAY] Using HAR replay from %s", har_path)
 
-        # Set up HAR replay first - this will handle most requests
-        # Disabled to handle all requests with custom matching logic
-
-        # Add custom route handler for all HTTP methods (GET, POST, DELETE, PUT, PATCH, etc.)
-        # that need special URL matching. This handler runs first (LIFO), but falls back
-        # to HAR replay for requests it doesn't handle
         async def custom_route_handler(route: Route, request: Request) -> None:
-            # Handle all HTTP methods with custom matching logic
             await self.handle_requests(route, request, allow_network_fallback)
 
         await context.route("**/*", custom_route_handler)
-
-        await context.route_from_har(
-            str(har_path),
-            not_found="fallback",  # so goes to custom handler if not found
-            update=False,
-        )
+        await context.route_from_har(str(har_path), not_found="fallback", update=False)
+        await context.set_offline(True)
 
     async def handle_requests(
         self,
@@ -402,15 +351,19 @@ class ReplayBundle:
                 f"Multiple HAR candidates ({len(entries)}) found for {method} {shorter_url}, using LM matching",
             )
 
-            # TODO: if min params URL difference,
-            # TODO: if same URL method, but 1 of them with just different post data
             try:
                 post_data = request.post_data
             except Exception:
                 post_data = None
 
             entry = None
-            idx = get_lm_match(
+            # TODO: any obvious way to simplify and call less this? any heuristics? check the LM reasoning response.
+            # TODO: add some caching here in a JSON of matches that can be distributed later
+            # - how accurate is this? should barely fail
+            # ----- 1)
+            # TODO: now what websites are manual navigation failing? or collection
+            # TODO: if non, what's wrong with replay.py, why's sometimes not replaying as expected.
+            idx = retrieve_best_request_match(
                 target_request=request.__dict__, candidates=entries, post_data=post_data
             )
             entry = entries[idx]
@@ -518,7 +471,7 @@ async def _cli(
         page = await context.new_page()
         start_url = bundle.guess_start_url() or "about:blank"
         logger.info("Opening %s", start_url)
-        await page.goto(start_url)
+        await page.goto(start_url, timeout=60000)
 
         if trajectory_steps:
             executor = TaskStepExecutor(
