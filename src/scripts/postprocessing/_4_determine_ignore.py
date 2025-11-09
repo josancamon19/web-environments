@@ -33,6 +33,7 @@ IGNORED_PATTERNS = [
     # TODO: need to collect traces for LM matching, to amnually check where to expand.
     "coursera.org/api/rest/v1/eventing/infobatch",
     "bam-cell.nr-data.net",
+    "amazon.com/hz/primenavigation/primeflyout",
 ]
 no_ignore_patterns = [
     ".png",

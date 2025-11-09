@@ -364,20 +364,76 @@ class ReplayBundle:
         index_key = (method, request_url_base)
         candidate_entries = self._har_index.get(index_key, [])
 
+        # TODO: try again, are we matching better? why gpt-5-nano rate limit
+        # - is amazon handling requests even with different constructed paths given a single endpoint
+
         if not candidate_entries:
             ignore_log = [".woff", ".jpg", ".gif", ".png", ".svg", ".ico"]
             if any(ignore_pattern in request.url for ignore_pattern in ignore_log):
                 await route.abort()
                 return
 
-            logger.warning(
-                f"No matching HAR entry found for {method} {shorter_url}, aborting",
-            )
-            await (route.fallback() if allow_network_fallback else route.abort())
-            return
+            candidate_entries = self._fallback_candidates_char_based(full_url, method)
+            if not candidate_entries:
+                logger.warning(
+                    f"No matching HAR entry found for {method} {shorter_url}, aborting",
+                )
+                await (route.fallback() if allow_network_fallback else route.abort())
+                return
 
         entries = [entry for _, entry in candidate_entries]
         return entries, method, shorter_url
+
+    def _fallback_candidates_char_based(self, full_url: str, method: str) -> List[dict]:
+        """
+        Find all HAR entries with the same domain and method, and select the best match based on the number of characters in the URL.
+        e.g. amazon requests css/js/media for the same endpoint in different order, so char based helps with matching.
+        """
+        target_chars = {}
+        for char in full_url:
+            target_chars[char] = target_chars.get(char, 0) + 1
+
+        # Find all HAR entries with the same domain and method
+        same_domain_candidates = []
+        har_entries = self._get_har_matches_by_base_url(full_url, method)
+
+        for idx, entry in enumerate(har_entries):
+            entry_url = entry.get("request", {}).get("url", "")
+            # Count character occurrences in entry URL
+            entry_chars = {}
+            for char in entry_url:
+                entry_chars[char] = entry_chars.get(char, 0) + 1
+
+            # Calculate match score: count how many target characters are available
+            match_score = 0
+            matches_all = True
+            for char, count in target_chars.items():
+                available = entry_chars.get(char, 0)
+                if available >= count:
+                    match_score += count
+                else:
+                    match_score += available
+                    matches_all = False
+            data = {
+                "idx": idx,
+                "entry": entry,
+                "match_score": match_score,
+                "matches_all": matches_all,
+            }
+            same_domain_candidates.append(data)
+
+        same_domain_candidates.sort(key=lambda x: x["match_score"], reverse=True)
+
+        perfect_match = next(
+            (c for c in same_domain_candidates if c["matches_all"]), None
+        )
+
+        if perfect_match:
+            return [(perfect_match["idx"], perfect_match["entry"])]
+
+        top_k = min(5, len(same_domain_candidates))
+        top_candidates = same_domain_candidates[:top_k]
+        return [(c["idx"], c["entry"]) for c in top_candidates]
 
     def _select_best_entry(
         self, request: Request, entries: List[dict], method: str, shorter_url: str
@@ -453,6 +509,25 @@ class ReplayBundle:
             body=body,
             content_type=content.get("mimeType"),
         )
+
+    def _get_har_matches_by_base_url(self, full_url: str, method: str) -> List[dict]:
+        har_entries = self._har_data.get("log", {}).get("entries", [])
+        base_url = urlparse(full_url).netloc
+        matches = []
+        for idx, entry in enumerate(har_entries):
+            if idx in self._consumed_har_indices:
+                continue
+
+            entry_request = entry.get("request", {})
+            entry_method = entry_request.get("method", "GET").upper()
+            entry_url = entry_request.get("url", "")
+
+            if not entry_url or entry_method != method:
+                continue
+
+            if urlparse(entry_url).netloc == base_url:
+                matches.append(entry)
+        return matches
 
     def _storage_state_path(self) -> Optional[Path]:
         storage_dir = self.bundle_path / "storage"
