@@ -10,34 +10,41 @@ lm = dspy.LM(
 dspy.configure(lm=lm)
 
 
-class JudgeCompletion(dspy.Signature):
-    # TODO: improve prompt, provide more examples, use gpt prompt optimizer
-    """
-    You will be given a target request, and a list of candidates that we want to match the target request to.
-    The current request comes from a current browser replaying a human trajectory, and the candidates are HAR entries that are similar to the target request collected in a previous HAR capture.
-    Your task is to identify the best candidate that matches the target request.
+def get_judge_prompt(_candidates: list[dict[str, Any]]):
+    # TODO: move this out of dspy
+    # TODO: setup OAI traces to do auto optimizer after labeling
+    class JudgeCompletion(dspy.Signature):
+        # TODO: improve prompt, provide more examples, use gpt prompt optimizer
+        """
+        You will be given a target request, and a list of candidates that we want to match the target request to.
+        The current request comes from a current browser replaying a human trajectory, and the candidates are HAR entries that are similar to the target request collected in a previous HAR capture.
+        Your task is to identify the best candidate that matches the target request.
 
-    The mismatches are generally parameters in the URL or parameters in the POST data that tend to be dynamic and change frequently.
-    """
+        The mismatches are generally parameters in the URL or parameters in the POST data that tend to be dynamic and change frequently.
+        """
 
-    target_request: dict[str, Any] = dspy.InputField(description="The target request")
-    post_data: str = dspy.InputField(
-        description="The POST data of the target request, only if it is a POST request",
-        default=None,
-    )
-    candidates: list[dict[str, Any]] = dspy.InputField(
-        description="The candidate HAR entries that are similar to the target request"
-    )
+        target_request: dict[str, Any] = dspy.InputField(
+            description="The target request"
+        )
+        post_data: str = dspy.InputField(
+            description="The POST data of the target request, only if it is a POST request",
+            default=None,
+        )
+        candidates: list[dict[str, Any]] = dspy.InputField(
+            description="The candidate HAR entries that are similar to the target request"
+        )
 
-    selected_match: int = dspy.OutputField(
-        description="The index of the selected match"
-    )
-    reasoning: str = dspy.OutputField(
-        description="The reasoning for the selected match"
-    )
-    confidence: float = dspy.OutputField(
-        description="The confidence score for the selected match"
-    )
+        selected_match: int = dspy.OutputField(
+            description="The index of the selected match", ge=0, le=len(_candidates) - 1
+        )
+        reasoning: str = dspy.OutputField(
+            description="The reasoning for the selected match"
+        )
+        confidence: float = dspy.OutputField(
+            description="The confidence score for the selected match"
+        )
+
+    return JudgeCompletion
 
 
 async def retrieve_best_request_match(
@@ -45,7 +52,7 @@ async def retrieve_best_request_match(
     post_data: str | None,
     candidates: list[dict[str, Any]],
 ) -> int:
-    completion = dspy.Predict(JudgeCompletion)
+    completion = dspy.Predict(get_judge_prompt(candidates))
     result = await completion.acall(
         target_request=target_request, post_data=post_data, candidates=candidates
     )

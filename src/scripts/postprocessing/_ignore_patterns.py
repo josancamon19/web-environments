@@ -265,4 +265,7 @@ IGNORED_PATTERNS = [
     "metrics.icloud.com",
     "metrics.apple.com",
     "telemetry.dropbox.com",
+    # ----
+    "b.6sc.co",
+    "trkn.us/pixel",
 ]

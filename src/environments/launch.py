@@ -388,6 +388,7 @@ class ReplayBundle:
         Find all HAR entries with the same domain and method, and select the best match based on the number of characters in the URL.
         e.g. amazon requests css/js/media for the same endpoint in different order, so char based helps with matching.
         """
+        # TODO: it seems like this is even better than the initial baseline
         target_chars = {}
         for char in full_url:
             target_chars[char] = target_chars.get(char, 0) + 1
@@ -518,9 +519,9 @@ class ReplayBundle:
         # Github
         # - When opening a file details, it says return to repo overview
         # - when refreshing the page, then works, and shows the file
-        # Eventbrite works great, just a bunch of tracking bs
-        # Qatar airways
-        # Gitlab
+        # Eventbrite ✅
+        # Qatar airways ✅
+        # Gitlab (Rate limit prob analytics matches)
 
         # TODO: sometimes selector returns JSON instead of website contents, this should be handled.
 
