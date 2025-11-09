@@ -1,17 +1,20 @@
 # cleanup HAR
 
 import json
-import dspy
+import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from src.config.storage import DATA_DIR
+from pydantic import BaseModel, Field
+from openai import OpenAI
 
-from src.scripts.postprocessing._ignore_patterns import IGNORED_PATTERNS
+from config.storage import DATA_DIR
+from scripts.postprocessing._ignore_patterns import IGNORED_PATTERNS
 
 
 # TODO: need to find all of this that don't mean anything to match
 # TODO: need to collect traces for LM matching, to amnually check where to expand.
+# TODO: optimize this so we don't LM call the same repeated URL's
 no_ignore_patterns = [
     ".png",
     ".jpg",
@@ -27,6 +30,30 @@ no_ignore_patterns = [
     ".ico",
     "jquery",
 ]
+PROMPT = """You are analyzing HTTP requests from HAR recordings to identify requests that are not relevant for website functionality or user experience.
+
+These typically include:
+- Analytics services (Google Analytics, Adobe Analytics, etc.)
+- Advertisement networks and trackers
+- Social media tracking pixels
+- Tag managers that don't affect core functionality
+- Third-party monitoring and metrics services
+
+However, DO NOT ignore:
+- Core API requests needed for functionality
+- Authentication/session management requests
+- Content delivery requests (images, CSS, fonts, media files)
+- WebSocket connections for real-time features
+- Any requests that directly contribute to user-visible content or interactions
+
+Analyze the following URLs from a HAR recording and identify which ones are NOT relevant for website functionality or user experience.
+
+Return the indices (0-based) of URLs that can be safely ignored during replay.
+
+URLs to analyze:
+{url_list}
+
+Select the indices of URLs that we can ignore during the replay of the trajectory without affecting the website functionality or experience."""
 
 _compiled_patterns = []
 for pattern in IGNORED_PATTERNS:
@@ -60,31 +87,39 @@ def should_always_keep_url(url: str):
     return False
 
 
-class ExtractNonRelevant(dspy.Signature):
-    """
-    You will be given a list of URLs from a HAR recording, your task is to for each one of them determine if it is a request that is not relevant for the website functionality or experience to persist. For example google analyitcs, google ads, google tag manager, etc.
+class ExtractNonRelevant(BaseModel):
+    """Response format for extracting non-relevant URLs."""
 
-    Select the indices of the URLs that we can ignore during the replay of the trajectory without affecting the website functionality or experience.
-    """
-
-    urls: list[str] = dspy.InputField(
-        description="The list of urls collected in the recording har"
-    )
-
-    non_relevant_indices: list[int] = dspy.OutputField(
+    non_relevant_indices: list[int] = Field(
         description="The list of indices of the URLs that we can ignore during the replay of the trajectory without affecting the website functionality or experience."
     )
+    reasoning: str = Field(
+        description="Brief explanation of why these URLs were identified as non-relevant"
+    )
+
+
+# Initialize OpenAI client
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 
 def process_url_batch(batch_data: tuple) -> set:
     batch_urls, batch_original_indices, batch_idx = batch_data
 
     try:
-        predictor = dspy.Predict(ExtractNonRelevant)
-        url_list = [f"{i}: {url}" for i, url in enumerate(batch_urls)]
-        prediction = predictor(urls=url_list)
-        lm_ignored_batch = set(prediction.non_relevant_indices)
+        # Format URLs with indices
+        url_list = "\n".join([f"{i}: {url}" for i, url in enumerate(batch_urls)])
+        prompt = PROMPT.format(url_list=url_list)
+        response = client.responses.parse(
+            model="gpt-5",
+            reasoning={"effort": "high"},
+            input=[{"role": "user", "content": prompt}],
+            text_format=ExtractNonRelevant,
+        )
 
+        result = response.output_parsed
+        lm_ignored_batch = set(result.non_relevant_indices)
+
+        # Map batch indices back to original indices
         ignored_original_indices = set()
         for batch_idx_val in lm_ignored_batch:
             if 0 <= batch_idx_val < len(batch_original_indices):
@@ -96,6 +131,9 @@ def process_url_batch(batch_data: tuple) -> set:
         return ignored_original_indices
     except Exception as e:
         print(f"  Warning: Batch {batch_idx} LM analysis failed: {e}")
+        import traceback
+
+        traceback.print_exc()
         return set()
 
 
@@ -244,19 +282,16 @@ def process_task(task_dir: Path) -> dict:
 
 def main():
     """Process all task directories in parallel."""
-    # Configure dspy with LM
-    lm = dspy.LM(
-        "openai/gpt-5",
-        reasoning_effort="high",
-        temperature=1.0,
-        max_tokens=24000,
-    )
+    # No need to configure dspy anymore - using OpenAI client directly
+
+    # Optional: Set up MLflow tracking if needed
+    # import mlflow
+    # from datetime import datetime
     # mlflow.set_tracking_uri("http://127.0.0.1:5000")
     # mlflow.set_experiment(
     #     f"determine-ignore-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
     # )
-    # mlflow.dspy.autolog()
-    dspy.configure(lm=lm)
+    # mlflow.openai.autolog()
 
     # Find all task directories
     captures_dir = DATA_DIR / "captures"

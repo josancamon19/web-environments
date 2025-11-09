@@ -224,10 +224,9 @@ class ReplayBundle:
 
     def _load_ignored_urls(self) -> List[str]:
         """Load ignored URLs from ignored.json file."""
-        # ignored_path = self.bundle_path / "ignored.json"
-        # assert ignored_path.exists(), f"ignored.json file not found at {ignored_path}"
-        # return json.loads(ignored_path.read_text(encoding="utf-8"))
-        return []
+        ignored_path = self.bundle_path / "ignored.json"
+        assert ignored_path.exists(), f"ignored.json file not found at {ignored_path}"
+        return json.loads(ignored_path.read_text(encoding="utf-8"))
 
     def _should_ignore_url(self, url: str) -> bool:
         """Check if a URL should be ignored based on the ignored.json patterns."""
