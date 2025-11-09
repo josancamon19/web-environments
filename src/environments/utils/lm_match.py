@@ -47,9 +47,6 @@ def retrieve_best_request_match(
 ) -> int:
     completion = dspy.Predict(JudgeCompletion)
     result = completion(
-        target_request=target_request,
-        post_data=post_data,
-        candidates=candidates,
+        target_request=target_request, post_data=post_data, candidates=candidates
     )
-    # print("🔍 LM match result:", result)
     return result.selected_match

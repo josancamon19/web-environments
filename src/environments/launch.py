@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Optional, Set
 
 from environments.utils.lm_match import retrieve_best_request_match
 
-# TODO: replace for proper matching reading from ignored.json
 from scripts.postprocessing._4_determine_ignore import should_ignore_url
 import typer
 from playwright.async_api import (
@@ -88,6 +87,9 @@ class ReplayBundle:
         self._consumed_har_indices: Set[int] = set()
         self._har_data: Dict = self._load_har_data()
 
+        # Load ignored URLs from ignored.json
+        self._ignored_urls: List[str] = self._load_ignored_urls()
+
         # Build index for fast lookup: (method, url_base) -> list of entries
         # url_base is scheme + netloc + path (without query/fragment for indexing)
         self._har_index: Dict[tuple[str, str], List[tuple[int, dict]]] = {}
@@ -116,7 +118,7 @@ class ReplayBundle:
         """Set up network event listeners to log requests not found in HAR."""
 
         async def log_request_failed(request):
-            if should_ignore_url(request.url):
+            if self._should_ignore_url(request.url):
                 return
 
             logger.warning(
@@ -219,6 +221,19 @@ class ReplayBundle:
             raise FileNotFoundError(f"HAR file not found at {har_path}")
         return json.loads(har_path.read_text(encoding="utf-8"))
 
+    def _load_ignored_urls(self) -> List[str]:
+        """Load ignored URLs from ignored.json file."""
+        # ignored_path = self.bundle_path / "ignored.json"
+        # assert ignored_path.exists(), f"ignored.json file not found at {ignored_path}"
+        # return json.loads(ignored_path.read_text(encoding="utf-8"))
+        return []
+
+    def _should_ignore_url(self, url: str) -> bool:
+        """Check if a URL should be ignored based on the ignored.json patterns."""
+        if should_ignore_url(url):
+            return True
+        return any(ignored_pattern in url for ignored_pattern in self._ignored_urls)
+
     def _build_har_index(self) -> None:
         """Build an index of HAR entries for fast lookup by method and URL base."""
         har_entries = self._har_data.get("log", {}).get("entries", [])
@@ -319,7 +334,7 @@ class ReplayBundle:
         request: Request,
         allow_network_fallback: bool = False,
     ) -> None:
-        if should_ignore_url(request.url):
+        if self._should_ignore_url(request.url):
             await route.abort()
             return
 
@@ -384,6 +399,11 @@ class ReplayBundle:
         # ----- 1)
         # TODO: now what websites are manual navigation failing? or collection
         # TODO: coursera input for email changes?
+        # TODO: shouldn't replay be just making click, not handling navigations themselves?
+
+        # 1. ignore.py
+        # 2. lm match, traces, and find basic heuristics
+
         idx = retrieve_best_request_match(
             target_request=request.__dict__, candidates=entries, post_data=post_data
         )
