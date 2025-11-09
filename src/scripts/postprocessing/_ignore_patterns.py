@@ -268,4 +268,8 @@ IGNORED_PATTERNS = [
     # ----
     "b.6sc.co",
     "trkn.us/pixel",
+    "new-sentry.gitlab.net",
+    "bizible.com",
+    "mutinyhq.io",
+    "qualified.com",
 ]

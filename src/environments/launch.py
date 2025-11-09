@@ -521,12 +521,10 @@ class ReplayBundle:
         # - when refreshing the page, then works, and shows the file
         # Eventbrite ✅
         # Qatar airways ✅
-        # Gitlab (Rate limit prob analytics matches)
-
-        # TODO: sometimes selector returns JSON instead of website contents, this should be handled.
+        # Gitlab NOT WORKING (it's prompt selection why?)
 
         idx = await retrieve_best_request_match(
-            target_request=request.__dict__, candidates=candidates, post_data=post_data
+            target_request=request, candidates=candidates
         )
         # NOTE: consider consumed indices (?)
         selected_entry = entries[idx]
