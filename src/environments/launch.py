@@ -305,13 +305,15 @@ class ReplayBundle:
         logger.info("[HAR REPLAY] Using HAR replay from %s", har_path)
 
         async def custom_route_handler(route: Route, request: Request) -> None:
-            await self.handle_requests(route, request, allow_network_fallback)
+            await self.handle_requests_with_no_exact_match(
+                route, request, allow_network_fallback
+            )
 
         await context.route("**/*", custom_route_handler)
         await context.route_from_har(str(har_path), not_found="fallback", update=False)
         await context.set_offline(True)
 
-    async def handle_requests(
+    async def handle_requests_with_no_exact_match(
         self,
         route: Route,
         request: Request,
@@ -321,6 +323,21 @@ class ReplayBundle:
             await route.abort()
             return
 
+        data = await self._obtain_request_candidates(
+            request, route, allow_network_fallback
+        )
+        if not data:
+            return
+
+        entries, method, shorter_url = data
+        entry = self._select_best_entry(request, entries, method, shorter_url)
+        await self._fulfill_request_with_entry_found(
+            request, entry, route, allow_network_fallback
+        )
+
+    async def _obtain_request_candidates(
+        self, request: Request, route: Route, allow_network_fallback: bool = False
+    ) -> List[dict] | None:
         method = request.method.upper()
         full_url = request.url
         shorter_url = full_url[:100] + "..." if len(full_url) > 100 else full_url
@@ -345,33 +362,40 @@ class ReplayBundle:
             return
 
         entries = [entry for _, entry in candidate_entries]
+        return entries, method, shorter_url
 
-        if len(entries) > 1:
-            logger.info(
-                f"Multiple HAR candidates ({len(entries)}) found for {method} {shorter_url}, using LM matching",
-            )
+    def _select_best_entry(
+        self, request: Request, entries: List[dict], method: str, shorter_url: str
+    ) -> dict:
+        if len(entries) == 1:
+            return entries[0]
 
-            try:
-                post_data = request.post_data
-            except Exception:
-                post_data = None
+        logger.info(
+            f"Multiple HAR candidates ({len(entries)}) found for {method} {shorter_url}, using LM matching",
+        )
+        try:
+            post_data = request.post_data
+        except Exception:
+            post_data = None
 
-            entry = None
-            # TODO: any obvious way to simplify and call less this? any heuristics? check the LM reasoning response.
-            # TODO: add some caching here in a JSON of matches that can be distributed later
-            # - how accurate is this? should barely fail
-            # ----- 1)
-            # TODO: now what websites are manual navigation failing? or collection
-            # TODO: if non, what's wrong with replay.py, why's sometimes not replaying as expected.
-            idx = retrieve_best_request_match(
-                target_request=request.__dict__, candidates=entries, post_data=post_data
-            )
-            entry = entries[idx]
-        else:
-            entry = entries[0]
-            logger.debug("✓ Single HAR candidate found for %s %s", method, shorter_url)
+        # TODO: any obvious way to simplify and call less this? any heuristics? check the LM reasoning response.
+        # TODO: add some caching here in a JSON of matches that can be distributed later
+        # - how accurate is this? should barely fail
+        # ----- 1)
+        # TODO: now what websites are manual navigation failing? or collection
+        # TODO: if non, what's wrong with replay.py, why's sometimes not replaying as expected.
+        idx = retrieve_best_request_match(
+            target_request=request.__dict__, candidates=entries, post_data=post_data
+        )
+        return entries[idx]
 
-        # Step 4: Fulfill the request with the selected entry
+    async def _fulfill_request_with_entry_found(
+        self,
+        request: Request,
+        entry: dict,
+        route: Route,
+        allow_network_fallback: bool = False,
+    ) -> None:
         # TODO: ensure this matches as expected
         response = entry.get("response", {})
         status = response.get("status", 200)
