@@ -29,6 +29,9 @@ IGNORED_PATTERNS = [
     "adtrafficquality.google",
     "googlesyndication.com",
     "googletagservices.com",
+    # TODO: need to find all of this that don't mean anything to match
+    # TODO: need to collect traces for LM matching, to amnually check where to expand.
+    "coursera.org/api/rest/v1/eventing/infobatch",
 ]
 no_ignore_patterns = [
     ".png",
