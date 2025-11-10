@@ -1,6 +1,9 @@
 import asyncio
 import logging
-import sys
+from typing import Optional
+
+import typer
+
 from browser.browser import StealthBrowser
 from browser.recorder import get_video_path
 from config.start import InitialTasks
@@ -29,7 +32,11 @@ logging.getLogger("peewee").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
-async def main(dev_mode: bool = False, dev_url: str = None):
+async def main(
+    dev_mode: bool = False,
+    dev_url: Optional[str] = None,
+    log_browser_console: bool = True,
+):
     """Main async function"""
     initial_tasks = InitialTasks()
 
@@ -70,7 +77,7 @@ async def main(dev_mode: bool = False, dev_url: str = None):
         logger.info(f"Task saved: {task_id}")
 
         print(f'🚀 Launching stealth browser for task: "{task_description}"...')
-        stealth_browser = StealthBrowser()
+        stealth_browser = StealthBrowser(log_browser_console=log_browser_console)
         page = await stealth_browser.launch()
 
         print("Browser launched successfully!")
@@ -86,7 +93,10 @@ async def main(dev_mode: bool = False, dev_url: str = None):
 
         print("\n" + "=" * 60)
         print("You can now navigate to any page and interact with it.")
-        print("Page events will be logged to the console.")
+        if log_browser_console:
+            print("Page events will be logged to the console.")
+        else:
+            print("Browser console logging is disabled.")
         print("=" * 60)
         print("\n💡 When you're done, press ENTER here to complete the task")
         print("=" * 60 + "\n")
@@ -119,21 +129,38 @@ async def main(dev_mode: bool = False, dev_url: str = None):
         await stealth_browser.close()
 
 
+def _cli(
+    dev: bool = typer.Option(
+        False,
+        "--dev",
+        help="Enable development mode with predefined task inputs.",
+    ),
+    dev_url: Optional[str] = typer.Option(
+        None,
+        "--dev-url",
+        help="URL to open automatically when running in development mode.",
+    ),
+    log_browser_console: bool = typer.Option(
+        True,
+        "--browser-console/--no-browser-console",
+        help="Toggle browser console logging in the terminal.",
+    ),
+) -> None:
+    """CLI implementation executed via Typer."""
+    if dev_url and not dev:
+        typer.secho(
+            "--dev-url requires --dev to be set.", fg=typer.colors.RED, err=True
+        )
+        raise typer.Exit(code=2)
+
+    asyncio.run(
+        main(dev_mode=dev, dev_url=dev_url, log_browser_console=log_browser_console)
+    )
+
+
 def cli():
     """CLI entry point for the web-envs command."""
-    # Parse command line arguments
-    dev_mode = False
-    dev_url = None
-
-    args = sys.argv[1:]  # Skip the script name
-
-    if args and args[0] == "--dev":
-        dev_mode = True
-        # Check if URL is provided after --dev
-        if len(args) > 1:
-            dev_url = args[1]
-
-    asyncio.run(main(dev_mode=dev_mode, dev_url=dev_url))
+    typer.run(_cli)
 
 
 if __name__ == "__main__":

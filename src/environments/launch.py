@@ -525,6 +525,8 @@ class ReplayBundle:
         # TODO: context closed sometimes trigger an error,
         # - Channel.send: Target page, context or browser has been closed
         # TODO: tab_visibility_changed multiple times in some websites, koa.com also happens. (kayak as well), foxsports, espn, everything?
+        # TODO: when multiple tabs open, close browser/finish task doesn't work (foxsports|soundcloud vs sixflags, this one works)
+        # TODO: soo many load events
 
         # TODO: too many requests going through retrieve_best_match, going out of tokens too fast, wtf.
         # TODO: _4_ script 429 rate limited

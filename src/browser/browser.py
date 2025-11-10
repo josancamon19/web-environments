@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class StealthBrowser:
-    def __init__(self):
+    def __init__(self, log_browser_console: bool = True):
         self.playwright = None
         self.context = None
         self.page = None
@@ -31,6 +31,7 @@ class StealthBrowser:
 
         self._binding_registered = False
         self._page_script_registered = False
+        self.log_browser_console = log_browser_console
 
     async def launch(self):
         """Launch stealth browser"""
@@ -88,7 +89,8 @@ class StealthBrowser:
                 return
             print(f"🌐 Browser console: {text}")
 
-        self.page.on("console", console_handler)
+        if self.log_browser_console:
+            self.page.on("console", console_handler)
 
         await self.apply_stealth_techniques()
         await self.setup_per_page_dom_listeners(self.page)
