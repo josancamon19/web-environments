@@ -1,11 +1,16 @@
 import json
+import asyncio
+import logging
+import re
 from typing import Any
 import os
 from pydantic import BaseModel, Field
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, RateLimitError
 from playwright.async_api import Request
 
 import mlflow
+
+logger = logging.getLogger(__name__)
 
 prompt_template = """
 You will be given a target request (as a JSON object via json.dumps), and a list of candidate requests (each also a JSON object via json.dumps) that we want to match the target request to.
@@ -92,25 +97,77 @@ def _get_request_string(i: int | None, request: Request | dict[str, Any]) -> str
 async def retrieve_best_request_match(
     target_request: Request | dict[str, Any],
     candidates: list[dict[str, Any]],
+    max_retries: int = 5,
 ) -> int:
+    if not candidates:
+        raise ValueError("candidates list cannot be empty")
+    
     # Serialize the request if it's a Playwright Request object
     candidate_strings = []
     for i, candidate in enumerate(candidates):
         candidate_strings.append(_get_request_string(i, candidate))
 
-    candidates = "\n\n".join(candidate_strings)
+    candidates_str = "\n\n".join(candidate_strings)
     prompt = prompt_template.format(
-        request=_get_request_string(None, target_request), candidates=candidates
+        request=_get_request_string(None, target_request), candidates=candidates_str
     )
 
-    # Call OpenAI API with structured outputs
-    response = await client.responses.parse(
-        model="gpt-5-nano",
-        reasoning={"effort": "minimal"},
-        input=[{"role": "user", "content": prompt}],
-        text_format=ResponseFormat,
-    )
+    # Retry logic with exponential backoff for rate limit errors
+    for attempt in range(max_retries):
+        try:
+            # Call OpenAI API with structured outputs
+            response = await client.responses.parse(
+                model="gpt-5-nano",
+                reasoning={"effort": "minimal"},
+                input=[{"role": "user", "content": prompt}],
+                text_format=ResponseFormat,
+            )
 
-    result = response.output_parsed
-    print(result)
-    return result.selected_match
+            result = response.output_parsed
+            print(result)
+            selected_idx = result.selected_match
+            
+            # Validate index is within bounds
+            if selected_idx < 0 or selected_idx >= len(candidates):
+                logger.warning("LLM returned invalid index %d (candidates: %d). Falling back to first candidate.", selected_idx, len(candidates))
+                return 0
+            
+            return selected_idx
+            
+        except RateLimitError as e:
+            # Extract retry_after from error message if available
+            retry_after = 1.0  # Default wait time in seconds
+            error_message = str(e)
+            
+            # Try to extract retry time from error message
+            if "try again in" in error_message:
+                try:
+                    # Extract time like "5.417s" or "24.709s"
+                    match = re.search(r"try again in ([\d.]+)s", error_message)
+                    if match:
+                        retry_after = float(match.group(1))
+                        # Add a small buffer
+                        retry_after = min(retry_after + 0.5, 30.0)  # Cap at 30 seconds
+                except (ValueError, AttributeError):
+                    pass
+            
+            if attempt < max_retries - 1:
+                # Exponential backoff, but cap at reasonable maximum
+                wait_time = min(retry_after * (2 ** attempt), 60.0)  # Cap at 60 seconds
+                logger.warning(
+                    "Rate limit error (attempt %d/%d). Retrying after %.2f seconds...", attempt + 1, max_retries, wait_time
+                )
+                await asyncio.sleep(wait_time)
+            else:
+                logger.error("Rate limit error after %d attempts. Falling back to first candidate.", max_retries)
+                # Fallback to first candidate when rate limits persist
+                return 0
+                
+        except Exception as e:
+            # For other errors, log and fall back
+            logger.error("Error calling OpenAI API: %s. Falling back to first candidate.", e)
+            return 0
+    
+    # Should not reach here, but just in case
+    logger.warning("All retries exhausted. Falling back to first candidate.")
+    return 0
