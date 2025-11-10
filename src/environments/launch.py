@@ -520,9 +520,8 @@ class ReplayBundle:
         # - when refreshing the page, then works, and shows the file
         # Eventbrite ✅
         # Qatar airways ✅
-        # Gitlab NOT WORKING (it's prompt selection why?)
-
-        # TODO: run tasks 1, 2 with ignored URLs finding and check still work.w3-reporting.reddit.com/policy
+        # Gitlab NOT WORKING (it's path selection?)
+        # Uniqlo, NOT working, limit rate, index error?
 
         idx = await retrieve_best_request_match(
             target_request=request, candidates=candidates

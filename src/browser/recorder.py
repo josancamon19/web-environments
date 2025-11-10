@@ -51,6 +51,8 @@ class Recorder:
         self.actual_page = ActualPage()
         self.step_manager = StepManager()
         self._cdp_session = None
+        self._last_screenshot_time = 0  # Throttle screenshots
+        self._last_screenshot_url = ""  # Prevent duplicate URL screenshots
 
     async def record_step(self, step_info: dict, omit_screenshot: bool = False):
         try:
@@ -65,7 +67,7 @@ class Recorder:
             event_type = event_info.get("event_type", "unknown")
             context = event_info.get("event_context", "unknown")
 
-            logger.info(f"[RECORD_STEP] Recording: {context}:{event_type}")
+            logger.info(f"[RECORD_STEP] {context}:{event_type}")
 
             context_type_action = f"{context}:{event_type}"
             context_type_action_formatted = context_type_action.replace(":", "_")
@@ -74,21 +76,17 @@ class Recorder:
                 actual_task.id, context_type_action_formatted
             )
 
-            # Determine if we should take a screenshot based on event type
+            # Get current page URL for filtering
             should_screenshot = self._should_take_screenshot(event_type)
-            logger.debug(
-                f"[RECORD_STEP] Event: {event_type}, Should screenshot: {should_screenshot}, Omit: {omit_screenshot}"
-            )
 
             actual_screenshot_path = ""
             if not omit_screenshot and should_screenshot:
-                logger.info(f"[RECORD_STEP] Taking screenshot for {event_type}")
                 try:
                     await self.take_screenshot(screenshot_path)
                     actual_screenshot_path = screenshot_path
-                    logger.info(f"[RECORD_STEP] Screenshot saved to {screenshot_path}")
+                    logger.info(f"[SCREENSHOT] {context_type_action_formatted}")
                 except Exception as e:
-                    logger.error(f"[RECORD_STEP] Screenshot failed: {e}")
+                    logger.error(f"[SCREENSHOT] Failed: {e}")
 
             # Extract event data safely
             event_data = self._normalize_event_data(event_info.get("event_data", {}))
@@ -151,42 +149,44 @@ class Recorder:
     def _should_take_screenshot(self, event_type: str) -> bool:
         """
         Determine if a screenshot should be taken for this event type.
-        Skip screenshots for rapid/continuous events to prevent browser jumping.
+        Skip screenshots for rapid/continuous events, tracking URLs, and about:blank.
         """
         # Events that should NOT trigger screenshots (high frequency events)
         skip_screenshot_events = {
-            "keydown",  # Individual key presses
-            "input",  # Text input events
-            "scroll",  # Scrolling events
-            "mousemove",  # Mouse movement
-            "mousedown",  # Mouse button down
-            "mouseup",  # Mouse button up
-            "pointerdown",  # Pointer down
-            "pointerup",  # Pointer up
-            "pointermove",  # Pointer movement
-            "hover",  # Hover events (too frequent, would cause performance issues)
+            "keydown",
+            "input",
+            "scroll",
+            "mousemove",
+            "mousedown",
+            "mouseup",
+            "pointerdown",
+            "pointerup",
+            "pointermove",
+            "hover",
+            "tab_visibility_changed",  # Tab switching events
         }
+
+        if event_type in skip_screenshot_events:
+            return False
 
         # Only take screenshots for significant events
         important_events = {
-            "click",  # User clicks
-            "load",  # Page load
-            "navigate_start",  # Navigation start
-            "navigated",  # Navigation complete
-            "domcontentloaded",  # DOM ready
-            "contextmenu",  # Right-click menu
-            "loaded",  # Page fully loaded
-            "back",  # Browser back/forward navigation
+            "click",
+            "loaded",  # Only fully loaded pages
+            "back",
         }
 
-        # Check if this is an event we should screenshot
+        # Throttle screenshots to prevent duplicates (max 1 per 500ms per URL)
+        current_time = time.time()
+        if current_time - self._last_screenshot_time < 0.5:
+            return False
+
+        # Check if this is an important event
         if event_type in important_events:
+            self._last_screenshot_time = current_time
             return True
-        elif event_type in skip_screenshot_events:
-            return False
-        else:
-            # Default to false for unknown events to be safe
-            return False
+
+        return False
 
     async def _get_cdp_session(self):
         """Get or create a reusable CDP session for the current page."""
@@ -202,8 +202,6 @@ class Recorder:
     async def take_screenshot(self, screenshot_path: str):
         """Take a screenshot using CDP to avoid visual flicker from Playwright's method."""
         try:
-            logger.debug("[SCREENSHOT] Starting CDP screenshot capture")
-
             # Reuse CDP session to avoid overhead of creating new sessions
             cdp_session = await self._get_cdp_session()
             screenshot_data = await cdp_session.send(
@@ -218,10 +216,8 @@ class Recorder:
             with open(screenshot_path, "wb") as f:
                 f.write(base64.b64decode(screenshot_data["data"]))
 
-            logger.debug("[SCREENSHOT] CDP screenshot captured successfully")
-
         except Exception as e:
-            logger.error(f"[SCREENSHOT] Failed to take CDP screenshot: {e}")
+            logger.warning(f"[SCREENSHOT] CDP failed, using fallback: {e}")
             # Reset CDP session on error in case it became stale
             self._cdp_session = None
 
@@ -230,9 +226,7 @@ class Recorder:
                 page = self.actual_page.get_page()
                 await page.screenshot(path=screenshot_path, full_page=False)
             except Exception as fallback_error:
-                logger.error(
-                    f"[SCREENSHOT] Fallback screenshot also failed: {fallback_error}"
-                )
+                logger.error(f"[SCREENSHOT] Fallback also failed: {fallback_error}")
                 raise
 
     def _parse_metadata(self, metadata: Any) -> Dict[str, Any]:

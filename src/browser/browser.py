@@ -41,8 +41,9 @@ class StealthBrowser:
 
         self.context = await self.launch_browser(task.id)
         await self.environment_capturer.start(self.context)
-        self.context.on("request", self.request_event_handler.listen)
-        self.context.on("response", self.response_event_handler.listen)
+        # Paused: Already collecting HAR, no need to save requests/responses to database
+        # self.context.on("request", self.request_event_handler.listen)
+        # self.context.on("response", self.response_event_handler.listen)
 
         # Ensure bindings/scripts for any subsequent pages/documents
         await self.setup_context_dom_listeners()
@@ -177,8 +178,8 @@ class StealthBrowser:
         logger.info("[CLOSE] Starting browser close sequence...")
 
         self.playwright_page_handler.detach_all_page_listeners()
-        self.context.remove_listener("request", self.request_event_handler.listen)
-        self.context.remove_listener("response", self.response_event_handler.listen)
+        # self.context.remove_listener("request", self.request_event_handler.listen)
+        # self.context.remove_listener("response", self.response_event_handler.listen)
 
         for page in self.context.pages:
             try:

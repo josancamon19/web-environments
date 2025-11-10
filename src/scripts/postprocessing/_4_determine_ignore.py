@@ -282,7 +282,6 @@ def process_task(task_dir: Path) -> dict:
 
 def main():
     """Process all task directories in parallel."""
-    # No need to configure dspy anymore - using OpenAI client directly
 
     # Optional: Set up MLflow tracking if needed
     # import mlflow
