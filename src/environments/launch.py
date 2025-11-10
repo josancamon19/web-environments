@@ -291,7 +291,9 @@ class ReplayBundle:
         self, *, include_storage_state: bool = False
     ) -> Dict[str, Any]:
         """Prepare context configuration, optionally including storage state."""
-        context_config = dict(self.environment.get("context_config") or {**CONTEXT_CONFIG})
+        context_config = dict(
+            self.environment.get("context_config") or {**CONTEXT_CONFIG}
+        )
 
         if include_storage_state:
             storage_state_path = self._storage_state_path()
@@ -348,6 +350,10 @@ class ReplayBundle:
 
         entries, method, shorter_url = data
         entry = await self._select_best_entry(request, entries, method, shorter_url)
+        if not entry:
+            await route.abort()
+            return
+
         await self._fulfill_request_with_entry_found(
             request, entry, route, allow_network_fallback
         )
@@ -527,6 +533,9 @@ class ReplayBundle:
         idx = await retrieve_best_request_match(
             target_request=request, candidates=candidates
         )
+        if idx is None:
+            return None
+
         # NOTE: consider consumed indices (?)
         selected_entry = entries[idx]
 

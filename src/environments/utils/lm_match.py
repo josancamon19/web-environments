@@ -1,6 +1,7 @@
 import json
 from typing import Any
 import os
+import openai
 from pydantic import BaseModel, Field
 from openai import AsyncOpenAI
 from playwright.async_api import Request
@@ -92,7 +93,7 @@ def _get_request_string(i: int | None, request: Request | dict[str, Any]) -> str
 async def retrieve_best_request_match(
     target_request: Request | dict[str, Any],
     candidates: list[dict[str, Any]],
-) -> int:
+) -> int | None:
     # Serialize the request if it's a Playwright Request object
     candidate_strings = []
     for i, candidate in enumerate(candidates):
@@ -104,12 +105,18 @@ async def retrieve_best_request_match(
     )
 
     # Call OpenAI API with structured outputs
-    response = await client.responses.parse(
-        model="gpt-5-nano",
-        reasoning={"effort": "minimal"},
-        input=[{"role": "user", "content": prompt}],
-        text_format=ResponseFormat,
-    )
+    try:
+        response = await client.responses.parse(
+            model="gpt-5-nano",
+            reasoning={"effort": "minimal"},
+            input=[{"role": "user", "content": prompt}],
+            text_format=ResponseFormat,
+        )
+    except openai.RateLimitError:
+        # TODO: what to do with this requests
+        # - feels like most of them are anyways skippable, even/track based
+        print(f"Rate Limit Error: tokens ≈ {len(prompt) / 4}")
+        return None
 
     result = response.output_parsed
     print(result)
