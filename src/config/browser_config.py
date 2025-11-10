@@ -30,7 +30,6 @@ BROWSER_ARGS = [
     "--disable-sync",
     "--disable-web-security",
     "--metrics-recording-only",
-    "--no-first-run",
     "--safebrowsing-disable-auto-update",
     "--enable-automation=false",
     "--password-store=basic",
@@ -40,7 +39,6 @@ BROWSER_ARGS = [
 
 CONTEXT_CONFIG = {
     "viewport": {"width": 1366, "height": 768},
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "locale": "en-US",
     "timezone_id": "America/New_York",
     "permissions": ["geolocation"],
