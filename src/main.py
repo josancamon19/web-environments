@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import sys
 from browser.browser import StealthBrowser
 from browser.recorder import get_video_path
 from config.start import InitialTasks
@@ -28,7 +29,7 @@ logging.getLogger("peewee").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
-async def main():
+async def main(dev_mode: bool = False, dev_url: str = None):
     """Main async function"""
     initial_tasks = InitialTasks()
 
@@ -36,10 +37,25 @@ async def main():
     print("Initial tasks completed")
 
     # Get task source, type, description and website from user
-    source = get_source_from_user()
-    task_type = get_task_type_from_user()
-    task_description = get_task_description_from_user()
-    website = get_website_from_user()
+    if dev_mode:
+        # Dev mode: use default values
+        source = "mind2web"  # option 6
+        task_type = "action"  # option 1
+        task_description = "test task"
+        website = dev_url if dev_url else "url"
+
+        print("🔧 DEV MODE ENABLED")
+        print("=" * 60)
+        print(f"Source: {source}")
+        print(f"Task Type: {task_type}")
+        print(f"Description: {task_description}")
+        print(f"Website: {website}")
+        print("=" * 60 + "\n")
+    else:
+        source = get_source_from_user()
+        task_type = get_task_type_from_user()
+        task_description = get_task_description_from_user()
+        website = get_website_from_user()
 
     try:
         # Get TaskManager singleton instance
@@ -55,9 +71,18 @@ async def main():
 
         print(f'🚀 Launching stealth browser for task: "{task_description}"...')
         stealth_browser = StealthBrowser()
-        await stealth_browser.launch()
+        page = await stealth_browser.launch()
 
         print("Browser launched successfully!")
+
+        # Navigate to URL if dev mode and URL provided
+        if dev_mode and dev_url:
+            print(f"🌐 Navigating to {dev_url}...")
+            try:
+                await page.goto(dev_url, wait_until="domcontentloaded", timeout=30000)
+                print(f"✅ Navigated to {dev_url}")
+            except Exception as e:
+                print(f"⚠️  Warning: Could not navigate to {dev_url}: {e}")
 
         print("\n" + "=" * 60)
         print("You can now navigate to any page and interact with it.")
@@ -96,7 +121,19 @@ async def main():
 
 def cli():
     """CLI entry point for the web-envs command."""
-    asyncio.run(main())
+    # Parse command line arguments
+    dev_mode = False
+    dev_url = None
+
+    args = sys.argv[1:]  # Skip the script name
+
+    if args and args[0] == "--dev":
+        dev_mode = True
+        # Check if URL is provided after --dev
+        if len(args) > 1:
+            dev_url = args[1]
+
+    asyncio.run(main(dev_mode=dev_mode, dev_url=dev_url))
 
 
 if __name__ == "__main__":
