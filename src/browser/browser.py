@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 from playwright.async_api import BrowserContext, async_playwright
-from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG
+from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG, IGNORE_DEFAULT_ARGS
 from config.browser_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
 from browser.recorder import Recorder, get_video_path
 from browser.page import ActualPage
@@ -199,17 +199,12 @@ class StealthBrowser:
         preferred_channel = (
             os.environ.get("RECORDER_BROWSER_CHANNEL", "chrome").strip() or None
         )
-        ignore_default_args = [
-            "--enable-automation",
-            "--use-mock-keychain",
-            "--password-store=basic",
-        ]
 
         browser = await self.playwright.chromium.launch(
             channel=preferred_channel,
             headless=False,
             args=BROWSER_ARGS,
-            ignore_default_args=ignore_default_args,
+            ignore_default_args=IGNORE_DEFAULT_ARGS,
         )
 
         self.context = await browser.new_context(
