@@ -4,6 +4,7 @@ import logging
 import re
 from typing import Any
 import os
+import openai
 from pydantic import BaseModel, Field
 from openai import AsyncOpenAI, RateLimitError
 from playwright.async_api import Request
