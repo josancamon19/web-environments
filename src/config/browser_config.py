@@ -49,7 +49,6 @@ CONTEXT_CONFIG = {
     "extra_http_headers": {
         "Accept-Language": "en-US,en;q=0.9",
         "Accept-Encoding": "gzip, deflate, br",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
         "Upgrade-Insecure-Requests": "1",
         "Sec-Fetch-Site": "none",
         "Sec-Fetch-Mode": "navigate",
@@ -57,3 +56,9 @@ CONTEXT_CONFIG = {
         "Sec-Fetch-Dest": "document",
     },
 }
+
+IGNORE_DEFAULT_ARGS = [
+    "--enable-automation",
+    "--use-mock-keychain",
+    "--password-store=basic",
+]

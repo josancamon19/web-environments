@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qsl
 from typing import Any, Dict, List, Optional, Set
 
+from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG, IGNORE_DEFAULT_ARGS
 from environments.utils.lm_match import retrieve_best_request_match
 
 from scripts.postprocessing._4_determine_ignore import should_ignore_url
@@ -280,7 +281,7 @@ class ReplayBundle:
         context_config = self.get_context_config(
             include_storage_state=include_storage_state
         )
-        context = await browser.new_context(**context_config)
+        context = await browser.new_context(**context_config, bypass_csp=True)
         await self.configure_context(
             context, allow_network_fallback=allow_network_fallback
         )
@@ -290,7 +291,7 @@ class ReplayBundle:
         self, *, include_storage_state: bool = False
     ) -> Dict[str, Any]:
         """Prepare context configuration, optionally including storage state."""
-        context_config = dict(self.environment.get("context_config") or {})
+        context_config = dict(self.environment.get("context_config") or {**CONTEXT_CONFIG})
 
         if include_storage_state:
             storage_state_path = self._storage_state_path()
@@ -651,7 +652,12 @@ async def _cli(
     )
 
     async with async_playwright() as pw:
-        launch_kwargs: Dict[str, Any] = {"headless": headless, "channel": channel}
+        launch_kwargs: Dict[str, Any] = {
+            "headless": headless,
+            "channel": channel,
+            "args": BROWSER_ARGS,
+            "ignore_default_args": IGNORE_DEFAULT_ARGS,
+        }
         browser = await pw.chromium.launch(**launch_kwargs)
         context = await bundle.build_context(
             browser,
