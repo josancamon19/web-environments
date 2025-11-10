@@ -71,29 +71,43 @@ def _serialize_request(request: Request | dict[str, Any]) -> dict[str, Any]:
     return serialized
 
 
+def _get_request_string(i: int | None, request: Request | dict[str, Any]) -> str:
+    serialized = _serialize_request(request)
+    method = serialized.get("method", "")
+    url = serialized.get("url", "")
+    resource_type = serialized.get("resourceType", "")
+    headers = serialized.get("headers", "")
+    post_data = serialized.get("postData", "")
+
+    candidate_str = (
+        f"{str(i) if i is not None else ''} {method} {url} ({resource_type})"
+    )
+    candidate_str += f"\n- headers:\n{json.dumps(headers, indent=2)}"
+    if post_data:
+        candidate_str += f"\n- post data:\n{post_data}"
+
+    return candidate_str
+
+
 async def retrieve_best_request_match(
     target_request: Request | dict[str, Any],
     candidates: list[dict[str, Any]],
 ) -> int:
     # Serialize the request if it's a Playwright Request object
-    serialized_request = _serialize_request(target_request)
-    candidates = [_serialize_request(candidate) for candidate in candidates]
+    candidate_strings = []
+    for i, candidate in enumerate(candidates):
+        candidate_strings.append(_get_request_string(i, candidate))
+
+    candidates = "\n\n".join(candidate_strings)
     prompt = prompt_template.format(
-        request=json.dumps(serialized_request),
-        candidates=json.dumps(candidates, indent=2),
+        request=_get_request_string(None, target_request), candidates=candidates
     )
 
     # Call OpenAI API with structured outputs
     response = await client.responses.parse(
         model="gpt-5-nano",
         reasoning={"effort": "minimal"},
-        input=[
-            {
-                "role": "system",
-                "content": "You are a helpful assistant that matches HTTP requests.",
-            },
-            {"role": "user", "content": prompt},
-        ],
+        input=[{"role": "user", "content": prompt}],
         text_format=ResponseFormat,
     )
 
