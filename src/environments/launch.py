@@ -512,24 +512,17 @@ class ReplayBundle:
         )
 
         candidates = [entry.get("request", {}) for entry in entries]
-
-        # TODO: doesn't seem to be failing when I explore a route that was not recorded
-        # - cause it's always trying to find a match
+        # NOTE: doesn't seem to be failing when I explore a route that was not recorded (cause it's always trying to find a match)
 
         # TODO: what if 2FA, it should still work, right?
         # TODO: do websites that require sign in, like spotify, gmail, etc.
 
-        # ✅ Reddit, Uniqlo, Gitlab, Github, EventBrite, Qatar airways, United, ticketcenter
-        # NOTE: tvguide.com is shit, has a bunch of spamming tracking that ends up :load states
-        # TODO: page:load, tab_visibility_changed alway lasts events in db recording
-        # TODO: context closed sometimes trigger an error,
-        # - Channel.send: Target page, context or browser has been closed
-        # TODO: tab_visibility_changed multiple times in some websites, koa.com also happens. (kayak as well), foxsports, espn, everything?
-        # TODO: when multiple tabs open, close browser/finish task doesn't work (foxsports|soundcloud vs sixflags, this one works)
-        # TODO: soo many load events
-
+        # ====
         # TODO: too many requests going through retrieve_best_match, going out of tokens too fast, wtf.
         # TODO: _4_ script 429 rate limited
+        # TODO: systematic analysis on collected, as launched trajectories, repeat, repeat.
+        # - then run agent launched on sandbox
+        # - then explore depth and replay need to work I think.
 
         idx = await retrieve_best_request_match(
             target_request=request, candidates=candidates

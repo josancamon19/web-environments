@@ -12,6 +12,7 @@ from db.task import TaskManager
 from browser.handlers.request_event import RequestEvent
 from browser.handlers.response_event import ResponseEvent
 from environments.capture import OfflineCaptureManager
+from playwright_stealth import Stealth
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,10 @@ class StealthBrowser:
         self._binding_registered = False
         self._page_script_registered = False
         self.log_browser_console = log_browser_console
+        self.stealth = Stealth(
+            # script_logging=True,
+            # navigator_languages_override=("fr-FR", "fr")
+        )
 
     async def launch(self):
         """Launch stealth browser"""
@@ -41,6 +46,13 @@ class StealthBrowser:
         task = task_manager.get_current_task()
 
         self.context = await self.launch_browser(task.id)
+        # Apply stealth to the entire context - all pages created will have stealth applied
+        print(
+            f"🔐 Applying stealth with {len(self.stealth.script_payload)} characters of script payload..."
+        )
+        await self.stealth.apply_stealth_async(self.context)
+        print("✅ Stealth applied to context")
+
         await self.environment_capturer.start(self.context)
         # Paused: Already collecting HAR, no need to save requests/responses to database
         # self.context.on("request", self.request_event_handler.listen)
@@ -92,7 +104,8 @@ class StealthBrowser:
         if self.log_browser_console:
             self.page.on("console", console_handler)
 
-        await self.apply_stealth_techniques()
+        # print(f"languages = {await self.page.evaluate('navigator.languages')}")
+
         await self.setup_per_page_dom_listeners(self.page)
 
         return self.page
