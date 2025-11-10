@@ -182,6 +182,7 @@ class StealthBrowser:
         # self.context.remove_listener("response", self.response_event_handler.listen)
 
         for page in self.context.pages:
+            # await page.close()
             try:
                 await page.goto("about:blank", timeout=1000, wait_until="commit")
             except Exception:

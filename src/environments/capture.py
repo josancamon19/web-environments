@@ -276,6 +276,11 @@ class OfflineCaptureManager:
         body_data = await self._process_response_body(response)
         resource_id = await self._generate_resource_id()
 
+        try:
+            request_frame_url = request.frame.url
+        except Exception:
+            request_frame_url = None
+
         # Build resource entry
         entry = {
             "id": resource_id,
@@ -283,7 +288,7 @@ class OfflineCaptureManager:
             "url": url,
             "method": request.method,
             "resource_type": request.resource_type,
-            "frame_url": request.frame.url if request.frame else None,
+            "frame_url": request_frame_url,
             "initiator": request_headers.get("referer")
             or request_headers.get("Referer"),
             "status": response.status,

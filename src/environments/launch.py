@@ -519,16 +519,15 @@ class ReplayBundle:
         # TODO: what if 2FA, it should still work, right?
         # TODO: do websites that require sign in, like spotify, gmail, etc.
 
-        # Reddit
-        # - fails on collection (says "retry", "failed", etc)
-        # - triggers RateLimits OpenAI API.
-        # Github
-        # - When opening a file details, it says return to repo overview
-        # - when refreshing the page, then works, and shows the file
-        # Eventbrite ✅
-        # Qatar airways ✅
-        # Gitlab NOT WORKING (it's path selection?)
-        # Uniqlo, NOT working, limit rate, index error?
+        # ✅ Reddit, Uniqlo, Gitlab, Github, EventBrite, Qatar airways, United, ticketcenter
+        # NOTE: tvguide.com is shit, has a bunch of spamming tracking that ends up :load states
+        # TODO: page:load, tab_visibility_changed alway lasts events in db recording
+        # TODO: context closed sometimes trigger an error,
+        # - Channel.send: Target page, context or browser has been closed
+        # TODO: tab_visibility_changed multiple times in some websites, koa.com also happens. (kayak as well), foxsports, espn, everything?
+
+        # TODO: too many requests going through retrieve_best_match, going out of tokens too fast, wtf.
+        # TODO: _4_ script 429 rate limited
 
         idx = await retrieve_best_request_match(
             target_request=request, candidates=candidates
