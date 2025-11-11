@@ -5,7 +5,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urlparse, parse_qsl
+from urllib.parse import urlparse
 from typing import Any, Dict, List, Optional, Set
 
 from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG, IGNORE_DEFAULT_ARGS
@@ -24,49 +24,11 @@ from db.step import StepManager
 
 from environments.replay import TaskStepExecutor
 from config.storage import DATA_DIR
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
-
-
-def most_relevant_entry(entries: List[dict], request_url: str) -> dict:
-    """Find the most relevant entry based on the number of overlapping parameters."""
-    if not entries:
-        raise ValueError("entries list cannot be empty")
-
-    if len(entries) == 1:
-        return entries[0]
-
-    # Parse request URL once for reuse
-    request_parsed = urlparse(request_url)
-    request_params = dict(parse_qsl(request_parsed.query))
-    request_fragment_params = dict(parse_qsl(request_parsed.fragment))
-
-    overlap_entries = []
-    for entry in entries:
-        entry_url = entry.get("request", {}).get("url", "")
-        entry_parsed = urlparse(entry_url)
-        entry_params = dict(parse_qsl(entry_parsed.query))
-        entry_fragment_params = dict(parse_qsl(entry_parsed.fragment))
-
-        # Count overlapping query parameters
-        param_overlap = sum(
-            1
-            for k in request_params
-            if k in entry_params and entry_params[k] == request_params[k]
-        )
-
-        # Count overlapping fragment parameters
-        fragment_overlap = sum(
-            1
-            for k in request_fragment_params
-            if k in entry_fragment_params
-            and entry_fragment_params[k] == request_fragment_params[k]
-        )
-
-        overlap_entries.append((entry, param_overlap + fragment_overlap))
-
-    overlap_entries.sort(key=lambda x: x[1], reverse=True)
-    return overlap_entries[0][0]
 
 
 class ReplayBundle:
@@ -374,6 +336,7 @@ class ReplayBundle:
 
         if not candidate_entries:
             ignore_log = [".woff", ".jpg", ".gif", ".png", ".svg", ".ico"]
+            # TODO: is this correct?
             if any(ignore_pattern in request.url for ignore_pattern in ignore_log):
                 await route.abort()
                 return
@@ -395,6 +358,7 @@ class ReplayBundle:
         e.g. amazon requests css/js/media for the same endpoint in different order, so char based helps with matching.
         """
         # TODO: it seems like this is even better than the initial baseline
+        # TODO: should consider request body maybe?
         target_chars = {}
         for char in full_url:
             target_chars[char] = target_chars.get(char, 0) + 1

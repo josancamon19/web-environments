@@ -7,10 +7,12 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from pydantic import BaseModel, Field
 from openai import OpenAI
+from dotenv import load_dotenv
 
 from config.storage import DATA_DIR
 from scripts.postprocessing._ignore_patterns import IGNORED_PATTERNS
 
+load_dotenv()
 
 # TODO: need to find all of this that don't mean anything to match
 # TODO: need to collect traces for LM matching, to amnually check where to expand.

@@ -4,13 +4,14 @@ import logging
 import re
 from typing import Any
 import os
-import openai
 from pydantic import BaseModel, Field
 from openai import AsyncOpenAI, RateLimitError
 from playwright.async_api import Request
 
 import mlflow
+from dotenv import load_dotenv
 
+load_dotenv()
 logger = logging.getLogger(__name__)
 
 prompt_template = """
@@ -102,7 +103,7 @@ async def retrieve_best_request_match(
 ) -> int:
     if not candidates:
         raise ValueError("candidates list cannot be empty")
-    
+
     # Serialize the request if it's a Playwright Request object
     candidate_strings = []
     for i, candidate in enumerate(candidates):
@@ -125,21 +126,25 @@ async def retrieve_best_request_match(
             )
 
             result = response.output_parsed
-            print(result)
+            # print(result)
             selected_idx = result.selected_match
-            
+
             # Validate index is within bounds
             if selected_idx < 0 or selected_idx >= len(candidates):
-                logger.warning("LLM returned invalid index %d (candidates: %d). Falling back to first candidate.", selected_idx, len(candidates))
+                logger.warning(
+                    "LLM returned invalid index %d (candidates: %d). Falling back to first candidate.",
+                    selected_idx,
+                    len(candidates),
+                )
                 return 0
-            
+
             return selected_idx
-            
+
         except RateLimitError as e:
             # Extract retry_after from error message if available
             retry_after = 1.0  # Default wait time in seconds
             error_message = str(e)
-            
+
             # Try to extract retry time from error message
             if "try again in" in error_message:
                 try:
@@ -151,24 +156,32 @@ async def retrieve_best_request_match(
                         retry_after = min(retry_after + 0.5, 30.0)  # Cap at 30 seconds
                 except (ValueError, AttributeError):
                     pass
-            
+
             if attempt < max_retries - 1:
                 # Exponential backoff, but cap at reasonable maximum
-                wait_time = min(retry_after * (2 ** attempt), 60.0)  # Cap at 60 seconds
+                wait_time = min(retry_after * (2**attempt), 60.0)  # Cap at 60 seconds
                 logger.warning(
-                    "Rate limit error (attempt %d/%d). Retrying after %.2f seconds...", attempt + 1, max_retries, wait_time
+                    "Rate limit error (attempt %d/%d). Retrying after %.2f seconds...",
+                    attempt + 1,
+                    max_retries,
+                    wait_time,
                 )
                 await asyncio.sleep(wait_time)
             else:
-                logger.error("Rate limit error after %d attempts. Falling back to first candidate.", max_retries)
+                logger.error(
+                    "Rate limit error after %d attempts. Falling back to first candidate.",
+                    max_retries,
+                )
                 # Fallback to first candidate when rate limits persist
                 return 0
-                
+
         except Exception as e:
             # For other errors, log and fall back
-            logger.error("Error calling OpenAI API: %s. Falling back to first candidate.", e)
+            logger.error(
+                "Error calling OpenAI API: %s. Falling back to first candidate.", e
+            )
             return 0
-    
+
     # Should not reach here, but just in case
     logger.warning("All retries exhausted. Falling back to first candidate.")
     return 0
