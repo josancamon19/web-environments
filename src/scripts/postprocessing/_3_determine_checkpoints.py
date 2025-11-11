@@ -1,9 +1,7 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
 from typing import List
 
-import mlflow
 from pydantic import BaseModel, Field
 
 from src.config.storage import DATA_DIR
@@ -36,6 +34,7 @@ def extract_checkpoints(
         model="gpt-5",
         reasoning="high",
         text_format=CheckpointExtractionResult,
+        group_logging=True,
         task_description=task_description,
         steps_taken=steps_str,
         num_checkpoints=num_checkpoints,
@@ -46,12 +45,6 @@ def extract_checkpoints(
 
 
 def main():
-    mlflow.set_tracking_uri("http://127.0.0.1:5000")
-    mlflow.set_experiment(
-        f"extract-checkpoints-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
-    )
-    mlflow.openai.autolog()
-
     with open(DATA_DIR / "tasks.jsonl", "r") as f:
         tasks = [json.loads(line) for line in f if line.strip()]
 

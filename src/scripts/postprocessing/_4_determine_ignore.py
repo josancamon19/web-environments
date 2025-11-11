@@ -83,6 +83,7 @@ def process_url_batch(batch_data: tuple) -> set:
             prompt_name="determine_ignore",
             model="gpt-5",
             reasoning="high",
+            group_logging=True,
             text_format=ExtractNonRelevant,
             url_list=url_list,
         )
@@ -252,16 +253,6 @@ def process_task(task_dir: Path) -> dict:
 
 def main():
     """Process all task directories in parallel."""
-
-    # Optional: Set up MLflow tracking if needed
-    # import mlflow
-    # from datetime import datetime
-    # mlflow.set_tracking_uri("http://127.0.0.1:5000")
-    # mlflow.set_experiment(
-    #     f"determine-ignore-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
-    # )
-    # mlflow.openai.autolog()
-
     # Find all task directories
     captures_dir = DATA_DIR / "captures"
     if not captures_dir.exists():

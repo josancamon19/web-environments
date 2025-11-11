@@ -4,15 +4,9 @@ from typing import Any
 from pydantic import BaseModel, Field
 from playwright.async_api import Request
 
-import mlflow
-
 from utils.oai import openai_structured_output_request_async
 
 logger = logging.getLogger(__name__)
-
-mlflow.set_tracking_uri("http://127.0.0.1:5000")
-mlflow.set_experiment("lm-match")
-mlflow.openai.autolog()
 
 
 class ResponseFormat(BaseModel):
@@ -22,7 +16,6 @@ class ResponseFormat(BaseModel):
 
 
 # TODO: sometimes selector returns JSON instead of website contents, this should be handled.
-# TODO: collect traces
 
 
 def _serialize_request(request: Request | dict[str, Any]) -> dict[str, Any]:
@@ -92,6 +85,7 @@ async def retrieve_best_request_match(
             model="gpt-5-nano",
             reasoning="minimal",
             text_format=ResponseFormat,
+            auto_set_experiment=True,
             request=request_str,
             candidates=candidates_str,
         )

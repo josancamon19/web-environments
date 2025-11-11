@@ -1,9 +1,7 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
 from typing import List, Dict
 
-import mlflow
 from pydantic import BaseModel, Field
 
 from src.config.storage import DATA_DIR
@@ -42,6 +40,7 @@ def extract_credentials_from_trajectory(
         prompt_name="extract_credentials",
         model="gpt-5",
         reasoning="medium",
+        group_logging=True,
         text_format=CredentialExtractionResult,
         task_description=task_description,
         trajectory=trajectory_str,
@@ -54,12 +53,6 @@ def extract_credentials_from_trajectory(
 
 
 def main():
-    mlflow.set_tracking_uri("http://127.0.0.1:5000")
-    mlflow.set_experiment(
-        f"extract-credentials-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
-    )
-    mlflow.openai.autolog()
-
     with open(DATA_DIR / "tasks.jsonl", "r") as f:
         tasks = [json.loads(line) for line in f if line.strip()]
 
