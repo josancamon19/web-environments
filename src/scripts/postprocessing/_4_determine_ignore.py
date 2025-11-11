@@ -1,18 +1,14 @@
 # cleanup HAR
 
 import json
-import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from pydantic import BaseModel, Field
-from openai import OpenAI
-from dotenv import load_dotenv
 
 from config.storage import DATA_DIR
 from scripts.postprocessing._ignore_patterns import IGNORED_PATTERNS
-
-load_dotenv()
+from utils.oai import openai_structured_output_request
 
 # TODO: need to find all of this that don't mean anything to match
 # TODO: need to collect traces for LM matching, to amnually check where to expand.
@@ -32,30 +28,6 @@ no_ignore_patterns = [
     ".ico",
     "jquery",
 ]
-PROMPT = """You are analyzing HTTP requests from HAR recordings to identify requests that are not relevant for website functionality or user experience.
-
-These typically include:
-- Analytics services (Google Analytics, Adobe Analytics, etc.)
-- Advertisement networks and trackers
-- Social media tracking pixels
-- Tag managers that don't affect core functionality
-- Third-party monitoring and metrics services
-
-However, DO NOT ignore:
-- Core API requests needed for functionality
-- Authentication/session management requests
-- Content delivery requests (images, CSS, fonts, media files)
-- WebSocket connections for real-time features
-- Any requests that directly contribute to user-visible content or interactions
-
-Analyze the following URLs from a HAR recording and identify which ones are NOT relevant for website functionality or user experience.
-
-Return the indices (0-based) of URLs that can be safely ignored during replay.
-
-URLs to analyze:
-{url_list}
-
-Select the indices of URLs that we can ignore during the replay of the trajectory without affecting the website functionality or experience."""
 
 _compiled_patterns = []
 for pattern in IGNORED_PATTERNS:
@@ -100,25 +72,21 @@ class ExtractNonRelevant(BaseModel):
     )
 
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-
-
 def process_url_batch(batch_data: tuple) -> set:
     batch_urls, batch_original_indices, batch_idx = batch_data
 
     try:
         # Format URLs with indices
         url_list = "\n".join([f"{i}: {url}" for i, url in enumerate(batch_urls)])
-        prompt = PROMPT.format(url_list=url_list)
-        response = client.responses.parse(
+
+        result = openai_structured_output_request(
+            prompt_name="determine_ignore",
             model="gpt-5",
-            reasoning={"effort": "high"},
-            input=[{"role": "user", "content": prompt}],
+            reasoning="high",
             text_format=ExtractNonRelevant,
+            url_list=url_list,
         )
 
-        result = response.output_parsed
         lm_ignored_batch = set(result.non_relevant_indices)
 
         # Map batch indices back to original indices

@@ -1,0 +1,24 @@
+You are analyzing HTTP requests from HAR recordings to identify requests that are not relevant for website functionality or user experience.
+
+These typically include:
+- Analytics services (Google Analytics, Adobe Analytics, etc.)
+- Advertisement networks and trackers
+- Social media tracking pixels
+- Tag managers that don't affect core functionality
+- Third-party monitoring and metrics services
+
+However, DO NOT ignore:
+- Core API requests needed for functionality
+- Authentication/session management requests
+- Content delivery requests (images, CSS, fonts, media files)
+- WebSocket connections for real-time features
+- Any requests that directly contribute to user-visible content or interactions
+
+Analyze the following URLs from a HAR recording and identify which ones are NOT relevant for website functionality or user experience.
+
+Return the indices (0-based) of URLs that can be safely ignored during replay.
+
+URLs to analyze:
+{url_list}
+
+Select the indices of URLs that we can ignore during the replay of the trajectory without affecting the website functionality or experience.

@@ -1,0 +1,17 @@
+You will be given a target request (as a JSON object via json.dumps), and a list of candidate requests (each also a JSON object via json.dumps) that we want to match the target request to.
+
+The current request comes from a browser replaying a human trajectory. The candidates are HAR request entries, collected in a previous HAR capture, that are similar to the target request.
+
+Your task is to identify the best candidate that matches the target request. To do this, compare the various fields in the target request and each candidate request. Give special attention to fields that typically stay consistent (such as HTTP method, path, core headers, etc.), but deprioritize fields known to change frequently (like dynamic URL parameters or POST data values).
+
+Choose the candidate that is the closest logical match, preferring candidates where stable fields align and dynamic/noisy fields account for most of the differences.
+
+Return the index of the selected match.
+
+<target_request>
+{request}
+</target_request>
+
+<candidates>
+{candidates}
+</candidates>
