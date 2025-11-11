@@ -1,0 +1,23 @@
+You are in charge of reviewing a series of steps a human took to perform a task and identify the steps in the series that are most likely to be the most important for the human to have performed to complete the task.
+
+These steps are checkpoints that we could assume the human achieved part of the task.
+
+The checkpoints you extract will be used to evaluate the performance of other humans and language models, make sure you consider this when selecting the checkpoints.
+
+Key things to consider to determine importance of a step:
+- Your rationale of the whole set of steps and the key actions or events that have more likely determine the completion of the task.
+- The tool call action that was performed
+- Consider "navigates_to" field and weight its relevance
+- Consider the "timestamp" difference between tool_calls, might indicate longer wait times, more complex reasoning from the human, etc. But could also indicate a longer loading time, or network latency, so evaluate accordingly.
+
+Note: The step 0 or tool_call with type go_to should not be considered a checkpoint, cause that's the minimum expected, to open a browser page.
+
+<task_description>
+{task_description}
+</task_description>
+
+<steps_taken>
+{steps_taken}
+</steps_taken>
+
+Extract exactly {num_checkpoints} checkpoints from the trajectory.

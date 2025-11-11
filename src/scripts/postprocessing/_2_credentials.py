@@ -1,79 +1,51 @@
-from dataclasses import dataclass, field, asdict
 import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import List, Dict
 
-import dspy
 import mlflow
+from pydantic import BaseModel, Field
 
 from src.config.storage import DATA_DIR
-from src.models import BaseToolCallData
+from utils.oai import openai_structured_output_request
 
 
-@dataclass
-class Credential:
-    website: str = field(default="")
-    fields: Dict[str, str] = field(default_factory=dict)
-    tool_call_ids: List[int] = field(default_factory=list)
+class Credential(BaseModel):
+    website: str = Field(
+        default="", description="The website domain (e.g., amazon.com)"
+    )
+    fields: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Dictionary of credential field names to values",
+    )
+    tool_call_ids: List[int] = Field(
+        default_factory=list,
+        description="IDs of tool calls that entered these credentials",
+    )
 
 
-def get_credential_extractor():
-    class CredentialExtractor(dspy.Signature):
-        """
-        You are in charge of reviewing a series of steps a human took to perform a task and identify any credentials
-        (login information) that were entered during the task execution.
-
-        Credentials can include:
-        - Email addresses
-        - Passwords
-        - Usernames
-        - Phone numbers
-
-        Your goal is to extract these credentials and associate them with the correct website.
-
-        Key things to consider:
-        - Look for "type" actions where text is being entered into login/authentication forms
-        - Identify the website from the URL in "go_to" actions or "navigates_to" fields
-        - Extract the base domain (e.g., "amazon.com")
-        - Determine what type of credential field it is based on the selector and context
-        - Common field indicators: "email", "username", "password", "phone", "user", "pwd", "pass"
-        - Note: Empty strings or placeholder text should NOT be considered credentials
-        - Associate the credential with the tool call(s) that performed the action, by including those ids in the tool_call_ids field.
-        """
-
-        task_description: str = dspy.InputField(
-            description="The description of the task"
-        )
-        trajectory: List[BaseToolCallData] = dspy.InputField(
-            description="The steps taken by the human to perform the task."
-        )
-        credentials: List[Credential] = dspy.OutputField(
-            description="List of credentials found in the trajectory.",
-            default_factory=list,
-        )
-
-    return CredentialExtractor
+class CredentialExtractionResult(BaseModel):
+    credentials: List[Credential] = Field(
+        default_factory=list, description="List of credentials found in the trajectory."
+    )
 
 
 def extract_credentials_from_trajectory(
-    task_description: str, trajectory: List[BaseToolCallData]
+    task_description: str, trajectory: List[dict]
 ) -> List[Credential]:
     print(f"Extracting credentials for task: {task_description[:60]}...")
 
-    CredentialExtractor = get_credential_extractor()
-    predictor = dspy.Predict(CredentialExtractor)
+    # Convert trajectory to JSON string for the prompt
+    trajectory_str = json.dumps(trajectory, indent=2)
 
-    trajectory = [
-        BaseToolCallData(
-            type=step.get("type"),
-            params=step.get("params", {}),
-            timestamp=step.get("timestamp"),
-        )
-        for step in trajectory
-    ]
-
-    result = predictor(task_description=task_description, trajectory=trajectory)
+    result = openai_structured_output_request(
+        prompt_name="extract_credentials",
+        model="gpt-5",
+        reasoning="medium",
+        text_format=CredentialExtractionResult,
+        task_description=task_description,
+        trajectory=trajectory_str,
+    )
 
     if result.credentials:
         return result.credentials
@@ -82,18 +54,11 @@ def extract_credentials_from_trajectory(
 
 
 def main():
-    lm = dspy.LM(
-        "openai/gpt-5",
-        reasoning_effort="medium",
-        temperature=1.0,
-        max_tokens=16000,
-    )
     mlflow.set_tracking_uri("http://127.0.0.1:5000")
     mlflow.set_experiment(
         f"extract-credentials-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
     )
-    mlflow.dspy.autolog()
-    dspy.configure(lm=lm)
+    mlflow.openai.autolog()
 
     with open(DATA_DIR / "tasks.jsonl", "r") as f:
         tasks = [json.loads(line) for line in f if line.strip()]
@@ -112,7 +77,9 @@ def main():
 
         for future, task in zip(futures, tasks):
             credentials = future.result()
-            task["credentials"] = [asdict(credential) for credential in credentials]
+            task["credentials"] = [
+                credential.model_dump() for credential in credentials
+            ]
 
     with open(DATA_DIR / "tasks.jsonl", "w") as f:
         for task in tasks:
