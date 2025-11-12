@@ -8,6 +8,7 @@ from tenacity import (
     retry,
     stop_after_attempt,
     wait_random_exponential,
+    AsyncRetrying,
 )
 
 load_dotenv()
@@ -60,7 +61,6 @@ def openai_structured_output_request(
     return response.output_parsed
 
 
-@retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5))
 async def openai_structured_output_request_async(
     prompt_name: str,
     model: str = "gpt-5",
@@ -80,14 +80,19 @@ async def openai_structured_output_request_async(
     """
 
     prompt = get_prompt(prompt_name).format(**format_kwargs)
-    response = await async_client.responses.parse(
-        model=model,
-        reasoning={"effort": reasoning},
-        input=[{"role": "user", "content": prompt}],
-        metadata={"source": prompt_name},
-        text_format=text_format,
-    )
-    return response.output_parsed
+
+    async for attempt in AsyncRetrying(
+        wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5)
+    ):
+        with attempt:
+            response = await async_client.responses.parse(
+                model=model,
+                reasoning={"effort": reasoning},
+                input=[{"role": "user", "content": prompt}],
+                metadata={"source": prompt_name},
+                text_format=text_format,
+            )
+            return response.output_parsed
 
 
 # SMARTER retry
