@@ -34,7 +34,6 @@ def extract_checkpoints(
         model="gpt-5",
         reasoning="high",
         text_format=CheckpointExtractionResult,
-        group_logging=True,
         task_description=task_description,
         steps_taken=steps_str,
         num_checkpoints=num_checkpoints,

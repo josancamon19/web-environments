@@ -300,6 +300,7 @@ class ReplayBundle:
         request: Request,
         allow_network_fallback: bool = False,
     ) -> None:
+        # TODO: amazon trajectory fail after sign in? says "no internet" for a second, then refresh page works.
         if self._should_ignore_url(request.url):
             await route.abort()
             return
@@ -334,14 +335,28 @@ class ReplayBundle:
         index_key = (method, request_url_base)
         candidate_entries = self._har_index.get(index_key, [])
 
+        # Improvements
+        # TODO: make ignore generation faster.
+        # Requirements
+        # TODO: make sure it's detectable when you open a page that wasn't explored, how to fail a URL when not found at all. (return JSON when requires a website, this should be clear in prompt)
+        # TODO: test more websites collected, launch them and see how well they work, anything bad, breaking?
+        # TODO: test replay.py, and get it to navigate same as human
+        # TODO: manage replay to explore with n depth script
+        # TODO: hire a playwright expert to solve stealth issues
+        # TODO: review whole eval pipeline creation, and run 1 eval task offline with an agent.
+
         if not candidate_entries:
             ignore_log = [".woff", ".jpg", ".gif", ".png", ".svg", ".ico"]
-            # TODO: is this correct?
-            if any(ignore_pattern in request.url for ignore_pattern in ignore_log):
+            # NOTE: is this ignorable? like I'm worried this would cause too many requests via LM match unnecessary, wasting tokens and time.
+            if any(
+                request.url.endswith(ignore_pattern) for ignore_pattern in ignore_log
+            ):
                 await route.abort()
                 return
 
-            candidate_entries = self._fallback_candidates_char_based(full_url, method)
+            candidate_entries = self._fallback_candidates_char_based(
+                full_url, method, request
+            )
             if not candidate_entries:
                 logger.warning(
                     f"No matching HAR entry found for {method} {shorter_url}, aborting",
@@ -352,43 +367,106 @@ class ReplayBundle:
         entries = [entry for _, entry in candidate_entries]
         return entries, method, shorter_url
 
-    def _fallback_candidates_char_based(self, full_url: str, method: str) -> List[dict]:
+    def _fallback_candidates_char_based(
+        self, full_url: str, method: str, request
+    ) -> List[dict]:
+        # NOTE: explore logs here to find patterns and make less and less lm based selection.
+        # NOTE: consider a full char based match, tried a bit and sign in amazon password goes back to password.
         """
         Find all HAR entries with the same domain and method, and select the best match based on the number of characters in the URL.
         e.g. amazon requests css/js/media for the same endpoint in different order, so char based helps with matching.
         """
-        # TODO: it seems like this is even better than the initial baseline
-        # TODO: should consider request body maybe?
-        target_chars = {}
-        for char in full_url:
-            target_chars[char] = target_chars.get(char, 0) + 1
 
-        # Find all HAR entries with the same domain and method
-        same_domain_candidates = []
-        har_entries = self._get_har_matches_by_base_url(full_url, method)
+        # Helper function to compute character frequency
+        def count_chars(text: str) -> dict:
+            char_counts = {}
+            for char in text:
+                char_counts[char] = char_counts.get(char, 0) + 1
+            return char_counts
 
-        for idx, entry in enumerate(har_entries):
-            entry_url = entry.get("request", {}).get("url", "")
-            # Count character occurrences in entry URL
-            entry_chars = {}
-            for char in entry_url:
-                entry_chars[char] = entry_chars.get(char, 0) + 1
-
-            # Calculate match score: count how many target characters are available
+        # Helper function to compute character match score
+        def compute_char_match_score(
+            target_chars: dict, candidate_chars: dict
+        ) -> tuple[int, bool]:
             match_score = 0
             matches_all = True
             for char, count in target_chars.items():
-                available = entry_chars.get(char, 0)
+                available = candidate_chars.get(char, 0)
                 if available >= count:
                     match_score += count
                 else:
                     match_score += available
                     matches_all = False
+            return match_score, matches_all
+
+        # Get target request data
+        target_url_chars = count_chars(full_url)
+
+        # Get request body if available
+        target_body = ""
+        if hasattr(request, "post_data"):
+            target_body = request.post_data or ""
+        target_body_chars = count_chars(target_body) if target_body else {}
+
+        # Get request headers
+        target_headers = ""
+        if hasattr(request, "headers"):
+            # Convert headers dict to string for character matching
+            target_headers = str(sorted(request.headers.items()))
+        target_headers_chars = count_chars(target_headers) if target_headers else {}
+
+        # Find all HAR entries with the same domain and method
+        same_domain_candidates = []
+        har_entries = self._get_har_matches_by_base_url(full_url, method)
+        if not har_entries:
+            return []
+
+        for idx, entry in enumerate(har_entries):
+            request_data = entry.get("request", {})
+
+            # URL matching (primary criteria)
+            entry_url = request_data.get("url", "")
+            entry_url_chars = count_chars(entry_url)
+            url_score, url_matches_all = compute_char_match_score(
+                target_url_chars, entry_url_chars
+            )
+
+            # Body matching (for logging)
+            entry_body = (
+                request_data.get("postData", {}).get("text", "")
+                if request_data.get("postData")
+                else ""
+            )
+            entry_body_chars = count_chars(entry_body) if entry_body else {}
+            body_score, _ = (
+                compute_char_match_score(target_body_chars, entry_body_chars)
+                if target_body_chars
+                else (0, True)
+            )
+
+            # Headers matching (for logging)
+            entry_headers = str(
+                sorted(
+                    [
+                        (h.get("name", ""), h.get("value", ""))
+                        for h in request_data.get("headers", [])
+                    ]
+                )
+            )
+            entry_headers_chars = count_chars(entry_headers) if entry_headers else {}
+            headers_score, _ = (
+                compute_char_match_score(target_headers_chars, entry_headers_chars)
+                if target_headers_chars
+                else (0, True)
+            )
+
             data = {
                 "idx": idx,
                 "entry": entry,
-                "match_score": match_score,
-                "matches_all": matches_all,
+                "match_score": url_score,
+                "matches_all": url_matches_all,
+                "body_score": body_score,
+                "headers_score": headers_score,
             }
             same_domain_candidates.append(data)
 
@@ -403,6 +481,21 @@ class ReplayBundle:
 
         top_k = min(5, len(same_domain_candidates))
         top_candidates = same_domain_candidates[:top_k]
+        # Print candidate information for debugging
+        # print(
+        #     f"\nFound {len(top_candidates)} candidates for {method} {full_url[:100]}..."
+        # )
+        # print(
+        #     f"  Target - Body length: {len(target_body)}, Headers: {len(target_headers_chars)} unique chars"
+        # )
+        # for i, candidate in enumerate(top_candidates):
+        #     entry_url = candidate["entry"].get("request", {}).get("url", "")
+        #     print(f"  {i + 1}. {entry_url[:100]}...")
+        #     print(
+        #         f"      URL score: {candidate['match_score']}/{len(full_url)}, "
+        #         f"Body score: {candidate['body_score']}/{len(target_body) if target_body else 0}, "
+        #         f"Headers score: {candidate['headers_score']}/{len(target_headers) if target_headers else 0}"
+        #     )
         return [(c["idx"], c["entry"]) for c in top_candidates]
 
     # *********** Caching LM select best entry ***********

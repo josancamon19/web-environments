@@ -83,7 +83,6 @@ def process_url_batch(batch_data: tuple) -> set:
             prompt_name="determine_ignore",
             model="gpt-5",
             reasoning="high",
-            group_logging=True,
             text_format=ExtractNonRelevant,
             url_list=url_list,
         )

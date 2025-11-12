@@ -1,7 +1,5 @@
-import logging
 from pathlib import Path
 from typing import Any
-from datetime import datetime
 
 from dotenv import load_dotenv
 from openai import AsyncOpenAI, BaseModel, OpenAI
@@ -11,7 +9,6 @@ from tenacity import (
     stop_after_attempt,
     wait_random_exponential,
 )
-import mlflow
 
 load_dotenv()
 
@@ -20,17 +17,6 @@ async_client: Any = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 
 PROMPTS_DIR = Path("src/utils/prompts")
-os.environ["MLFLOW_TRACKING_URI"] = ""
-mlflow.set_tracking_uri("")
-logging.getLogger("mlflow").setLevel(logging.ERROR)
-
-try:
-    mlflow.set_tracking_uri("http://127.0.0.1:5000")
-    mlflow.openai.autolog()
-except Exception as e:
-    logging.error(
-        f"Failed to set up MLflow: {e} - continuing without MLflow, `mlflow server`"
-    )
 
 
 def get_prompt(prompt_name: str) -> str:
@@ -41,13 +27,7 @@ def get_prompt(prompt_name: str) -> str:
         raise FileNotFoundError(f"Prompt {prompt_name} not found in {PROMPTS_DIR}")
 
 
-def set_experiment(prompt_name: [str, None], include_timestamp: bool = False):
-    if include_timestamp:
-        name = f"{prompt_name}-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
-    try:
-        mlflow.set_experiment(name)
-    except Exception as _:  # noqa: F841
-        pass
+# NOTE: OAI logging requires system prompt to optimize
 
 
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5))
@@ -56,7 +36,6 @@ def openai_structured_output_request(
     model: str = "gpt-5",
     reasoning: str = "high",
     text_format: BaseModel = None,
-    group_logging: bool = True,
     **format_kwargs,
 ) -> BaseModel:
     """Make a structured output request to OpenAI API.
@@ -69,17 +48,14 @@ def openai_structured_output_request(
         group_logging: If True, automatically sets MLflow experiment to prompt_name
         **format_kwargs: Variables to format into the prompt template
     """
-    if group_logging:
-        set_experiment(prompt_name=prompt_name)
 
-    prompt = get_prompt(prompt_name)
-    if format_kwargs:
-        prompt = prompt.format(**format_kwargs)
+    prompt = get_prompt(prompt_name).format(**format_kwargs)
     response = client.responses.parse(
         model=model,
         reasoning={"effort": reasoning},
         input=[{"role": "user", "content": prompt}],
         text_format=text_format,
+        metadata={"source": prompt_name},
     )
     return response.output_parsed
 
@@ -90,7 +66,6 @@ async def openai_structured_output_request_async(
     model: str = "gpt-5",
     reasoning: str = "high",
     text_format: BaseModel = None,
-    auto_set_experiment: bool = False,
     **format_kwargs,
 ):
     """Make an async structured output request to OpenAI API.
@@ -103,16 +78,13 @@ async def openai_structured_output_request_async(
         auto_set_experiment: If True, automatically sets MLflow experiment to prompt_name
         **format_kwargs: Variables to format into the prompt template
     """
-    if auto_set_experiment:
-        set_experiment(prompt_name=prompt_name)
 
-    prompt = get_prompt(prompt_name)
-    if format_kwargs:
-        prompt = prompt.format(**format_kwargs)
+    prompt = get_prompt(prompt_name).format(**format_kwargs)
     response = await async_client.responses.parse(
         model=model,
         reasoning={"effort": reasoning},
         input=[{"role": "user", "content": prompt}],
+        metadata={"source": prompt_name},
         text_format=text_format,
     )
     return response.output_parsed

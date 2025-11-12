@@ -40,7 +40,6 @@ def extract_credentials_from_trajectory(
         prompt_name="extract_credentials",
         model="gpt-5",
         reasoning="medium",
-        group_logging=True,
         text_format=CredentialExtractionResult,
         task_description=task_description,
         trajectory=trajectory_str,

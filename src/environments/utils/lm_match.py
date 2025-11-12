@@ -85,7 +85,6 @@ async def retrieve_best_request_match(
             model="gpt-5-nano",
             reasoning="minimal",
             text_format=ResponseFormat,
-            auto_set_experiment=True,
             request=request_str,
             candidates=candidates_str,
         )
