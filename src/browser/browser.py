@@ -207,7 +207,7 @@ class StealthBrowser:
         logger.info("[CLOSE] Starting browser close sequence...")
 
         # Stop recording first to prevent analytics/tracking events during shutdown
-        self.recorder.stop_recording()
+        await self.recorder.stop_recording()
 
         self.playwright_page_handler.detach_all_page_listeners()
         # self.context.remove_listener("request", self.request_event_handler.listen)

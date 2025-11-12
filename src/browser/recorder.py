@@ -55,10 +55,20 @@ class Recorder:
         self._last_screenshot_url = ""  # Prevent duplicate URL screenshots
         self._is_closing = False  # Flag to stop recording during shutdown
 
-    def stop_recording(self):
+    async def stop_recording(self):
         """Stop recording events (used during browser shutdown)"""
         logger.info("[RECORDER] Recording stopped for shutdown")
         self._is_closing = True
+
+        # Clean up CDP session to prevent hanging
+        if self._cdp_session:
+            try:
+                await self._cdp_session.detach()
+                logger.info("[RECORDER] CDP session detached")
+            except Exception as e:
+                logger.warning(f"[RECORDER] Error detaching CDP session: {e}")
+            finally:
+                self._cdp_session = None
 
     async def record_step(self, step_info: dict, omit_screenshot: bool = False):
         # Skip recording if we're in shutdown mode
