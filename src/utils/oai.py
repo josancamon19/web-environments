@@ -58,7 +58,7 @@ def openai_structured_output_request(
     text_format: BaseModel = None,
     group_logging: bool = True,
     **format_kwargs,
-):
+) -> BaseModel:
     """Make a structured output request to OpenAI API.
 
     Args:

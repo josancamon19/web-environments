@@ -4,7 +4,7 @@ from typing import List, Dict
 
 from pydantic import BaseModel, Field
 
-from src.config.storage import DATA_DIR
+from config.storage import DATA_DIR
 from utils.oai import openai_structured_output_request
 
 
@@ -36,7 +36,7 @@ def extract_credentials_from_trajectory(
     # Convert trajectory to JSON string for the prompt
     trajectory_str = json.dumps(trajectory, indent=2)
 
-    result = openai_structured_output_request(
+    result: CredentialExtractionResult = openai_structured_output_request(
         prompt_name="extract_credentials",
         model="gpt-5",
         reasoning="medium",
@@ -46,10 +46,7 @@ def extract_credentials_from_trajectory(
         trajectory=trajectory_str,
     )
 
-    if result.credentials:
-        return result.credentials
-
-    return []
+    return result.credentials
 
 
 def main():

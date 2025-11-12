@@ -7,7 +7,10 @@ from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG, IGNORE_DEFAULT_A
 from config.browser_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
 from browser.recorder import Recorder, get_video_path
 from browser.page import ActualPage
-from browser.handlers.new_page_event import PlaywrightPageEvent
+from browser.handlers.new_page_event import (
+    PlaywrightPageEvent,
+    should_ignore_recording_url,
+)
 from db.task import TaskManager
 from browser.handlers.request_event import RequestEvent
 from browser.handlers.response_event import ResponseEvent
@@ -176,8 +179,19 @@ class StealthBrowser:
         try:
             event_type = event_info.get("event_type", "unknown")
             event_context = event_info.get("event_context", "unknown")
-            logger.debug(f"[PAGE_EVENT] Received: {event_context}:{event_type}")
 
+            # Filter out tracking/analytics iframe events
+            if (event_type == "load" and event_context == "state:page") or (
+                event_type == "tab_visibility_changed"
+                and event_context == "state:browser"
+            ):
+                event_data = event_info.get("event_data", {})
+                url = event_data.get("url", "")
+                if should_ignore_recording_url(url):
+                    # logger.debug(f"[PAGE_EVENT] Skipping tracking URL from JS: {url}")
+                    return
+
+            logger.debug(f"[PAGE_EVENT] Received: {event_context}:{event_type}")
             await self.recorder.record_step(
                 {
                     "event_info": event_info,
@@ -191,6 +205,9 @@ class StealthBrowser:
     async def close(self):
         """Close browser"""
         logger.info("[CLOSE] Starting browser close sequence...")
+
+        # Stop recording first to prevent analytics/tracking events during shutdown
+        self.recorder.stop_recording()
 
         self.playwright_page_handler.detach_all_page_listeners()
         # self.context.remove_listener("request", self.request_event_handler.listen)

@@ -1,7 +1,21 @@
 import logging
 from browser.recorder import Recorder
+from scripts.postprocessing._4_determine_ignore import should_ignore_url
 
 logger = logging.getLogger(__name__)
+
+
+def should_ignore_recording_url(url: str) -> bool:
+    """Check if URL is from a tracking/analytics domain or about:blank"""
+    if not url:
+        return False
+
+    # Filter out about:blank pages
+    if url == "about:blank":
+        return True
+
+    url_lower = url.lower()
+    return should_ignore_url(url_lower)
 
 
 class PlaywrightPageEvent:
@@ -37,6 +51,11 @@ class PlaywrightPageEvent:
             async def on_load(p=page):
                 # logger.info(f"[PAGE_EVENT] Page loaded: {p.url}")
                 # Scripts are already injected by context.add_init_script
+
+                # Skip recording loads from tracking/analytics iframes
+                if should_ignore_recording_url(p.url):
+                    # logger.debug(f"[PAGE_EVENT] Skipping tracking URL: {p.url}")
+                    return
 
                 # Record page load as a high-level event
                 await self.recorder.record_step(
