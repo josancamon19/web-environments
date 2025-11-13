@@ -34,12 +34,13 @@ logger = logging.getLogger(__name__)
 class ReplayBundle:
     """Replay previously captured browsing resources using HAR files."""
 
-    def __init__(self, bundle_path: Path):
+    def __init__(self, bundle_path: Path, ignore_cache: bool = False):
         bundle_path = bundle_path.expanduser().resolve()
         manifest_path = self._resolve_manifest(bundle_path)
 
         self.bundle_path = manifest_path.parent
         self.manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.ignore_cache = ignore_cache
 
         if "environment" not in self.manifest or "task" not in self.manifest:
             raise ValueError("Invalid manifest: missing required fields")
@@ -342,7 +343,12 @@ class ReplayBundle:
         # Improvements
         # ...
         # Requirements
-        # TODO: tell when a page wasn't opened and is still working, return -1 in index or figured based on reading front
+        # TODO: tell when a page wasn't opened and is still working, return -1 in index or figured based on reading front, should consume indices?
+        # koa.com, search bar is a mess, then click to search, chooses the request where you put filters for people, children, etc..., bad.
+        # ticketcenter, opened wrong url first, and didn't fail.
+        # some websites are very very slow, why? or keep loading during replay for long
+        # --ignore-cache, and log metadata to openai request.
+
         # TODO: test more websites collected, launch them and see how well they work, anything bad, breaking?
         # TODO: foxsports loads so many images that require lm_matching
 
@@ -556,11 +562,11 @@ class ReplayBundle:
         except Exception:
             post_data = None
 
-        # Check cache first
+        # Check cache first (unless ignore_cache is set)
         cache_key = self._get_cache_key(method, request.url, post_data)
         cache = self._load_matches_cache()
 
-        if cache_key in cache:
+        if not self.ignore_cache and cache_key in cache:
             cached_har_index = cache[cache_key]
             har_entries = self._har_data.get("log", {}).get("entries", [])
             if 0 <= cached_har_index < len(har_entries):
@@ -703,9 +709,10 @@ async def _cli(
     run_human_trajectory: bool,
     exit_on_completion: bool,
     include_storage_state: bool,
+    ignore_cache: bool,
 ) -> None:
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
-    bundle = ReplayBundle(bundle_path)
+    bundle = ReplayBundle(bundle_path, ignore_cache=ignore_cache)
 
     trajectory_steps = (
         StepManager.get_instance().get_steps_by_task_id(bundle.task_id)
@@ -767,6 +774,9 @@ def main(
     run_human_trajectory: bool = typer.Option(
         False, help="Replay timing with human-like pacing"
     ),
+    ignore_cache: bool = typer.Option(
+        False, help="Ignore cached request matches and use LM matching for all requests"
+    ),
 ):
     """Replay a captured browser bundle offline using HAR files."""
     asyncio.run(
@@ -778,6 +788,7 @@ def main(
             run_human_trajectory=run_human_trajectory,
             exit_on_completion=exit_on_completion,
             include_storage_state=include_storage_state,
+            ignore_cache=ignore_cache,
         )
     )
 
