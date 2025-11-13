@@ -32,6 +32,7 @@ def _serialize_request(request: Request | dict[str, Any]) -> dict[str, Any]:
         "url": request.url,
         "headers": dict(request.headers),
         "resourceType": request.resource_type,
+        "isNavigationRequest": request.is_navigation_request(),
     }
 
     # Add post data if available
@@ -47,18 +48,27 @@ def _serialize_request(request: Request | dict[str, Any]) -> dict[str, Any]:
 
 def _get_request_string(i: int | None, request: Request | dict[str, Any]) -> str:
     serialized = _serialize_request(request)
-    method = serialized.get("method", "")
-    url = serialized.get("url", "")
-    resource_type = serialized.get("resourceType", "")
-    headers = serialized.get("headers", "")
-    post_data = serialized.get("postData", "")
 
-    candidate_str = (
-        f"{str(i) if i is not None else ''} {method} {url} ({resource_type})"
-    )
-    candidate_str += f"\n- headers:\n{json.dumps(headers, indent=2)}"
-    if post_data:
-        candidate_str += f"\n- post data:\n{post_data}"
+    resource_type = serialized.get("resourceType")  # applies to target
+    is_navigation_request = serialized.get("isNavigationRequest")  # applies to target
+    response_mime_type = serialized.get("responseMimeType")  # applies to candidates
+
+    candidate_str = f"{str(i) + ' ' if i is not None else ''}{serialized['method']} {serialized['url']}"
+
+    if resource_type:
+        candidate_str += f"\n- resource type: ({resource_type})"
+    if is_navigation_request is not None:
+        candidate_str += f"\n- is navigation request: {is_navigation_request}"
+    if response_mime_type:
+        candidate_str += f"\n- response MIME type: {response_mime_type}"
+
+    if headers := serialized.get("headers"):
+        candidate_str += f"\n- headers: ```{json.dumps(headers, ensure_ascii=False)}```"
+
+    if post_data := serialized.get("postData"):
+        candidate_str += (
+            f"\n- post data: ```{json.dumps(post_data, ensure_ascii=False)}```"
+        )
 
     return candidate_str
 

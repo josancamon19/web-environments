@@ -335,10 +335,14 @@ class ReplayBundle:
         index_key = (method, request_url_base)
         candidate_entries = self._har_index.get(index_key, [])
 
+        # NOTE: following fields, as well as headers accept and sec-fetch-dest could be used to filter further
+        # request_resource_type = request.resource_type
+        # is_navigation_request = request.is_navigation_request()
+
         # Improvements
-        # TODO: make ignore generation faster.
+        # ...
         # Requirements
-        # TODO: make sure it's detectable when you open a page that wasn't explored, how to fail a URL when not found at all. (return JSON when requires a website, this should be clear in prompt)
+        # TODO: tell when a page wasn't opened and is still working, return -1 in index or figured based on reading front
         # TODO: test more websites collected, launch them and see how well they work, anything bad, breaking?
         # TODO: test replay.py, and get it to navigate same as human
         # TODO: manage replay to explore with n depth script
@@ -568,21 +572,16 @@ class ReplayBundle:
             f"Multiple HAR candidates ({len(entries)}) found for {method} {shorter_url}, using LM matching",
         )
 
-        candidates = [entry.get("request", {}) for entry in entries]
-        # NOTE: doesn't seem to be failing when I explore a route that was not recorded (cause it's always trying to find a match)
-
-        # TODO: what if 2FA, it should still work, right?
-        # TODO: do websites that require sign in, like spotify, gmail, etc.
-
-        # ====
-        # TODO: too many requests going through retrieve_best_match, going out of tokens too fast, wtf.
-        # TODO: _4_ script 429 rate limited
-        # TODO: systematic analysis on collected, as launched trajectories, repeat, repeat.
-        # - then run agent launched on sandbox
-        # - then explore depth and replay need to work I think.
+        candidates = []
+        for entry in entries:
+            entry_request = entry.get("request", {})
+            mime_type = entry.get("response", {}).get("content", {}).get("mimeType")
+            entry_request.update({"responseMimeType": mime_type})
+            candidates.append(entry_request)
 
         idx = await retrieve_best_request_match(
-            target_request=request, candidates=candidates
+            target_request=request,
+            candidates=candidates,
         )
         if idx is None:
             return None
