@@ -341,21 +341,23 @@ class ReplayBundle:
         # is_navigation_request = request.is_navigation_request()
 
         # Improvements
+        # TODO: is the model selecting the most chars regardless? or is there some logic that can be extracted
         # ...
         # Requirements
         # TODO: tell when a page wasn't opened and is still working, return -1 in index or figured based on reading front, should consume indices?
         # koa.com, search bar is a mess, then click to search, chooses the request where you put filters for people, children, etc..., bad.
         # ticketcenter, opened wrong url first, and didn't fail.
         # some websites are very very slow, why? or keep loading during replay for long
-        # --ignore-cache, and log metadata to openai request.
-
-        # TODO: test more websites collected, launch them and see how well they work, anything bad, breaking?
-        # TODO: foxsports loads so many images that require lm_matching
+        # TODO: log metadata on openai request
+        # foxsports loads so many images that require lm_matching
 
         # TODO: test replay.py, and get it to navigate same as human
         # TODO: manage replay to explore with n depth script
+        # - consider instead of replay, to simply open every URL navigated, and then expand from there, doesn't really need replay itself
         # TODO: hire a playwright expert to solve stealth issues
         # TODO: review whole eval pipeline creation, and run 1 eval task offline with an agent.
+
+        # TODO: package this as a library? probably yea.
 
         if not candidate_entries:
             ignore_log = [".woff", ".jpg", ".gif", ".png", ".svg", ".ico"]
