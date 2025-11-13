@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 import sys
-from playwright.async_api import BrowserContext, async_playwright
+from rebrowser_playwright.async_api import BrowserContext, async_playwright
 from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG, IGNORE_DEFAULT_ARGS
 from config.browser_scripts import STEALTH_SCRIPT, PAGE_EVENT_LISTENER_SCRIPT
 from browser.recorder import Recorder, get_video_path
@@ -15,7 +15,7 @@ from db.task import TaskManager
 from browser.handlers.request_event import RequestEvent
 from browser.handlers.response_event import ResponseEvent
 from environments.capture import OfflineCaptureManager
-from playwright_stealth import Stealth
+# from playwright_stealth import Stealth
 
 logger = logging.getLogger(__name__)
 
@@ -36,10 +36,10 @@ class StealthBrowser:
         self._binding_registered = False
         self._page_script_registered = False
         self.log_browser_console = log_browser_console
-        self.stealth = Stealth(
-            # script_logging=True,
-            # navigator_languages_override=("fr-FR", "fr")
-        )
+        # self.stealth = Stealth(
+        # script_logging=True,
+        # navigator_languages_override=("fr-FR", "fr")
+        # )
 
     async def launch(self):
         """Launch stealth browser"""
@@ -50,11 +50,7 @@ class StealthBrowser:
 
         self.context = await self.launch_browser(task.id)
         # Apply stealth to the entire context - all pages created will have stealth applied
-        print(
-            f"🔐 Applying stealth with {len(self.stealth.script_payload)} characters of script payload..."
-        )
-        await self.stealth.apply_stealth_async(self.context)
-        print("✅ Stealth applied to context")
+        # await self.stealth.apply_stealth_async(self.context)
 
         await self.environment_capturer.start(self.context)
         # Paused: Already collecting HAR, no need to save requests/responses to database

@@ -1,7 +1,11 @@
 import asyncio
 import logging
 from typing import Any, Dict, Optional, Tuple
-from playwright.async_api import Page, Locator, TimeoutError as PlaywrightTimeoutError
+from rebrowser_playwright.async_api import (
+    Page,
+    Locator,
+    TimeoutError as PlaywrightTimeoutError,
+)
 from db.models import StepModel
 
 

@@ -6,8 +6,8 @@ import socket
 from pathlib import Path
 from typing import List, Optional
 
-from playwright.async_api import Browser as PlaywrightBrowser
-from playwright.async_api import BrowserContext, BrowserType, async_playwright
+from rebrowser_playwright.async_api import Browser as PlaywrightBrowser
+from rebrowser_playwright.async_api import BrowserContext, BrowserType, async_playwright
 
 from environments.launch import ReplayBundle
 from config.browser_config import BROWSER_ARGS

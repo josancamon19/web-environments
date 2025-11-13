@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Any
 from pydantic import BaseModel, Field
-from playwright.async_api import Request
+from rebrowser_playwright.async_api import Request
 
 from utils.oai import openai_structured_output_request_async
 

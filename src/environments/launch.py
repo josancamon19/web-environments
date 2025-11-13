@@ -13,7 +13,7 @@ from environments.utils.lm_match import retrieve_best_request_match
 
 from scripts.postprocessing._4_determine_ignore import should_ignore_url
 import typer
-from playwright.async_api import (
+from rebrowser_playwright.async_api import (
     Browser,
     BrowserContext,
     Request,
