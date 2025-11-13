@@ -1,5 +1,6 @@
 # cleanup HAR
 
+import argparse
 import asyncio
 import json
 import re
@@ -108,10 +109,20 @@ async def process_url_batch(batch_data: tuple) -> set:
         return set()
 
 
-def collect_task_batches(task_dir: Path) -> tuple[Path, dict] | None:
+def collect_task_batches(
+    task_dir: Path, force: bool = False
+) -> tuple[Path, dict] | None:
     """Collect batches for a task without processing them. Returns (task_dir, task_data) or None."""
     task_name = task_dir.name
     har_file = task_dir / "recording.har"
+    ignored_file = task_dir / "ignored.json"
+
+    # Check if ignored.json already exists and force is not set
+    if not force and ignored_file.exists():
+        print(
+            f"Skipping {task_name}: ignored.json already exists (use --force to reprocess)"
+        )
+        return None
 
     if not har_file.exists():
         print(f"Skipping {task_name}: recording.har not found")
@@ -262,7 +273,7 @@ def save_task_results(task_data: dict, lm_ignored_indices: set, task_dir: Path):
     }
 
 
-async def main_async():
+async def main_async(force: bool = False):
     """Process all task directories by collecting all batches first, then processing them all."""
     # Find all task directories
     captures_dir = DATA_DIR / "captures"
@@ -277,6 +288,8 @@ async def main_async():
 
     print(f"\nFound {len(task_dirs)} task directories to process")
     print(f"Captures directory: {captures_dir}")
+    if force:
+        print("Force mode: Will reprocess all tasks even if ignored.json exists")
     print(f"\n{'=' * 80}")
     print("PHASE 1: Collecting all batches from all tasks (using multiprocessing)")
     print(f"{'=' * 80}\n")
@@ -288,7 +301,8 @@ async def main_async():
     with ProcessPoolExecutor() as executor:
         # Submit all tasks for parallel processing
         futures = [
-            executor.submit(collect_task_batches, task_dir) for task_dir in task_dirs
+            executor.submit(collect_task_batches, task_dir, force)
+            for task_dir in task_dirs
         ]
 
         # Collect results as they complete
@@ -349,7 +363,17 @@ async def main_async():
 
 def main():
     """Entry point that runs the async main function."""
-    asyncio.run(main_async())
+    parser = argparse.ArgumentParser(
+        description="Determine which URLs to ignore during replay of captured trajectories."
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force reprocessing of tasks even if ignored.json already exists",
+    )
+    args = parser.parse_args()
+
+    asyncio.run(main_async(force=args.force))
 
 
 if __name__ == "__main__":
