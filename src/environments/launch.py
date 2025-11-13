@@ -344,6 +344,8 @@ class ReplayBundle:
         # Requirements
         # TODO: tell when a page wasn't opened and is still working, return -1 in index or figured based on reading front
         # TODO: test more websites collected, launch them and see how well they work, anything bad, breaking?
+        # TODO: foxsports loads so many images that require lm_matching
+
         # TODO: test replay.py, and get it to navigate same as human
         # TODO: manage replay to explore with n depth script
         # TODO: hire a playwright expert to solve stealth issues

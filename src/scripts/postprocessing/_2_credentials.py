@@ -1,6 +1,6 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Dict
+from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -8,23 +8,26 @@ from config.storage import DATA_DIR
 from utils.oai import openai_structured_output_request
 
 
-class Credential(BaseModel):
-    website: str = Field(
-        default="", description="The website domain (e.g., amazon.com)"
+class CredentialField(BaseModel):
+    field_name: str = Field(
+        description="The credential field name (e.g., 'email', 'password', 'username', 'phone', 'username')"
     )
-    fields: Dict[str, str] = Field(
-        default_factory=dict,
-        description="Dictionary of credential field names to values",
+    field_value: str = Field(description="The credential field value")
+
+
+class Credential(BaseModel):
+    website: str = Field(description="The website domain (e.g., amazon.com)")
+    fields: List[CredentialField] = Field(
+        description="List of credential fields with their names and values"
     )
     tool_call_ids: List[int] = Field(
-        default_factory=list,
-        description="IDs of tool calls that entered these credentials",
+        description="IDs of tool calls that entered these credentials"
     )
 
 
 class CredentialExtractionResult(BaseModel):
     credentials: List[Credential] = Field(
-        default_factory=list, description="List of credentials found in the trajectory."
+        description="List of credentials found in the trajectory."
     )
 
 
@@ -33,16 +36,13 @@ def extract_credentials_from_trajectory(
 ) -> List[Credential]:
     print(f"Extracting credentials for task: {task_description[:60]}...")
 
-    # Convert trajectory to JSON string for the prompt
-    trajectory_str = json.dumps(trajectory, indent=2)
-
     result: CredentialExtractionResult = openai_structured_output_request(
         prompt_name="extract_credentials",
         model="gpt-5",
         reasoning="medium",
         text_format=CredentialExtractionResult,
         task_description=task_description,
-        trajectory=trajectory_str,
+        trajectory=json.dumps(trajectory, indent=2),
     )
 
     return result.credentials
