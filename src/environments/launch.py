@@ -354,6 +354,7 @@ class ReplayBundle:
         if not candidate_entries:
             ignore_log = [".woff", ".jpg", ".gif", ".png", ".svg", ".ico"]
             # NOTE: is this ignorable? like I'm worried this would cause too many requests via LM match unnecessary, wasting tokens and time.
+            # this vs `pattern in request.url`
             if any(
                 request.url.endswith(ignore_pattern) for ignore_pattern in ignore_log
             ):

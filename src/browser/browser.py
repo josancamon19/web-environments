@@ -125,9 +125,9 @@ class StealthBrowser:
 
             async def _on_page_event(source, event_info):
                 try:
-                    logger.info(
-                        f"[BINDING] _on_page_event called with event_type: {event_info.get('event_type', 'unknown')}"
-                    )
+                    # logger.info(
+                    #     f"[BINDING] _on_page_event called with event_type: {event_info.get('event_type', 'unknown')}"
+                    # )
                     page = getattr(source, "page", None)
                     await self.handle_dom_change_event(event_info, page)
                 except Exception as e:
@@ -191,7 +191,7 @@ class StealthBrowser:
                     # logger.debug(f"[PAGE_EVENT] Skipping tracking URL from JS: {url}")
                     return
 
-            logger.debug(f"[PAGE_EVENT] Received: {event_context}:{event_type}")
+            # logger.debug(f"[PAGE_EVENT] Received: {event_context}:{event_type}")
             await self.recorder.record_step(
                 {
                     "event_info": event_info,

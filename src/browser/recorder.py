@@ -215,6 +215,7 @@ class Recorder:
         # Create new session if none exists or if page changed
         if self._cdp_session is None:
             self._cdp_session = await page.context.new_cdp_session(page)
+            # TODO: why is this being called multiple times?
             logger.debug("[SCREENSHOT] Created new CDP session")
 
         return self._cdp_session

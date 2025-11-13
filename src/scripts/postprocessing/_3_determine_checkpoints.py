@@ -4,7 +4,7 @@ from typing import List
 
 from pydantic import BaseModel, Field
 
-from src.config.storage import DATA_DIR
+from config.storage import DATA_DIR
 from utils.oai import openai_structured_output_request
 
 
