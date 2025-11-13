@@ -9,11 +9,6 @@ logger = logging.getLogger(__name__)
 # NOTE: This executor replays user actions (clicks, inputs, submits, etc.) from recorded trajectories.
 # Navigations are triggered naturally by user actions (clicks, submits) rather than being replayed directly.
 # Only the initial navigation is performed to set up the starting state.
-# TODO: potential fixes to debug if failing
-# - is the CSS scaping enough given our usecase?
-# - is URLs differ to simple given the purpose of this? which is replicating a set of human trajectory steps from the DB
-# - are wait and page timeouts set properly?
-# - are we handling scroll offsets properly?
 
 
 class TaskStepExecutor:
@@ -330,14 +325,20 @@ class TaskStepExecutor:
 
 
 # Escape characters for CSS selectors
+# Only escaping characters that realistically appear in HTML IDs/classes
+# and conflict with CSS selector syntax
 CSS_ESCAPE_MAP = {
+    # Whitespace characters (rare in IDs, but possible)
+    " ": "\\ ",
+    "\t": "\\9 ",
     "\n": "\\A ",
     "\r": "",
     "\f": "\\C ",
-    "\t": " ",
-    " ": " ",
-    '"': '\\"',
-    "'": "\\'",
-    "#": "\\#",
-    ":": "\\:",
+    # Characters that conflict with CSS selector syntax
+    ".": "\\.",  # Common in some frameworks, conflicts with class selector
+    ":": "\\:",  # Common in Angular/Vue/React IDs, conflicts with pseudo-selectors
+    "#": "\\#",  # Conflicts with ID selector
+    "[": "\\[",  # Conflicts with attribute selector
+    "]": "\\]",  # Conflicts with attribute selector
+    "\\": "\\\\",  # Escape character itself
 }
