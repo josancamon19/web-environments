@@ -10,6 +10,12 @@ from typing import Any, Dict, List, Optional, Set
 
 from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG, IGNORE_DEFAULT_ARGS
 from environments.utils.lm_match import retrieve_best_request_match
+from environments.models import (
+    CandidateEntry,
+    CandidateEntryMetadata,
+    HarEntry,
+    parse_har_entry,
+)
 
 from scripts.postprocessing._4_determine_ignore import should_ignore_url
 import typer
@@ -50,22 +56,13 @@ class ReplayBundle:
 
         # Track consumed HAR entries to avoid reusing them (important for sequential requests)
         self._consumed_har_indices: Set[int] = set()
-        self._har_data: Dict = self._load_har_data()
-
-        # Load ignored URLs from ignored.json
-        self._ignored_urls: List[str] = self._load_ignored_urls()
-
-        # Build index for fast lookup: (method, url_base) -> list of entries
-        # url_base is scheme + netloc + path (without query/fragment for indexing)
-        self._har_index: Dict[tuple[str, str], List[tuple[int, dict]]] = {}
-        self._har_full_index: Dict[tuple[str, str], List[tuple[int, dict]]] = {}
-        self._har_method_index: Dict[str, List[tuple[int, dict]]] = {}
-        self._build_har_index()
+        self._har_entries: List[HarEntry] = self._load_har_data()
+        self._ignored_urls: List[str] = self._load_ignored_urls()  # ignored.json
 
         logger.info(
             "Loaded bundle %s with %d HAR entries",
             bundle_path,
-            len(self._har_data.get("log", {}).get("entries", [])),
+            len(self._har_entries),
         )
 
     def guess_start_url(self) -> Optional[str]:
@@ -82,7 +79,7 @@ class ReplayBundle:
     def _setup_har_logging(self, context: BrowserContext) -> None:
         """Set up network event listeners to log requests not found in HAR."""
 
-        async def log_request_failed(request):
+        async def log_request_failed(request: Request) -> None:
             if self._should_ignore_url(request.url):
                 return
 
@@ -96,7 +93,7 @@ class ReplayBundle:
             # Capture full request details to file for debugging
             await self._save_failed_request_to_file(request)
 
-        async def log_request_finished(request):
+        async def log_request_finished(request: Request) -> None:
             response = await request.response()
             if response:
                 if response.from_service_worker:
@@ -179,12 +176,15 @@ class ReplayBundle:
         except Exception as exc:
             logger.error(f"Failed to save request details: {exc}")
 
-    def _load_har_data(self) -> Dict:
+    def _load_har_data(self) -> List[HarEntry]:
         """Load HAR file data."""
         har_path = self.bundle_path / "recording.har"
         if not har_path.exists():
             raise FileNotFoundError(f"HAR file not found at {har_path}")
-        return json.loads(har_path.read_text(encoding="utf-8"))
+        har_data = json.loads(har_path.read_text(encoding="utf-8"))
+        har_entries = har_data.get("log", {}).get("entries", [])
+        entries: List[HarEntry] = [parse_har_entry(entry) for entry in har_entries]
+        return entries
 
     def _load_ignored_urls(self) -> List[str]:
         """Load ignored URLs from ignored.json file."""
@@ -198,40 +198,10 @@ class ReplayBundle:
             return True
         return any(ignored_pattern in url for ignored_pattern in self._ignored_urls)
 
-    def _build_har_index(self) -> None:
-        """Build an index of HAR entries for fast lookup by method and URL base."""
-        har_entries = self._har_data.get("log", {}).get("entries", [])
-
-        for idx, entry in enumerate(har_entries):
-            request = entry.get("request", {})
-            method = request.get("method", "GET").upper()
-            url = request.get("url", "")
-
-            if not url:
-                continue
-
-            # Parse URL once and extract base (scheme + netloc + path)
-            parsed = urlparse(url)
-            url_base = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
-
-            # Index by (method, url_base)
-            key = (method, url_base)
-            if key not in self._har_index:
-                self._har_index[key] = []
-            # Store index and entry for later reference
-            self._har_index[key].append((idx, entry))
-
-            # Also index by full URL for exact matching
-            full_key = (method, url)
-            if full_key not in self._har_full_index:
-                self._har_full_index[full_key] = []
-            self._har_full_index[full_key].append((idx, entry))
-
-        logger.debug(
-            "Built HAR index with %d unique (method, url_base) keys and %d full URL keys",
-            len(self._har_index),
-            len(self._har_full_index),
-        )
+    @staticmethod
+    def _get_url_base(url: str) -> str:
+        parsed = urlparse(url)
+        return f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
 
     async def build_context(
         self,
@@ -324,37 +294,49 @@ class ReplayBundle:
 
     async def _obtain_request_candidates(
         self, request: Request, route: Route, allow_network_fallback: bool = False
-    ) -> tuple[List[dict], str, str] | None:
+    ) -> tuple[List[CandidateEntry], str, str] | None:
         method = request.method.upper()
         full_url = request.url
         shorter_url = full_url[:100] + "..." if len(full_url) > 100 else full_url
-        request_parsed = urlparse(full_url)
-        request_url_base = (
-            f"{request_parsed.scheme}://{request_parsed.netloc}{request_parsed.path}"
-        )
 
-        index_key = (method, request_url_base)
-        candidate_entries = self._har_index.get(index_key, [])
+        # Find candidate entries by matching method and URL base
+        url_base = self._get_url_base(full_url)
+        candidate_entries = []
+        for idx, entry in enumerate(self._har_entries):
+            if idx in self._consumed_har_indices:
+                continue
+            entry_url_base = self._get_url_base(entry.request.url)
+            if entry.request.method.upper() == method and entry_url_base == url_base:
+                candidate_entries.append(
+                    CandidateEntry(
+                        idx=idx,
+                        entry=entry,
+                        metadata=CandidateEntryMetadata(
+                            match_score=0, body_score=0, headers_score=0
+                        ),
+                    )
+                )
 
         # NOTE: following fields, as well as headers accept and sec-fetch-dest could be used to filter further
         # request_resource_type = request.resource_type
         # is_navigation_request = request.is_navigation_request()
 
         # Improvements
-        # TODO: is the model selecting the most chars regardless? or is there some logic that can be extracted
         # ...
         # Requirements
         # TODO: tell when a page wasn't opened and is still working, return -1 in index or figured based on reading front, should consume indices?
+        # TODO: is the model selecting the most chars regardless? or is there some logic that can be extracted
         # koa.com, search bar is a mess, then click to search, chooses the request where you put filters for people, children, etc..., bad.
         # ticketcenter, opened wrong url first, and didn't fail.
         # some websites are very very slow, why? or keep loading during replay for long
         # TODO: log metadata on openai request
         # foxsports loads so many images that require lm_matching
 
+        # =====
+
         # TODO: test replay.py, and get it to navigate same as human
         # TODO: manage replay to explore with n depth script
         # - consider instead of replay, to simply open every URL navigated, and then expand from there, doesn't really need replay itself
-        # TODO: hire a playwright expert to solve stealth issues
         # TODO: review whole eval pipeline creation, and run 1 eval task offline with an agent.
 
         # TODO: package this as a library? probably yea.
@@ -379,12 +361,11 @@ class ReplayBundle:
                 await (route.fallback() if allow_network_fallback else route.abort())
                 return
 
-        entries = [entry for _, entry in candidate_entries]
-        return entries, method, shorter_url
+        return candidate_entries, method, shorter_url
 
     def _fallback_candidates_char_based(
         self, full_url: str, method: str, request
-    ) -> List[dict]:
+    ) -> List[CandidateEntry]:
         # NOTE: explore logs here to find patterns and make less and less lm based selection.
         # NOTE: consider a full char based match, tried a bit and sign in amazon password goes back to password.
         """
@@ -393,15 +374,15 @@ class ReplayBundle:
         """
 
         # Helper function to compute character frequency
-        def count_chars(text: str) -> dict:
-            char_counts = {}
+        def count_chars(text: str) -> dict[str, int]:
+            char_counts: dict[str, int] = {}
             for char in text:
                 char_counts[char] = char_counts.get(char, 0) + 1
             return char_counts
 
         # Helper function to compute character match score
         def compute_char_match_score(
-            target_chars: dict, candidate_chars: dict
+            target_chars: dict[str, int], candidate_chars: dict[str, int]
         ) -> tuple[int, bool]:
             match_score = 0
             matches_all = True
@@ -437,21 +418,17 @@ class ReplayBundle:
             return []
 
         for idx, entry in enumerate(har_entries):
-            request_data = entry.get("request", {})
+            request_data = entry.request
 
             # URL matching (primary criteria)
-            entry_url = request_data.get("url", "")
+            entry_url = request_data.url
             entry_url_chars = count_chars(entry_url)
             url_score, url_matches_all = compute_char_match_score(
                 target_url_chars, entry_url_chars
             )
 
             # Body matching (for logging)
-            entry_body = (
-                request_data.get("postData", {}).get("text", "")
-                if request_data.get("postData")
-                else ""
-            )
+            entry_body = request_data.postData.text if request_data.postData else ""
             entry_body_chars = count_chars(entry_body) if entry_body else {}
             body_score, _ = (
                 compute_char_match_score(target_body_chars, entry_body_chars)
@@ -461,12 +438,7 @@ class ReplayBundle:
 
             # Headers matching (for logging)
             entry_headers = str(
-                sorted(
-                    [
-                        (h.get("name", ""), h.get("value", ""))
-                        for h in request_data.get("headers", [])
-                    ]
-                )
+                sorted([(h.name, h.value) for h in request_data.headers])
             )
             entry_headers_chars = count_chars(entry_headers) if entry_headers else {}
             headers_score, _ = (
@@ -475,43 +447,31 @@ class ReplayBundle:
                 else (0, True)
             )
 
-            data = {
-                "idx": idx,
-                "entry": entry,
-                "match_score": url_score,
-                "matches_all": url_matches_all,
-                "body_score": body_score,
-                "headers_score": headers_score,
-            }
-            same_domain_candidates.append(data)
+            metadata = CandidateEntryMetadata(
+                match_score=url_score,
+                matches_all=url_matches_all,
+                body_score=body_score,
+                headers_score=headers_score,
+            )
 
-        same_domain_candidates.sort(key=lambda x: x["match_score"], reverse=True)
+            same_domain_candidates.append(
+                CandidateEntry(
+                    idx=idx,
+                    entry=entry,
+                    metadata=metadata,
+                )
+            )
+
+        same_domain_candidates.sort(key=lambda x: x.metadata.match_score, reverse=True)
 
         perfect_match = next(
-            (c for c in same_domain_candidates if c["matches_all"]), None
+            (c for c in same_domain_candidates if c.metadata.matches_all), None
         )
 
         if perfect_match:
-            return [(perfect_match["idx"], perfect_match["entry"])]
-
+            same_domain_candidates = [perfect_match]
         top_k = min(5, len(same_domain_candidates))
-        top_candidates = same_domain_candidates[:top_k]
-        # Print candidate information for debugging
-        # print(
-        #     f"\nFound {len(top_candidates)} candidates for {method} {full_url[:100]}..."
-        # )
-        # print(
-        #     f"  Target - Body length: {len(target_body)}, Headers: {len(target_headers_chars)} unique chars"
-        # )
-        # for i, candidate in enumerate(top_candidates):
-        #     entry_url = candidate["entry"].get("request", {}).get("url", "")
-        #     print(f"  {i + 1}. {entry_url[:100]}...")
-        #     print(
-        #         f"      URL score: {candidate['match_score']}/{len(full_url)}, "
-        #         f"Body score: {candidate['body_score']}/{len(target_body) if target_body else 0}, "
-        #         f"Headers score: {candidate['headers_score']}/{len(target_headers) if target_headers else 0}"
-        #     )
-        return [(c["idx"], c["entry"]) for c in top_candidates]
+        return same_domain_candidates[:top_k]
 
     # *********** Caching LM select best entry ***********
 
@@ -542,10 +502,9 @@ class ReplayBundle:
             body_hash = hashlib.md5(post_data.encode()).hexdigest()[:16]
         return f"{method}-{url}-{body_hash}"
 
-    def _find_entry_index_in_har(self, entry: dict) -> Optional[int]:
+    def _find_entry_index_in_har(self, entry: HarEntry) -> Optional[int]:
         """Find the index of an entry in the original HAR entries."""
-        har_entries = self._har_data.get("log", {}).get("entries", [])
-        for idx, har_entry in enumerate(har_entries):
+        for idx, har_entry in enumerate(self._har_entries):
             if har_entry is entry or har_entry == entry:
                 return idx
         return None
@@ -553,10 +512,14 @@ class ReplayBundle:
     # *********** Caching LM select best entry ***********
 
     async def _select_best_entry(
-        self, request: Request, entries: List[dict], method: str, shorter_url: str
+        self,
+        request: Request,
+        entries: List[CandidateEntry],
+        method: str,
+        shorter_url: str,
     ) -> dict:
         if len(entries) == 1:
-            return entries[0]
+            return entries[0].entry
 
         # Get post data for cache key
         try:
@@ -570,25 +533,36 @@ class ReplayBundle:
 
         if not self.ignore_cache and cache_key in cache:
             cached_har_index = cache[cache_key]
-            har_entries = self._har_data.get("log", {}).get("entries", [])
-            if 0 <= cached_har_index < len(har_entries):
-                cached_entry = har_entries[cached_har_index]
+            if 0 <= cached_har_index < len(self._har_entries):
+                cached_entry = self._har_entries[cached_har_index]
                 # Verify it's in our candidates
                 for entry in entries:
-                    if entry is cached_entry or entry == cached_entry:
+                    if entry.entry is cached_entry or entry.entry == cached_entry:
                         logger.info(f"Using cached match for {method} {shorter_url}")
-                        return entry
+                        return entry.entry
 
         logger.info(
             f"Multiple HAR candidates ({len(entries)}) found for {method} {shorter_url}, using LM matching",
         )
 
         candidates = []
-        for entry in entries:
-            entry_request = entry.get("request", {})
-            mime_type = entry.get("response", {}).get("content", {}).get("mimeType")
-            entry_request.update({"responseMimeType": mime_type})
-            candidates.append(entry_request)
+        for candidate_entry in entries:
+            # Convert HarEntry back to dict format for LM matching
+            entry_dict = {
+                "method": candidate_entry.entry.request.method,
+                "url": candidate_entry.entry.request.url,
+                "headers": {
+                    h.name: h.value for h in candidate_entry.entry.request.headers
+                },
+                "postData": {
+                    "mimeType": candidate_entry.entry.request.postData.mimeType,
+                    "text": candidate_entry.entry.request.postData.text,
+                }
+                if candidate_entry.entry.request.postData
+                else None,
+                "responseMimeType": candidate_entry.entry.response.content.mimeType,
+            }
+            candidates.append(entry_dict)
 
         idx = await retrieve_best_request_match(
             target_request=request,
@@ -598,33 +572,35 @@ class ReplayBundle:
             return None
 
         # NOTE: consider consumed indices (?)
-        selected_entry = entries[idx]
+        selected_candidate = entries[idx]
 
         # Save to cache
-        har_index = self._find_entry_index_in_har(selected_entry)
+        har_index = self._find_entry_index_in_har(selected_candidate.entry)
         if har_index is not None:
             self._save_to_matches_cache(cache_key, har_index)
 
-        return selected_entry
+        return selected_candidate.entry
 
     async def _fulfill_request_with_entry_found(
         self,
         request: Request,
-        entry: dict,
+        entry: HarEntry,
         route: Route,
         allow_network_fallback: bool = False,
     ) -> None:
         # TODO: ensure this matches as expected
-        response = entry.get("response", {})
-        status = response.get("status", 200)
-        headers = {h["name"]: h["value"] for h in response.get("headers", [])}
-        content = response.get("content", {})
+        # Entry is already a HarEntry object
+        response = entry.response
+
+        status = response.status
+        headers = {h.name: h.value for h in response.headers}
+        content = response.content
 
         # Handle different response body types
         body = None
-        if "text" in content:
-            text = content["text"]
-            encoding = content.get("encoding", "")
+        if content.text:
+            text = content.text
+            encoding = content.encoding or ""
 
             if encoding == "base64":
                 # Decode base64 to bytes for binary content
@@ -649,20 +625,22 @@ class ReplayBundle:
             status=status,
             headers=headers,
             body=body,
-            content_type=content.get("mimeType"),
+            content_type=content.mimeType,
         )
 
-    def _get_har_matches_by_base_url(self, full_url: str, method: str) -> List[dict]:
-        har_entries = self._har_data.get("log", {}).get("entries", [])
+    def _get_har_matches_by_base_url(
+        self, full_url: str, method: str
+    ) -> List[HarEntry]:
+        # TODO: baseUrl vs this
         base_url = urlparse(full_url).netloc
         matches = []
-        for idx, entry in enumerate(har_entries):
+        for idx, entry in enumerate(self._har_entries):
             if idx in self._consumed_har_indices:
                 continue
 
-            entry_request = entry.get("request", {})
-            entry_method = entry_request.get("method", "GET").upper()
-            entry_url = entry_request.get("url", "")
+            entry_request = entry.request
+            entry_method = entry_request.method.upper()
+            entry_url = entry_request.url
 
             if not entry_url or entry_method != method:
                 continue
