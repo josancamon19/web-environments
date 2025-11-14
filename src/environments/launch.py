@@ -205,7 +205,11 @@ class ReplayBundle:
         return f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
 
     @staticmethod
-    def _get_shorter_url(url: str, max_length: int = 100) -> str:
+    def _get_shorter_url(
+        url: str, max_length: int = 100, normalize: bool = False
+    ) -> str:
+        if normalize:
+            url = normalize_url_for_matching(url)
         return url[:max_length] + "..." if len(url) > max_length else url
 
     async def build_context(
@@ -311,9 +315,6 @@ class ReplayBundle:
         candidate_entries = []
         metadata = {}
         for idx, entry in enumerate(self._har_entries):
-            # TODO: should consume indices everyehwere? how to track from main match, what has been consumed anyways?
-            # if idx in self._consumed_har_indices:
-            #     continue
             entry_url_base = self._get_url_base(entry.request.url)
             if entry.request.method.upper() == method and entry_url_base == url_base:
                 candidate_entries.append(
@@ -333,12 +334,13 @@ class ReplayBundle:
         # Improvements
         # ...
         # Requirements
-        # TODO: tell when a page wasn't opened and is still working, return -1 in index or figured based on reading front, should consume indices?
-        # TODO: is the model selecting the most chars regardless? or is there some logic that can be extracted
-        # koa.com, search bar is a mess, then click to search, chooses the request where you put filters for people, children, etc..., bad.
-        # ticketcenter, opened wrong url first, and didn't fail.
-        # some websites are very very slow, why? or keep loading during replay for long
-        # foxsports loads so many images that require lm_matching
+        # TODO: char based, if 2 requests have 90%+ match, but one has 20% more matches in headers or body, choose right away
+        # TODO: no char based, add logging, and add char matching, just to logs, to understand when to remove no char based match.
+
+        # TODO: some websites are very very slow, why? or keep loading during replay for long
+        # TODO: foxsports loads so many images that require lm_matching
+        # TODO: tell when a page wasn't opened and is still working, return -1 in index? vs consumed indices?
+        # TODO: sometimes selector returns JSON instead of website contents, this should be handled.
 
         # =====
 
@@ -485,12 +487,12 @@ class ReplayBundle:
         top_k = min(5, len(same_domain_candidates))
         top_candidates = same_domain_candidates[:top_k]
         # Log candidate information
-        logger.info(
-            "Found %d candidates for %s %s",
-            len(same_domain_candidates),
-            method,
-            self._get_shorter_url(full_url),
-        )
+        # logger.info(
+        #     "Found %d candidates for %s %s",
+        #     len(same_domain_candidates),
+        #     method,
+        #     self._get_shorter_url(full_url),
+        # )
 
         # Collect metadata for LM matching
         url_scores = []
@@ -499,8 +501,8 @@ class ReplayBundle:
         headers_scores = []
 
         for i, candidate in enumerate(top_candidates):
-            candidate_url = candidate.entry.request.url
-            candidate_shorter_url = self._get_shorter_url(candidate_url, max_length=80)
+            # candidate_url = candidate.entry.request.url
+            # candidate_shorter_url = self._get_shorter_url(candidate_url, max_length=80)
 
             url_score = candidate.metadata.match_score
             url_score_pct = (
@@ -514,15 +516,15 @@ class ReplayBundle:
             body_scores.append(body_score)
             headers_scores.append(headers_score)
 
-            logger.info(
-                "  Candidate %d: %s (url_score=%.2f - %.2f  , body_score=%.2f, headers_score=%.2f)",
-                i,
-                candidate_shorter_url,
-                url_score,
-                url_score_pct,
-                body_score,
-                headers_score,
-            )
+            # logger.info(
+            #     "  Candidate %d: %s (url_score=%.2f - %.2f  , body_score=%.2f, headers_score=%.2f)",
+            #     i,
+            #     candidate_shorter_url,
+            #     url_score,
+            #     url_score_pct,
+            #     body_score,
+            #     headers_score,
+            # )
 
         metadata = {
             "scores_url": ", ".join(map(str, url_scores)),
@@ -581,7 +583,7 @@ class ReplayBundle:
         if len(candidates) == 1:
             return candidates[0].entry
 
-        shorter_url = self._get_shorter_url(request.url)
+        shorter_url = self._get_shorter_url(request.url, normalize=True)
 
         # Get post data for cache key
         try:
@@ -615,7 +617,7 @@ class ReplayBundle:
             metadata=metadata,
         )
 
-        logger.info(f"Selected candidate index {idx} for {method} {shorter_url}")
+        # logger.info(f"Selected candidate index {idx} for {method} {shorter_url}")
         selected_candidate = candidates[idx]
 
         # Save to cache
@@ -755,7 +757,7 @@ async def _cli(
         page = await context.new_page()
         start_url = bundle.guess_start_url() or "about:blank"
         logger.info("Opening %s", start_url)
-        await page.goto(start_url, timeout=60000)
+        await page.goto(start_url, timeout=90000)
 
         if trajectory_steps:
             executor = TaskStepExecutor(

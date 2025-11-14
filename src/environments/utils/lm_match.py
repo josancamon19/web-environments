@@ -16,9 +16,6 @@ class ResponseFormat(BaseModel):
     confidence: float = Field(description="The confidence score for the selected match")
 
 
-# TODO: sometimes selector returns JSON instead of website contents, this should be handled.
-
-
 def _serialize_request(request: Request | dict[str, Any]) -> dict[str, Any]:
     """Convert a Playwright Request object to a JSON-serializable dict.
 
@@ -92,7 +89,7 @@ async def retrieve_best_request_match(
         result, resp_id = await openai_structured_output_request_async(
             prompt_name="lm_match",
             model="gpt-5-nano",
-            reasoning="minimal",
+            reasoning="low",
             text_format=ResponseFormat,
             metadata=metadata,
             request=request_str,
@@ -102,7 +99,7 @@ async def retrieve_best_request_match(
         selected_idx = result.selected_match
         if selected_idx != 0:
             logger.info(
-                "Interesting response details: https://platform.openai.com/logs/%s",
+                "Relevant LM match response details: https://platform.openai.com/logs/%s",
                 resp_id,
             )
 
