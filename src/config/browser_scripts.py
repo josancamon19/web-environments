@@ -61,7 +61,7 @@ if (!window.__RECORDER_EVENT_LISTENER_LOADED__) {
 
   function flushQueuedEvents() {
     try {
-      if (typeof window.onPageEvent === 'function' && Array.isArray(window.__RECORDER_QUEUE__) && window.__RECORDER_QUEUE__.length) {
+      if (window.onPageEvent && typeof window.onPageEvent === 'function' && Array.isArray(window.__RECORDER_QUEUE__) && window.__RECORDER_QUEUE__.length) {
         const batch = window.__RECORDER_QUEUE__.splice(0, window.__RECORDER_QUEUE__.length);
         for (const evt of batch) {
           try { window.onPageEvent(evt); } catch (_) { /* stop flushing on hard failure */ break; }
@@ -80,9 +80,16 @@ if (!window.__RECORDER_EVENT_LISTENER_LOADED__) {
         const data = e && e.data;
         if (data && data.__RECORDER_EVENT__) {
           const eventInfo = data.__RECORDER_EVENT__;
-          if (typeof window.onPageEvent === 'function') {
-            window.onPageEvent(eventInfo);
-          } else {
+          let bindingCalled = false;
+          try {
+            if (window.onPageEvent && typeof window.onPageEvent === 'function') {
+              window.onPageEvent(eventInfo);
+              bindingCalled = true;
+            }
+          } catch (bindingError) {
+            // Binding failed, fall through to enqueue
+          }
+          if (!bindingCalled) {
             enqueueEvent(eventInfo);
           }
         }
@@ -103,12 +110,26 @@ if (!window.__RECORDER_EVENT_LISTENER_LOADED__) {
             page_title: document.title,
         }
       };
-      if (typeof window.onPageEvent === 'function') {
-        window.onPageEvent(eventObj);
-        if (type === 'scroll') {
-          console.log('[RECORDER] ✅ Scroll event sent via onPageEvent');
+      
+      // Try to call the binding if it exists and is callable
+      let bindingCalled = false;
+      try {
+        if (window.onPageEvent && typeof window.onPageEvent === 'function') {
+          // Double-check it's actually callable by attempting to call it
+          window.onPageEvent(eventObj);
+          bindingCalled = true;
+          if (type === 'scroll') {
+            console.log('[RECORDER] ✅ Scroll event sent via onPageEvent');
+          }
         }
-      } else {
+      } catch (bindingError) {
+        // Binding exists but failed to call - fall through to fallback
+        if (type === 'scroll') {
+          console.log('[RECORDER] ⚠️ onPageEvent binding error, using fallback:', bindingError.message);
+        }
+      }
+      
+      if (!bindingCalled) {
         // If we're inside an iframe or binding not yet ready, try parent first, else queue
         if (type === 'scroll') {
           console.log('[RECORDER] ⚠️ onPageEvent not available, queuing scroll event');
