@@ -66,8 +66,9 @@ async def openai_structured_output_request_async(
     model: str = "gpt-5",
     reasoning: str = "high",
     text_format: BaseModel = None,
+    metadata: dict[str, Any] = None,
     **format_kwargs,
-):
+) -> tuple[BaseModel, str]:
     """Make an async structured output request to OpenAI API.
 
     Args:
@@ -85,14 +86,16 @@ async def openai_structured_output_request_async(
         wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5)
     ):
         with attempt:
+            metadata = metadata or {}
+            metadata["source"] = prompt_name
             response = await async_client.responses.parse(
                 model=model,
                 reasoning={"effort": reasoning},
                 input=[{"role": "user", "content": prompt}],
-                metadata={"source": prompt_name},
+                metadata=metadata,
                 text_format=text_format,
             )
-            return response.output_parsed
+            return response.output_parsed, response.id
 
 
 # SMARTER retry

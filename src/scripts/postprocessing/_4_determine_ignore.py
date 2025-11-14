@@ -81,7 +81,7 @@ async def process_url_batch(batch_data: tuple) -> set:
         # Format URLs with indices
         url_list = "\n".join([f"{i}: {url}" for i, url in enumerate(batch_urls)])
 
-        result = await openai_structured_output_request_async(
+        result, _ = await openai_structured_output_request_async(
             prompt_name="determine_ignore",
             model="gpt-5",
             reasoning="high",

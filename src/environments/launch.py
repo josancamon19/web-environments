@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
+from utils.normalize_url import normalize_url_for_matching
 from typing import Any, Dict, List, Optional, Set
 
 from config.browser_config import BROWSER_ARGS, CONTEXT_CONFIG, IGNORE_DEFAULT_ARGS
@@ -203,6 +204,10 @@ class ReplayBundle:
         parsed = urlparse(url)
         return f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
 
+    @staticmethod
+    def _get_shorter_url(url: str, max_length: int = 100) -> str:
+        return url[:max_length] + "..." if len(url) > max_length else url
+
     async def build_context(
         self,
         browser: Browser,
@@ -282,8 +287,8 @@ class ReplayBundle:
         if not data:
             return
 
-        entries, method, shorter_url = data
-        entry = await self._select_best_entry(request, entries, method, shorter_url)
+        candidates, method, metadata = data
+        entry = await self._select_best_entry(request, candidates, method, metadata)
         if not entry:
             await route.abort()
             return
@@ -293,18 +298,22 @@ class ReplayBundle:
         )
 
     async def _obtain_request_candidates(
-        self, request: Request, route: Route, allow_network_fallback: bool = False
+        self,
+        request: Request,
+        route: Route,
+        allow_network_fallback: bool = False,
     ) -> tuple[List[CandidateEntry], str, str] | None:
         method = request.method.upper()
         full_url = request.url
-        shorter_url = full_url[:100] + "..." if len(full_url) > 100 else full_url
 
         # Find candidate entries by matching method and URL base
         url_base = self._get_url_base(full_url)
         candidate_entries = []
+        metadata = {}
         for idx, entry in enumerate(self._har_entries):
-            if idx in self._consumed_har_indices:
-                continue
+            # TODO: should consume indices everyehwere? how to track from main match, what has been consumed anyways?
+            # if idx in self._consumed_har_indices:
+            #     continue
             entry_url_base = self._get_url_base(entry.request.url)
             if entry.request.method.upper() == method and entry_url_base == url_base:
                 candidate_entries.append(
@@ -329,7 +338,6 @@ class ReplayBundle:
         # koa.com, search bar is a mess, then click to search, chooses the request where you put filters for people, children, etc..., bad.
         # ticketcenter, opened wrong url first, and didn't fail.
         # some websites are very very slow, why? or keep loading during replay for long
-        # TODO: log metadata on openai request
         # foxsports loads so many images that require lm_matching
 
         # =====
@@ -351,21 +359,24 @@ class ReplayBundle:
                 await route.abort()
                 return
 
-            candidate_entries = self._fallback_candidates_char_based(
+            candidate_entries, metadata = self._fallback_candidates_char_based(
                 full_url, method, request
             )
             if not candidate_entries:
                 logger.warning(
-                    f"No matching HAR entry found for {method} {shorter_url}, aborting",
+                    f"No matching HAR entry found for {method} {self._get_shorter_url(full_url)}, aborting",
                 )
                 await (route.fallback() if allow_network_fallback else route.abort())
                 return
 
-        return candidate_entries, method, shorter_url
+        return candidate_entries, method, metadata
 
     def _fallback_candidates_char_based(
-        self, full_url: str, method: str, request
-    ) -> List[CandidateEntry]:
+        self,
+        full_url: str,
+        method: str,
+        request: Request,
+    ) -> tuple[list[CandidateEntry], dict[str, Any]]:
         # NOTE: explore logs here to find patterns and make less and less lm based selection.
         # NOTE: consider a full char based match, tried a bit and sign in amazon password goes back to password.
         """
@@ -395,8 +406,9 @@ class ReplayBundle:
                     matches_all = False
             return match_score, matches_all
 
-        # Get target request data
-        target_url_chars = count_chars(full_url)
+        # Get target request data - normalize URL before counting chars
+        normalized_target_url = normalize_url_for_matching(full_url)
+        target_url_chars = count_chars(normalized_target_url)
 
         # Get request body if available
         target_body = ""
@@ -412,17 +424,17 @@ class ReplayBundle:
         target_headers_chars = count_chars(target_headers) if target_headers else {}
 
         # Find all HAR entries with the same domain and method
-        same_domain_candidates = []
-        har_entries = self._get_har_matches_by_base_url(full_url, method)
+        same_domain_candidates: list[CandidateEntry] = []
+        har_entries = self._get_har_matches_by_host_and_method(full_url, method)
         if not har_entries:
-            return []
+            return same_domain_candidates
 
         for idx, entry in enumerate(har_entries):
             request_data = entry.request
 
-            # URL matching (primary criteria)
-            entry_url = request_data.url
-            entry_url_chars = count_chars(entry_url)
+            # URL matching (primary criteria) - normalize URL before counting chars
+            normalized_entry_url = normalize_url_for_matching(request_data.url)
+            entry_url_chars = count_chars(normalized_entry_url)
             url_score, url_matches_all = compute_char_match_score(
                 target_url_chars, entry_url_chars
             )
@@ -447,7 +459,7 @@ class ReplayBundle:
                 else (0, True)
             )
 
-            metadata = CandidateEntryMetadata(
+            metadata: CandidateEntryMetadata = CandidateEntryMetadata(
                 match_score=url_score,
                 matches_all=url_matches_all,
                 body_score=body_score,
@@ -471,7 +483,55 @@ class ReplayBundle:
         if perfect_match:
             same_domain_candidates = [perfect_match]
         top_k = min(5, len(same_domain_candidates))
-        return same_domain_candidates[:top_k]
+        top_candidates = same_domain_candidates[:top_k]
+        # Log candidate information
+        logger.info(
+            "Found %d candidates for %s %s",
+            len(same_domain_candidates),
+            method,
+            self._get_shorter_url(full_url),
+        )
+
+        # Collect metadata for LM matching
+        url_scores = []
+        url_scores_percent = []
+        body_scores = []
+        headers_scores = []
+
+        for i, candidate in enumerate(top_candidates):
+            candidate_url = candidate.entry.request.url
+            candidate_shorter_url = self._get_shorter_url(candidate_url, max_length=80)
+
+            url_score = candidate.metadata.match_score
+            url_score_pct = (
+                candidate.metadata.match_score / len(normalized_target_url)
+            ) * 100
+            body_score = candidate.metadata.body_score
+            headers_score = candidate.metadata.headers_score
+
+            url_scores.append(url_score)
+            url_scores_percent.append(round(url_score_pct, 2))
+            body_scores.append(body_score)
+            headers_scores.append(headers_score)
+
+            logger.info(
+                "  Candidate %d: %s (url_score=%.2f - %.2f  , body_score=%.2f, headers_score=%.2f)",
+                i,
+                candidate_shorter_url,
+                url_score,
+                url_score_pct,
+                body_score,
+                headers_score,
+            )
+
+        metadata = {
+            "scores_url": ", ".join(map(str, url_scores)),
+            "scores_url_pct": ", ".join(map(str, url_scores_percent)),
+            "scores_body": ", ".join(map(str, body_scores)),
+            "scores_headers": ", ".join(map(str, headers_scores)),
+        }
+
+        return top_candidates, metadata
 
     # *********** Caching LM select best entry ***********
 
@@ -514,12 +574,14 @@ class ReplayBundle:
     async def _select_best_entry(
         self,
         request: Request,
-        entries: List[CandidateEntry],
+        candidates: list[CandidateEntry],
         method: str,
-        shorter_url: str,
-    ) -> dict:
-        if len(entries) == 1:
-            return entries[0].entry
+        metadata: dict[str, Any],
+    ) -> HarEntry:
+        if len(candidates) == 1:
+            return candidates[0].entry
+
+        shorter_url = self._get_shorter_url(request.url)
 
         # Get post data for cache key
         try:
@@ -536,43 +598,25 @@ class ReplayBundle:
             if 0 <= cached_har_index < len(self._har_entries):
                 cached_entry = self._har_entries[cached_har_index]
                 # Verify it's in our candidates
-                for entry in entries:
+                for entry in candidates:
                     if entry.entry is cached_entry or entry.entry == cached_entry:
                         logger.info(f"Using cached match for {method} {shorter_url}")
                         return entry.entry
 
         logger.info(
-            f"Multiple HAR candidates ({len(entries)}) found for {method} {shorter_url}, using LM matching",
+            f"Multiple HAR candidates ({len(candidates)}) found for {method} {shorter_url}, using LM matching",
         )
 
-        candidates = []
-        for candidate_entry in entries:
-            # Convert HarEntry back to dict format for LM matching
-            entry_dict = {
-                "method": candidate_entry.entry.request.method,
-                "url": candidate_entry.entry.request.url,
-                "headers": {
-                    h.name: h.value for h in candidate_entry.entry.request.headers
-                },
-                "postData": {
-                    "mimeType": candidate_entry.entry.request.postData.mimeType,
-                    "text": candidate_entry.entry.request.postData.text,
-                }
-                if candidate_entry.entry.request.postData
-                else None,
-                "responseMimeType": candidate_entry.entry.response.content.mimeType,
-            }
-            candidates.append(entry_dict)
-
+        # Convert to LM match format for matching, but keep original candidates
+        lm_match_candidates = [c.entry.to_lm_match_format() for c in candidates]
         idx = await retrieve_best_request_match(
             target_request=request,
-            candidates=candidates,
+            candidates=lm_match_candidates,
+            metadata=metadata,
         )
-        if idx is None:
-            return None
 
-        # NOTE: consider consumed indices (?)
-        selected_candidate = entries[idx]
+        logger.info(f"Selected candidate index {idx} for {method} {shorter_url}")
+        selected_candidate = candidates[idx]
 
         # Save to cache
         har_index = self._find_entry_index_in_har(selected_candidate.entry)
@@ -586,10 +630,8 @@ class ReplayBundle:
         request: Request,
         entry: HarEntry,
         route: Route,
-        allow_network_fallback: bool = False,
+        allow_network_fallback: bool,
     ) -> None:
-        # TODO: ensure this matches as expected
-        # Entry is already a HarEntry object
         response = entry.response
 
         status = response.status
@@ -622,17 +664,14 @@ class ReplayBundle:
                 body = text
 
         await route.fulfill(
-            status=status,
-            headers=headers,
-            body=body,
-            content_type=content.mimeType,
+            status=status, headers=headers, body=body, content_type=content.mimeType
         )
 
-    def _get_har_matches_by_base_url(
+    # *********** Utilities *************
+
+    def _get_har_matches_by_host_and_method(
         self, full_url: str, method: str
     ) -> List[HarEntry]:
-        # TODO: baseUrl vs this
-        base_url = urlparse(full_url).netloc
         matches = []
         for idx, entry in enumerate(self._har_entries):
             if idx in self._consumed_har_indices:
@@ -645,7 +684,7 @@ class ReplayBundle:
             if not entry_url or entry_method != method:
                 continue
 
-            if urlparse(entry_url).netloc == base_url:
+            if urlparse(entry_url).netloc == urlparse(full_url).netloc:
                 matches.append(entry)
         return matches
 

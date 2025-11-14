@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from rebrowser_playwright.async_api import Request
 
 from utils.oai import openai_structured_output_request_async
+from utils.normalize_url import normalize_url_for_matching
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ def _serialize_request(request: Request | dict[str, Any]) -> dict[str, Any]:
     # Extract serializable properties from Playwright Request
     serialized = {
         "method": request.method,
-        "url": request.url,
+        "url": normalize_url_for_matching(request.url),
         "headers": dict(request.headers),
         "resourceType": request.resource_type,
         "isNavigationRequest": request.is_navigation_request(),
@@ -46,14 +47,14 @@ def _serialize_request(request: Request | dict[str, Any]) -> dict[str, Any]:
     return serialized
 
 
-def _get_request_string(i: int | None, request: Request | dict[str, Any]) -> str:
-    serialized = _serialize_request(request)
+def _get_request_string(i: int | None, request: dict[str, Any]) -> str:
+    resource_type = request.get("resourceType")  # applies to target
+    is_navigation_request = request.get("isNavigationRequest")  # applies to target
+    response_mime_type = request.get("responseMimeType")  # applies to candidates
 
-    resource_type = serialized.get("resourceType")  # applies to target
-    is_navigation_request = serialized.get("isNavigationRequest")  # applies to target
-    response_mime_type = serialized.get("responseMimeType")  # applies to candidates
-
-    candidate_str = f"{str(i) + ' ' if i is not None else ''}{serialized['method']} {serialized['url']}"
+    candidate_str = (
+        f"{str(i) + ' ' if i is not None else ''}{request['method']} {request['url']}"
+    )
 
     if resource_type:
         candidate_str += f"\n- resource type: ({resource_type})"
@@ -62,10 +63,10 @@ def _get_request_string(i: int | None, request: Request | dict[str, Any]) -> str
     if response_mime_type:
         candidate_str += f"\n- response MIME type: {response_mime_type}"
 
-    if headers := serialized.get("headers"):
+    if headers := request.get("headers"):
         candidate_str += f"\n- headers: ```{json.dumps(headers, ensure_ascii=False)}```"
 
-    if post_data := serialized.get("postData"):
+    if post_data := request.get("postData"):
         candidate_str += (
             f"\n- post data: ```{json.dumps(post_data, ensure_ascii=False)}```"
         )
@@ -74,32 +75,36 @@ def _get_request_string(i: int | None, request: Request | dict[str, Any]) -> str
 
 
 async def retrieve_best_request_match(
-    target_request: Request | dict[str, Any],
+    target_request: Request,
     candidates: list[dict[str, Any]],
+    metadata: dict[str, Any] = None,
 ) -> int:
     if not candidates:
         raise ValueError("candidates list cannot be empty")
 
     # Serialize the request if it's a Playwright Request object
-    candidate_strings = []
-    for i, candidate in enumerate(candidates):
-        candidate_strings.append(_get_request_string(i, candidate))
-
+    candidate_strings = [_get_request_string(i, c) for i, c in enumerate(candidates)]
     candidates_str = "\n\n".join(candidate_strings)
-    request_str = _get_request_string(None, target_request)
+    request_str = _get_request_string(None, _serialize_request(target_request))
 
     try:
         # Call OpenAI API with structured outputs using centralized utility
-        result = await openai_structured_output_request_async(
+        result, resp_id = await openai_structured_output_request_async(
             prompt_name="lm_match",
             model="gpt-5-nano",
             reasoning="minimal",
             text_format=ResponseFormat,
+            metadata=metadata,
             request=request_str,
             candidates=candidates_str,
         )
 
         selected_idx = result.selected_match
+        if selected_idx != 0:
+            logger.info(
+                "Interesting response details: https://platform.openai.com/logs/%s",
+                resp_id,
+            )
 
         # Validate index is within bounds
         if selected_idx < 0 or selected_idx >= len(candidates):

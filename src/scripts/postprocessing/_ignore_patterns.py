@@ -304,4 +304,8 @@ IGNORED_PATTERNS = [
     "openx.net",
     "adtrafficquality.google",
     "recaptcha",
+    "hubspot.com",
+    "mountain.com",
+    "www.google.com/ccm/collect",
+    "www.google.com/gmp/conversion",
 ]
