@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Register Hotel - StayScout</title>
+    <link rel="stylesheet" href="/static-pages.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Register Hotel (Static)</h1>
+      <nav>
+        <a href="/">Back to SPA</a>
+        <a href="/zillow.html" target="_blank">Zillow view</a>
+      </nav>
+    </header>
+    <main>
+      <section>
+        <h2>Quick instructions</h2>
+        <p>
+          The main hotel registration experience lives in the React single page app, but this static page shows how
+          a classic form could submit to the same backend.
+        </p>
+      </section>
+      <section>
+        <h2>Owner form</h2>
+        <form class="static-form" method="post" action="http://localhost:4000/hotels" id="static-hotel-form">
+          <label>
+            Name
+            <input name="name" required />
+          </label>
+          <label>
+            City
+            <input name="city" required />
+          </label>
+          <label>
+            Price per night
+            <input name="pricePerNight" type="number" step="0.01" required />
+          </label>
+          <label>
+            Description
+            <textarea name="description" rows="3"></textarea>
+          </label>
+          <label>
+            Image URL
+            <input name="imageUrl" />
+          </label>
+          <p class="info">Note: This demo form expects you to be authenticated via the SPA before submitting.</p>
+          <p class="static-status" id="static-status"></p>
+          <button type="submit">Submit listing</button>
+        </form>
+      </section>
+    </main>
+    <footer>
+      <a href="/">Return to StayScout SPA</a>
+    </footer>
+    <script>
+      const form = document.getElementById('static-hotel-form');
+      const statusNode = document.getElementById('static-status');
+      const endpoint = 'http://localhost:4000/hotels';
+
+      if (form) {
+        form.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          if (statusNode) {
+            statusNode.textContent = 'Submitting hotel…';
+            statusNode.classList.remove('error');
+            statusNode.classList.add('loading');
+          }
+          const formData = new FormData(form);
+          const payload = Object.fromEntries(formData.entries());
+          payload.pricePerNight = Number(payload.pricePerNight);
+          try {
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify(payload),
+            });
+            if (!response.ok) {
+              const error = await response.json().catch(() => ({ message: 'Unable to register hotel.' }));
+              throw new Error(error.message || 'Unable to register hotel.');
+            }
+            window.location.href = '/';
+          } catch (error) {
+            if (statusNode) {
+              statusNode.textContent = error.message;
+              statusNode.classList.remove('loading');
+              statusNode.classList.add('error');
+            }
+          }
+        });
+      }
+    </script>
+  </body>
+</html>
+
