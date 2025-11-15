@@ -348,7 +348,6 @@ class ReplayBundle:
         # TODO: manage replay to explore with n depth script
         # - consider instead of replay, to simply open every URL navigated, and then expand from there, doesn't really need replay itself
         # TODO: review whole eval pipeline creation, and run 1 eval task offline with an agent.
-
         # TODO: package this as a library? probably yea.
 
         if not candidate_entries:
@@ -429,7 +428,7 @@ class ReplayBundle:
         same_domain_candidates: list[CandidateEntry] = []
         har_entries = self._get_har_matches_by_host_and_method(full_url, method)
         if not har_entries:
-            return same_domain_candidates
+            return same_domain_candidates, {}
 
         for idx, entry in enumerate(har_entries):
             request_data = entry.request

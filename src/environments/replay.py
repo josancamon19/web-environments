@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 from typing import Any, Dict, Optional, Tuple
 from rebrowser_playwright.async_api import (
     Page,
@@ -13,6 +14,8 @@ logger = logging.getLogger(__name__)
 # NOTE: This executor replays user actions (clicks, inputs, submits, etc.) from recorded trajectories.
 # Navigations are triggered naturally by user actions (clicks, submits) rather than being replayed directly.
 # Only the initial navigation is performed to set up the starting state.
+
+# TODO: refresh page when something fails?
 
 
 class TaskStepExecutor:
@@ -76,7 +79,7 @@ class TaskStepExecutor:
         self, page: Page, action: str, payload: Dict[str, Any]
     ) -> None:
         if action == "click":
-            await self._perform_pointer_click(page, payload)
+            await self._perform_pointer_move(page, payload, click=True)
             return
         if action == "hover":
             await self._perform_pointer_move(page, payload)
@@ -93,38 +96,38 @@ class TaskStepExecutor:
         if action == "submit":
             await self._perform_submit(page, payload)
 
-    async def _perform_pointer_click(self, page: Page, payload: Dict[str, Any]) -> None:
-        coords: Optional[Tuple[float, float]] = self._extract_coordinates(payload)
-        if coords is None:
-            selector: Optional[str] = self._build_selector(payload)
-            if selector:
-                try:
-                    # Use locator for better reliability and auto-waiting
-                    await page.locator(selector).click(timeout=5000)
-                except PlaywrightTimeoutError:
-                    logger.error(
-                        "Failed to click element with selector: %s",
-                        selector,
-                        exc_info=True,
-                    )
-                    raise
-            else:
-                logger.error(
-                    "Cannot perform click: no coordinates or selector available"
-                )
-                raise Exception("No coordinates or selector available for click")
-            return
+    async def _perform_pointer_move(
+        self, page: Page, payload: Dict[str, Any], click: bool = False
+    ) -> None:
+        # Prefer coordinates first, as this ignores changes in selector variation, like id's classes changes, due to DOM being dynamic.
+        coords: Optional[Tuple[float, float]] = await self._prepare_coordinates(
+            page, payload
+        )
         x, y = coords
         await page.mouse.move(x, y)
         await asyncio.sleep(0.1)
-        await page.mouse.click(x, y)
+        if click:
+            await page.mouse.click(x, y)
+            await self._post_action_settle(page)
 
-    async def _perform_pointer_move(self, page: Page, payload: Dict[str, Any]) -> None:
-        coords: Optional[Tuple[float, float]] = self._extract_coordinates(payload)
-        if coords is None:
-            return
-        x, y = coords
-        await page.mouse.move(x, y)
+        # selector: Optional[str] = self._build_selector(payload)
+        # if selector:
+        #     try:
+        #         await page.locator(selector).hover(timeout=5000)
+        #         return
+        #     except PlaywrightTimeoutError:
+        #         logger.debug(
+        #             "Hover via selector %s timed out, trying coordinate fallback",
+        #             selector,
+        #         )
+        #     except Exception as exc:
+        #         logger.debug(
+        #             "Hover via selector %s failed (%s), trying coordinate fallback",
+        #             selector,
+        #             exc,
+        #         )
+        # else:
+        #     logger.debug("Skipping hover: no usable coordinates or selector")
 
     async def _perform_scroll(self, page: Page, payload: Dict[str, Any]) -> None:
         x: Any = payload.get("x")
@@ -289,6 +292,81 @@ class TaskStepExecutor:
                 return float(left + width / 2), float(top + height / 2)
         return None
 
+    async def _prepare_coordinates(
+        self, page: Page, payload: Dict[str, Any]
+    ) -> Optional[Tuple[float, float]]:
+        coords = self._extract_coordinates(payload)
+        if coords is None:
+            return None
+        return await self._normalize_coordinates(page, coords, payload)
+
+    async def _normalize_coordinates(
+        self,
+        page: Page,
+        coords: Tuple[float, float],
+        payload: Dict[str, Any],
+    ) -> Optional[Tuple[float, float]]:
+        x, y = coords
+        if not (math.isfinite(x) and math.isfinite(y)):
+            return None
+
+        viewport = self._get_viewport_from_payload(payload)
+        if viewport is None:
+            viewport = await self._get_runtime_viewport(page)
+
+        if viewport:
+            width = self._to_float(viewport.get("width"))
+            height = self._to_float(viewport.get("height"))
+            if width and width > 1:
+                x = max(0.0, min(x, width - 1))
+            if height and height > 1:
+                y = max(0.0, min(y, height - 1))
+
+        if not (math.isfinite(x) and math.isfinite(y)):
+            return None
+
+        return x, y
+
+    def _get_viewport_from_payload(
+        self, payload: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        viewport: Any = payload.get("viewport")
+        coordinates: Any = payload.get("coordinates")
+        if isinstance(coordinates, dict):
+            coord_viewport = coordinates.get("viewport")
+            if isinstance(coord_viewport, dict):
+                viewport = coord_viewport
+        if isinstance(viewport, dict):
+            return viewport
+        return None
+
+    async def _get_runtime_viewport(self, page: Page) -> Optional[Dict[str, Any]]:
+        try:
+            viewport_size = page.viewport_size
+            if viewport_size:
+                return {
+                    "width": viewport_size.get("width", 0),
+                    "height": viewport_size.get("height", 0),
+                }
+            return await page.evaluate(
+                """() => ({
+                    width: window.innerWidth || 0,
+                    height: window.innerHeight || 0,
+                    devicePixelRatio: window.devicePixelRatio || 1
+                })"""
+            )
+        except Exception:
+            return None
+
+    @staticmethod
+    def _to_float(value: Any) -> Optional[float]:
+        if isinstance(value, (int, float)):
+            return float(value)
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
     def _build_selector(self, payload: Dict[str, Any]) -> Optional[str]:
         element_id: Any = payload.get("id") if isinstance(payload, dict) else None
         if element_id:
@@ -305,6 +383,12 @@ class TaskStepExecutor:
                 prefix: str = (tag or "*").lower() if tag else "*"
                 return f"{prefix}{''.join('.' + cls for cls in classes)}"
         return None
+
+    async def _post_action_settle(self, page: Page) -> None:
+        try:
+            await page.wait_for_load_state("networkidle", timeout=2000)  # type: ignore[arg-type]
+        except Exception:
+            await asyncio.sleep(0.05)
 
     @staticmethod
     def _is_valid_point(point: Any) -> bool:
