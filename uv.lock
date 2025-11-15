@@ -1766,6 +1766,37 @@ wheels = [
 ]
 
 [[package]]
+name = "playwright"
+version = "1.56.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "greenlet" },
+    { name = "pyee" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6b/31/a5362cee43f844509f1f10d8a27c9cc0e2f7bdce5353d304d93b2151c1b1/playwright-1.56.0-py3-none-macosx_10_13_x86_64.whl", hash = "sha256:b33eb89c516cbc6723f2e3523bada4a4eb0984a9c411325c02d7016a5d625e9c", size = 40611424, upload-time = "2025-11-11T18:39:10.175Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/95/347eef596d8778fb53590dc326c344d427fa19ba3d42b646fce2a4572eb3/playwright-1.56.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:b228b3395212b9472a4ee5f1afe40d376eef9568eb039fcb3e563de8f4f4657b", size = 39400228, upload-time = "2025-11-11T18:39:13.915Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/54/6ad97b08b2ca1dfcb4fbde4536c4f45c0d9d8b1857a2d20e7bbfdf43bf15/playwright-1.56.0-py3-none-macosx_11_0_universal2.whl", hash = "sha256:0ef7e6fd653267798a8a968ff7aa2dcac14398b7dd7440ef57524e01e0fbbd65", size = 40611424, upload-time = "2025-11-11T18:39:17.093Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/76/6d409e37e82cdd5dda3df1ab958130ae32b46e42458bd4fc93d7eb8749cb/playwright-1.56.0-py3-none-manylinux1_x86_64.whl", hash = "sha256:404be089b49d94bc4c1fe0dfb07664bda5ffe87789034a03bffb884489bdfb5c", size = 46263122, upload-time = "2025-11-11T18:39:20.619Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/84/fb292cc5d45f3252e255ea39066cd1d2385c61c6c1596548dfbf59c88605/playwright-1.56.0-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:64cda7cf4e51c0d35dab55190841bfcdfb5871685ec22cb722cd0ad2df183e34", size = 46110645, upload-time = "2025-11-11T18:39:24.005Z" },
+    { url = "https://files.pythonhosted.org/packages/61/bd/8c02c3388ae14edc374ac9f22cbe4e14826c6a51b2d8eaf86e89fabee264/playwright-1.56.0-py3-none-win32.whl", hash = "sha256:d87b79bcb082092d916a332c27ec9732e0418c319755d235d93cc6be13bdd721", size = 35639837, upload-time = "2025-11-11T18:39:27.174Z" },
+    { url = "https://files.pythonhosted.org/packages/64/27/f13b538fbc6b7a00152f4379054a49f6abc0bf55ac86f677ae54bc49fb82/playwright-1.56.0-py3-none-win_amd64.whl", hash = "sha256:3c7fc49bb9e673489bf2622855f9486d41c5101bbed964638552b864c4591f94", size = 35639843, upload-time = "2025-11-11T18:39:30.851Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/c7/3ee8b556107995846576b4fe42a08ed49b8677619421f2afacf6ee421138/playwright-1.56.0-py3-none-win_arm64.whl", hash = "sha256:2745490ae8dd58d27e5ea4d9aa28402e8e2991eb84fb4b2fd5fbde2106716f6f", size = 31248959, upload-time = "2025-11-11T18:39:33.998Z" },
+]
+
+[[package]]
+name = "playwright-stealth"
+version = "2.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "playwright" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b0/50/e008cc2d9f01e351d69f0bb0f394882c517611eec0ee3d5f8dd8535ce719/playwright_stealth-2.0.0.tar.gz", hash = "sha256:4f44d416d4226689895a4d1cfb40e8d137216c0c9710ea8f84bae2dbf1186fc5", size = 25723, upload-time = "2025-06-18T03:54:54.528Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b9/4e/c37ac19cea166a97de3a9690ad5ba340b3f4f4fcd5bf8237cedb2c2c7076/playwright_stealth-2.0.0-py3-none-any.whl", hash = "sha256:9eb3af1fd21619aac9fdd13a4a08141ed67159ac6310a94f7d2f758ba0cbe179", size = 32466, upload-time = "2025-06-18T03:54:53.394Z" },
+]
+
+[[package]]
 name = "portalocker"
 version = "2.10.1"
 source = { registry = "https://pypi.org/simple" }
@@ -4903,25 +4934,6 @@ wheels = [
 ]
 
 [[package]]
-name = "rebrowser-playwright"
-version = "1.52.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "greenlet" },
-    { name = "pyee" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/0a/90/1c9ecdb44b81c1b46d284ebd9d5ef27b5567a66192856e001c67caf2e02d/rebrowser_playwright-1.52.0-py3-none-macosx_10_13_x86_64.whl", hash = "sha256:ab47150ee1ab2efe2c5738b631cf366b46bcef3e2d3a72405fec564d8b13d424", size = 39281549, upload-time = "2025-05-09T05:23:03.415Z" },
-    { url = "https://files.pythonhosted.org/packages/fa/47/e5e44a9ddb7ab3f7305eced9ada7df72472abfe5e84165fcf35f220ab5aa/rebrowser_playwright-1.52.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:5dbf5ee4d6b34fba163e975c88bf34f6badb56290aa091510e422da4932c1e24", size = 37633283, upload-time = "2025-05-09T05:23:07.197Z" },
-    { url = "https://files.pythonhosted.org/packages/49/ca/bc3a206788195218f15b9a44b51b74c651f0f17c29a925226434ea28bd3f/rebrowser_playwright-1.52.0-py3-none-macosx_11_0_universal2.whl", hash = "sha256:ddd095e39e0ff68972307bd1fbe40f4a9e44fa4dbf121926b707a6b019ec9945", size = 39281549, upload-time = "2025-05-09T05:23:11.893Z" },
-    { url = "https://files.pythonhosted.org/packages/12/91/9fbff3e85dd2fd765452b1d287ef4ae93a96b669385228fa8e516085f7ca/rebrowser_playwright-1.52.0-py3-none-manylinux1_x86_64.whl", hash = "sha256:b9d27ee9fbacd597fb36a38c39d142f9a9a8837230c66207f5c15c727d3a1d91", size = 44811642, upload-time = "2025-05-09T05:23:18.006Z" },
-    { url = "https://files.pythonhosted.org/packages/43/67/8c6e02660ae209790cd73ecd99f6cacd2b85da19139d1e158f332f6a471e/rebrowser_playwright-1.52.0-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:065c70e1901928b16f07d26161f3c2d8f672e9176ddae055b9e802a591d88166", size = 44210930, upload-time = "2025-05-09T05:23:25.674Z" },
-    { url = "https://files.pythonhosted.org/packages/e7/0f/595b60ca41c5f381147b041d90a720aa3820d17156d3cda9b4f2a29d1acc/rebrowser_playwright-1.52.0-py3-none-win32.whl", hash = "sha256:928519b50dab08e14ac286334d96b7b09cd1090253c996c14042ecb6fb302776", size = 34509460, upload-time = "2025-05-09T05:23:32.715Z" },
-    { url = "https://files.pythonhosted.org/packages/e0/f3/023969defc1fe4178e38c45805e3a77f44d79def9db5329c5f3506fe2d18/rebrowser_playwright-1.52.0-py3-none-win_amd64.whl", hash = "sha256:e945020f49abb498e0d3965ba106fdc2d7afa13dbe98e789fbd3aab90bb811c2", size = 34509464, upload-time = "2025-05-09T05:23:39.103Z" },
-    { url = "https://files.pythonhosted.org/packages/f0/59/7155d058949baed2f10ae9f5dcb4416afc89d3ff6daadaa50d01d2035fd8/rebrowser_playwright-1.52.0-py3-none-win_arm64.whl", hash = "sha256:9bed76a49ce51feb65ca1f5e7df92302152e52893de4df472c998416d9806119", size = 30359272, upload-time = "2025-05-09T05:23:45.476Z" },
-]
-
-[[package]]
 name = "referencing"
 version = "0.37.0"
 source = { registry = "https://pypi.org/simple" }
@@ -5591,10 +5603,11 @@ dependencies = [
     { name = "openai" },
     { name = "pandas" },
     { name = "peewee" },
+    { name = "playwright" },
+    { name = "playwright-stealth" },
     { name = "pre-commit" },
     { name = "pyarrow" },
     { name = "python-dotenv" },
-    { name = "rebrowser-playwright" },
     { name = "ruff" },
     { name = "ty" },
     { name = "typer" },
@@ -5618,10 +5631,11 @@ requires-dist = [
     { name = "openai", specifier = ">=1.109.1" },
     { name = "pandas", specifier = ">=2.2.0" },
     { name = "peewee", specifier = ">=3.17.0" },
+    { name = "playwright", specifier = ">=1.55.0" },
+    { name = "playwright-stealth", specifier = ">=2.0.0" },
     { name = "pre-commit", specifier = ">=4.3.0" },
     { name = "pyarrow", specifier = ">=18.0.0" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
-    { name = "rebrowser-playwright", specifier = ">=1.52.0" },
     { name = "ruff", specifier = ">=0.13.3" },
     { name = "ty", specifier = ">=0.0.1a21" },
     { name = "typer", specifier = ">=0.19.2" },

@@ -20,7 +20,7 @@ from environments.models import (
 
 from scripts.postprocessing._4_determine_ignore import should_ignore_url
 import typer
-from rebrowser_playwright.async_api import (
+from playwright.async_api import (
     Browser,
     BrowserContext,
     Request,
@@ -331,6 +331,8 @@ class ReplayBundle:
         # request_resource_type = request.resource_type
         # is_navigation_request = request.is_navigation_request()
 
+        # TODO: rebrowser_playwright solves many bot detection issues, but damanges collection binding events, not detecting click, scroll, etc.
+
         # Improvements
         # ...
         # Requirements
@@ -344,7 +346,6 @@ class ReplayBundle:
 
         # =====
 
-        # TODO: test replay.py, and get it to navigate same as human
         # TODO: manage replay to explore with n depth script
         # - consider instead of replay, to simply open every URL navigated, and then expand from there, doesn't really need replay itself
         # TODO: review whole eval pipeline creation, and run 1 eval task offline with an agent.

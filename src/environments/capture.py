@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Set
 from urllib.parse import urlsplit
 
-from rebrowser_playwright.async_api import BrowserContext, Request, Response
+from playwright.async_api import BrowserContext, Request, Response
 
 from config.browser_config import CONTEXT_CONFIG
 from config.storage import DATA_DIR

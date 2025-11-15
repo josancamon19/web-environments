@@ -2,7 +2,7 @@ import asyncio
 import logging
 import math
 from typing import Any, Dict, Optional, Tuple
-from rebrowser_playwright.async_api import (
+from playwright.async_api import (
     Page,
     Locator,
     TimeoutError as PlaywrightTimeoutError,
