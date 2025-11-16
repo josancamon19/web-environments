@@ -129,11 +129,18 @@ for data_root in "${DATA_ROOTS[@]}"; do
     force_args+=(--force)
   fi
 
-  run_step_bg \
-    "$data_root" \
-    "Step 4: determine-ignore" \
-    uv run python -m scripts.postprocessing._4_determine_ignore \
-    "${force_args[@]}"
+  if [[ ${#force_args[@]} -gt 0 ]]; then
+    run_step_bg \
+      "$data_root" \
+      "Step 4: determine-ignore" \
+      uv run python -m scripts.postprocessing._4_determine_ignore \
+      "${force_args[@]}"
+  else
+    run_step_bg \
+      "$data_root" \
+      "Step 4: determine-ignore" \
+      uv run python -m scripts.postprocessing._4_determine_ignore
+  fi
 done
 
 for pid in "${bg_pids[@]}"; do

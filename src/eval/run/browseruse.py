@@ -663,7 +663,6 @@ def _main() -> None:
 
 if __name__ == "__main__":
     app()
-    # TODO: postprocess script.sh
     # TODO: test evaluation pipeline, real quick
     # TODO: Repeat for 2 more tasks/websites
     # TODO: start writing paper.md
