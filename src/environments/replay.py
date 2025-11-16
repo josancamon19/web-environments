@@ -214,7 +214,8 @@ class TaskStepExecutor:
                 # Try pressing Enter on the form element
                 form_locator: Locator = page.locator(selector)
                 if await form_locator.count() > 0:
-                    await form_locator.press("Enter", timeout=2000)
+                    await form_locator.press("Enter", timeout=2000, no_wait_after=True)
+                    await self._post_action_settle(page)
                     return
 
             # Try to find and click a submit button
@@ -222,19 +223,22 @@ class TaskStepExecutor:
                 'button[type="submit"], input[type="submit"]'
             ).first
             if await submit_button.count() > 0:
-                await submit_button.click(timeout=2000)
+                await submit_button.click(timeout=2000, no_wait_after=True)
+                await self._post_action_settle(page)
                 return
 
             # Fallback: press Enter on the focused element or first form
             focused: Locator = page.locator(":focus")
             if await focused.count() > 0:
-                await focused.press("Enter", timeout=2000)
+                await focused.press("Enter", timeout=2000, no_wait_after=True)
+                await self._post_action_settle(page)
                 return
 
             # Last resort: press Enter on the first form
             first_form: Locator = page.locator("form").first
             if await first_form.count() > 0:
-                await first_form.press("Enter", timeout=2000)
+                await first_form.press("Enter", timeout=2000, no_wait_after=True)
+                await self._post_action_settle(page)
                 return
 
             # If we reach here, no submit method worked
