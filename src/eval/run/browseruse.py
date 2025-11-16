@@ -1,4 +1,3 @@
-import argparse
 import asyncio
 import json
 import logging
@@ -7,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import typer
 from dotenv import load_dotenv
 from browser_use import Agent, Browser, ChatOpenAI
 from kernel import Kernel
@@ -284,46 +284,41 @@ async def run_task_with_agent(
 
     try:
         sandbox_start_error: Optional[Exception] = None
-        for safe_mode in [False, True]:
-            # try first antidetection and performance, if fails, try safe mode
 
-            logger.info(
-                "Starting sandbox for task %s at %s (safe_mode=%s)",
-                task["task_id"],
-                sandbox_bundle,
-                safe_mode,
-            )
+        logger.info(
+            "Starting sandbox for task %s at %s",
+            task["task_id"],
+            sandbox_bundle,
+        )
 
-            sandbox = SandboxEnvironment(
-                sandbox_bundle,
-                allow_network_fallback=sandbox_allow_network,
+        sandbox = SandboxEnvironment(
+            sandbox_bundle,
+            allow_network_fallback=sandbox_allow_network,
+            headless=sandbox_headless,
+            safe_mode=False,
+        )
+        try:
+            cdp_url = await sandbox.start()
+            browser = Browser(
+                cdp_url=cdp_url,
                 headless=sandbox_headless,
-                safe_mode=safe_mode,
+                viewport=viewport,
+                window_size=window_size,
+                device_scale_factor=1.0,
+                is_local=True,
+            )
+        except Exception as exc:
+            sandbox_start_error = exc
+            logger.warning(
+                "Sandbox launch failed for task %s (safe_mode=%s): %s",
+                task["task_id"],
+                exc,
             )
             try:
-                cdp_url = await sandbox.start()
-                browser = Browser(
-                    cdp_url=cdp_url,
-                    headless=sandbox_headless if not safe_mode else True,
-                    viewport=viewport,
-                    window_size=window_size,
-                    device_scale_factor=1.0,
-                    is_local=True,
-                )
-                break
-            except Exception as exc:
-                sandbox_start_error = exc
-                logger.warning(
-                    "Sandbox launch failed for task %s (safe_mode=%s): %s",
-                    task["task_id"],
-                    safe_mode,
-                    exc,
-                )
-                try:
-                    await sandbox.close()
-                except Exception:
-                    pass
-                sandbox = None
+                await sandbox.close()
+            except Exception:
+                pass
+            sandbox = None
 
         if sandbox_bundle and sandbox is None:
             if sandbox_allow_network:
@@ -596,58 +591,36 @@ async def process_all_tasks(
     return results_dir
 
 
-async def main(args: argparse.Namespace) -> None:
+async def main(model: str) -> None:
     sandbox_root: Optional[Path] = None
-    if not args.no_sandbox:
-        candidate_root = (DATA_DIR / "captures").expanduser().resolve()
-        if candidate_root.exists():
-            sandbox_root = candidate_root
-            logger.info("Using sandbox captures under %s", sandbox_root)
-        else:
-            logger.warning(
-                "Sandbox root %s not found; falling back to Kernel browser",
-                candidate_root,
-            )
-
-    sandbox_headless = not args.sandbox_headed
+    # handle no sandbox in case
+    candidate_root = (DATA_DIR / "captures").expanduser().resolve()
+    assert candidate_root.exists()
+    sandbox_root = candidate_root
+    logger.info("Using sandbox captures under %s", sandbox_root)
 
     results_dir = await process_all_tasks(
-        args.model,
+        model,
         sandbox_root=sandbox_root,
-        sandbox_allow_network=args.sandbox_allow_network,
-        sandbox_headless=sandbox_headless,
+        sandbox_allow_network=False,
+        sandbox_headless=False,
     )
     print(f"\nAll results saved to: {results_dir}")
 
 
-def parse_args() -> argparse.Namespace:
-    logger.info("Parsing arguments")
-    parser = argparse.ArgumentParser(
-        description="Run browser-use agent over recorded tasks"
-    )
-    parser.add_argument("--model", default="gpt-5-nano", help="LLM model name to use")
-    parser.add_argument(
-        "--no-sandbox",
-        action="store_true",
-        help="Disable sandbox replay and use the Kernel browser",
-    )
-    parser.add_argument(
-        "--sandbox-allow-network",
-        action="store_true",
-        help="Allow sandboxed replay to fall back to live network requests",
-    )
-    parser.add_argument(
-        "--sandbox-headed",
-        action="store_true",
-        help="Launch sandbox Chromium with a visible window",
-    )
-    return parser.parse_args()
+app = typer.Typer(help="Run browser-use agent over recorded tasks")
+
+
+@app.command()
+def run(model: str = typer.Option("gpt-5-nano", "--model", "-m")) -> None:
+    asyncio.run(main(model))
 
 
 def _main() -> None:
-    cli_args = parse_args()
-    asyncio.run(main(cli_args))
+    app()
 
 
 if __name__ == "__main__":
-    _main()
+    app()
+    # TODO: fix https://www.amazon.com/ vs amazon.com opened first URL
+    # TODO:

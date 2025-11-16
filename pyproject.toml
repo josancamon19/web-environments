@@ -6,7 +6,7 @@ authors = [{ name = "Joan Cabezas", email = "joan.santiago.cabezas@gmail.com" }]
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "browser-use>=0.9.1",
+    "browser-use>=0.9.6",
     "dspy>=3.0.3",
     "google-cloud-storage>=3.4.0",
     "kernel>=0.15.0",
