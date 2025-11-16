@@ -35,6 +35,36 @@ def get_kernel_client() -> Kernel:
     return _kernel_client
 
 
+def _normalize_url(url: Optional[str]) -> Optional[str]:
+    if not url:
+        return None
+
+    cleaned = url.strip()
+    if not cleaned:
+        return None
+
+    if not cleaned.startswith(("http://", "https://")):
+        cleaned = f"https://{cleaned.lstrip('/')}"
+
+    return cleaned
+
+
+def _resolve_initial_url(task: Dict[str, Any]) -> Optional[str]:
+    tool_calls = task.get("tool_calls")
+    if isinstance(tool_calls, list):
+        for call in tool_calls:
+            if not isinstance(call, dict):
+                continue
+            if call.get("type") != "go_to":
+                continue
+            params = call.get("params") or {}
+            url = _normalize_url(params.get("url"))
+            if url:
+                return url
+
+    return _normalize_url(task.get("website_url"))
+
+
 async def cleanup_all_kernel_sessions() -> None:
     """Delete all active Kernel browser sessions before starting a new run."""
     try:
@@ -310,7 +340,7 @@ async def run_task_with_agent(
         except Exception as exc:
             sandbox_start_error = exc
             logger.warning(
-                "Sandbox launch failed for task %s (safe_mode=%s): %s",
+                "Sandbox launch failed for task %s: %s",
                 task["task_id"],
                 exc,
             )
@@ -353,9 +383,20 @@ async def run_task_with_agent(
                     for pattern in domain_patterns:
                         sensitive_data[pattern] = fields
 
+        initial_url = _resolve_initial_url(task)
+        task_description = task["task_description"].lower()
+        if initial_url:
+            agent_task = f"Open {initial_url} and {task_description}"
+        else:
+            agent_task = task_description
+            logger.warning(
+                "Falling back to raw task description for task %s; no URL found",
+                task["task_id"],
+            )
+
         agent = Agent(
             browser_session=browser,
-            task=f"Open {task['website_url']} and {task['task_description'].lower()}",
+            task=agent_task,
             llm=llm,
             verbose=True,
             register_new_step_callback=capture_accessibility_tree,
@@ -622,5 +663,7 @@ def _main() -> None:
 
 if __name__ == "__main__":
     app()
-    # TODO: fix https://www.amazon.com/ vs amazon.com opened first URL
-    # TODO:
+    # TODO: postprocess script.sh
+    # TODO: test evaluation pipeline, real quick
+    # TODO: Repeat for 2 more tasks/websites
+    # TODO: start writing paper.md
