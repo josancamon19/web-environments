@@ -5707,7 +5707,7 @@ requires-dist = [
     { name = "openai", specifier = ">=1.109.1" },
     { name = "pandas", specifier = ">=2.2.0" },
     { name = "peewee", specifier = ">=3.17.0" },
-    { name = "playwright", specifier = ">=1.55.0" },
+    { name = "playwright", specifier = ">=1.56.0" },
     { name = "playwright-stealth", specifier = ">=2.0.0" },
     { name = "pre-commit", specifier = ">=4.3.0" },
     { name = "pyarrow", specifier = ">=18.0.0" },

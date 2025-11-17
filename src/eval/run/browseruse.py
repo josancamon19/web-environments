@@ -644,7 +644,7 @@ async def main(model: str) -> None:
         model,
         sandbox_root=sandbox_root,
         sandbox_allow_network=False,
-        sandbox_headless=False,
+        sandbox_headless=True,
     )
     print(f"\nAll results saved to: {results_dir}")
 
@@ -663,6 +663,6 @@ def _main() -> None:
 
 if __name__ == "__main__":
     app()
-    # TODO: test evaluation pipeline, real quick
-    # TODO: Repeat for 2 more tasks/websites
+    # NOTE: eval headless=False fails playwright
     # TODO: start writing paper.md
+    # TODO: hire collector for 10 tasks

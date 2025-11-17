@@ -1,21 +1,12 @@
 from dspy.predict.react import ReAct
 
 import json
-import logging
-import os
 from pathlib import Path
 from typing import Dict, Any, List
 
 import dspy
-import mlflow
 
 from src.models import BaseToolCallData
-
-
-# Disable MLflow logging to avoid spam warnings
-os.environ["MLFLOW_TRACKING_URI"] = ""
-mlflow.set_tracking_uri("")
-logging.getLogger("mlflow").setLevel(logging.ERROR)
 
 
 class JudgeCompletion(dspy.Signature):

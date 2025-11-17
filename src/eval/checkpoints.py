@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import dspy
-import mlflow
 import typer
 
 from src.config.storage import DATA_DIR
@@ -144,9 +143,6 @@ def _setup_dspy_and_mlflow(results_dir: str, judge_model: str) -> None:
         temperature=1.0,
         max_tokens=120000,
     )
-    mlflow.set_tracking_uri("http://127.0.0.1:5000")
-    mlflow.set_experiment(f"eval-checkpoints-{Path(results_dir).name}")
-    mlflow.dspy.autolog()
     dspy.configure(lm=lm)
 
 
@@ -381,5 +377,9 @@ def main(
         raise typer.Exit(code=1)
 
 
-if __name__ == "__main__":
+def _main() -> None:
     app()
+
+
+if __name__ == "__main__":
+    _main()

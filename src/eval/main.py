@@ -1,22 +1,14 @@
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import dspy
-import mlflow
 import typer
 
 from src.config.storage import DATA_DIR
 from src.eval.judges import JudgeCompletion
-
-# Disable MLflow logging to avoid spam warnings
-os.environ["MLFLOW_TRACKING_URI"] = ""
-mlflow.set_tracking_uri("")
-logging.getLogger("mlflow").setLevel(logging.ERROR)
-
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -29,9 +21,6 @@ def evaluate_model_outputs(results_dir: str, judge_model: str):
         temperature=1.0,
         max_tokens=64000,
     )
-    mlflow.set_tracking_uri("http://127.0.0.1:5000")
-    mlflow.set_experiment(f"eval-{results_dir.split('/')[-1]}")
-    mlflow.dspy.autolog()
     dspy.configure(lm=lm)
 
     results_dir = Path(results_dir)
@@ -372,5 +361,9 @@ def main(
         raise typer.Exit(code=1)
 
 
-if __name__ == "__main__":
+def _main():
     app()
+
+
+if __name__ == "__main__":
+    _main()

@@ -14,7 +14,7 @@ dependencies = [
     "openai>=1.109.1",
     "pandas>=2.2.0",
     "peewee>=3.17.0",
-    "playwright>=1.55.0",
+    "playwright>=1.56.0",
     "playwright-stealth>=2.0.0",
     "pre-commit>=4.3.0",
     "pyarrow>=18.0.0",
@@ -33,7 +33,12 @@ postprocess-set-checkpoints = "scripts.postprocessing._3_determine_checkpoints:m
 postprocess-determine-ignore = "scripts.postprocessing._4_determine_ignore:main"
 
 launch-environment = "environments.launch:_main"
-evaluate-browseruse = "eval.run.browseruse:_main"
+eval-run-browseruse = "eval.run.browseruse:_main"
+
+# call subsequently
+eval-judge-binary = "eval.main:_main"
+eval-judge-checkpointed = "eval.checkpoints:_main"
+
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
