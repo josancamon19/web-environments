@@ -2,399 +2,363 @@
 
 > **Browser agents are hill climbing in the wrong direction.**
 
-For understanding the ideas behind this repo, read: https://joan.so/learning/ml/research/browser-automation/0+main
+This repository contains the full collection → replay → evaluation stack described in the research notes here: https://joan.so/learning/ml/research/browser-automation/0+main. The goal is to make it trivial to capture thousands of long-horizon, economically valuable browser trajectories, replay them offline, and grade agents with granular checkpoints.
 
-Existing browser agents aren't production-ready, and benchmarks either focus on academic tasks or lack real economic value. Most progress happens closed-source because data collection is prohibitively expensive.
+## Highlights
 
-## Goals
+- Record real human browsing with stealth Playwright, HAR capture, DOM diffs, screenshots, and screen video.
+- Package every task as a reproducible sandbox (`data/captures/...`) that can be replayed without touching the live internet.
+- Run Browser-Use agents or OpenAI Computer Use (CUA) through the same evaluation harness.
+- Judge outputs with binary + checkpointed LLM graders powered by DSPy.
+- Ship the workflow to non-technical collectors through a Tk desktop app or PyInstaller bundle.
+- Upload datasets to GCS / Hugging Face with ready-made scripts.
 
-1. **Largest dataset:** Collect 10k+ browser interactions—2 orders of magnitude bigger than existing datasets
-2. **Economic value:** Focus on long-horizon tasks tied to real work that people are paid to do
-3. **Granular evaluation:** Identify real bottlenecks in existing agents with detailed checkpoints
-4. **Open source recipe:** Develop an OSS approach for data collection and RL fine-tuning on any website
+## Table of Contents
 
-### Why This Tool?
+- [Web Environments: Browser Agent Data Collection](#web-environments-browser-agent-data-collection)
+  - [Highlights](#highlights)
+  - [Table of Contents](#table-of-contents)
+  - [Repository Map](#repository-map)
+  - [Getting Started](#getting-started)
+    - [Prerequisites](#prerequisites)
+    - [Install dependencies](#install-dependencies)
+    - [Environment variables](#environment-variables)
+  - [Record a Task (CLI)](#record-a-task-cli)
+  - [What Gets Captured](#what-gets-captured)
+  - [Post-Processing Pipeline](#post-processing-pipeline)
+    - [1. `postprocess-toolcalls`](#1-postprocess-toolcalls)
+    - [2. `postprocess-credentials`](#2-postprocess-credentials)
+    - [3. `postprocess-set-checkpoints`](#3-postprocess-set-checkpoints)
+    - [4. `postprocess-determine-ignore`](#4-postprocess-determine-ignore)
+  - [Replay Captured Environments](#replay-captured-environments)
+  - [Evaluation Runners](#evaluation-runners)
+    - [Browser-Use Harness (`eval-run-browseruse`)](#browser-use-harness-eval-run-browseruse)
+  - [Judges \& Metrics](#judges--metrics)
+    - [Binary grading (`eval-judge-binary`)](#binary-grading-eval-judge-binary)
+    - [Checkpointed grading (`eval-judge-checkpointed`)](#checkpointed-grading-eval-judge-checkpointed)
+  - [Workflow Overview](#workflow-overview)
+  - [Desktop Task Collector](#desktop-task-collector)
+    - [Building a distributable app](#building-a-distributable-app)
+  - [Data Review \& Sharing](#data-review--sharing)
+  - [Configuration Reference](#configuration-reference)
+  - [Resources](#resources)
 
-Existing collection approaches are inadequate:
-- **Mind2Web's tool** isn't open-sourced, requires extensive training, and doesn't create reproducible environments
-- **WebArena/TheAgentCompany** spent hundreds of hours building website clones for just ~10 environments
-- **Binary evaluations** provide sparse feedback without understanding failure modes
 
-This tool collects everything needed for reproducible browser environments with zero training required after setup.
-
-## Quick Start
-
-**Requirements:** Python 3.13+, `uv` package manager
-
-**Setup:**
-```bash
-# Install uv if you haven't
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Install dependencies
-uv sync
-```
-
-**Run data collection:**
-```bash
-uv run web-envs
-```
-
-Provide task details when prompted; press Ctrl+C to end capture.
-
-### What Gets Collected
-
-Every browser interaction is captured for full reproducibility:
-- **Human trajectories:** Screenshots, videos, DOMs, tool calls (click, type, navigation)
-- **Network layer:** HAR files, API requests/responses, storage snapshots
-- **Reproducible environments:** Complete browser state (cookies, localStorage, IndexedDB) to replay offline
-
-Data structure:
-- Captures: `data/captures/task_<id>/<timestamp>/`
-- Task index: `data/tasks.db`
-- Artifacts: `data/screenshots/`, `data/videos/`, `data/doms/`
-
-## Codebase Structure
+## Repository Map
 
 ```
 web-environments/
 ├── src/
-│   ├── main.py                 # Entry point for task recording
-│   ├── browser/                # Stealth browser implementation
-│   │   ├── browser.py          # Playwright browser wrapper
-│   │   ├── recorder.py         # Event capture and recording logic
-│   │   └── capture.py          # Network capture (HAR files)
-│   ├── db/                     # Database management
-│   │   ├── database.py         # SQLite wrapper
-│   │   └── task.py             # Task CRUD operations
-│   ├── environments/           # Replay and sandbox environments
-│   │   ├── launch.py           # Launch recorded environment
-│   │   ├── replay.py           # Replay captured steps
-│   │   ├── capture.py          # Capture environment state
-│   │   └── environment.py      # Sandbox environment wrapper
+│   ├── main.py                    # Typer CLI for recording (`web-envs`)
+│   ├── browser/                   # Stealth Playwright capturer
+│   ├── environments/              # Offline replay + sandbox plumbing
+│   ├── eval/                      # Agent runners, harness, judges
 │   ├── scripts/
-│   │   └── postprocessing/     # Data processing pipeline
-│   │       ├── _1_tool_calls_format.py    # Convert events → tool calls
-│   │       ├── _2_credentials.py          # Extract login credentials
-│   │       └── _3_determine_checkpoints.py # LLM-based checkpoint extraction
-│   ├── eval/                   # Agent evaluation framework
-│   │   ├── run/
-│   │   │   └── browseruse.py   # Browser-use agent runner
-│   │   └── judges.py           # Checkpoint evaluation logic
-│   ├── config/                 # Configuration files
-│   └── utils/                  # Utility functions
-└── data/
-    ├── tasks.db                # SQLite database
-    ├── tasks.jsonl             # Processed trajectories
-    ├── captures/               # Recorded browser states
-    ├── screenshots/            # Per-task screenshots
-    ├── videos/                 # Per-task videos
-    └── doms/                   # DOM snapshots
+│   │   ├── postprocessing/        # Tool calls, creds, checkpoints, ignore list
+│   │   └── collection/            # Merge/view/upload scripts
+│   ├── db/, config/, utils/       # Storage + helper modules
+│   └── models.py                  # Shared data models
+├── desktop_app/                   # Tk Task Collector + PyInstaller packaging
+├── data/                          # Default recording/output root (configurable)
+├── data2/                         # Sample captures used for internal experiments
+├── results/                       # Agent evaluation dumps (per run)
+├── paper.md                       # Draft write-up / appendix
+├── setup.sh                       # macOS bootstrap for collectors
+├── pyproject.toml / uv.lock       # Dependency + CLI entry points
+└── README.md                      # This file
 ```
 
-## CLI Entry Points
+## Getting Started
 
-All commands are run with `uv run <command>` and support passing CLI parameters.
+### Prerequisites
 
-### 1. `web-envs` - Task Recording
+- macOS or Linux (recording is built/tested on macOS 14+, replay works anywhere Playwright does).
+- Python **3.13+** (enforced in `pyproject.toml`).
+- [uv](https://github.com/astral-sh/uv) package manager.
+- Chrome/Chromium installed (recorder launches the `chrome` channel by default).
 
-**Purpose:** Launch a browser to record human task execution with full environment capture.
+### Install dependencies
 
-**When to use:** Starting a new data collection session for a task.
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+cd /Users/joancabezas/Downloads/projects/ai-research/web-environments
+uv sync
+```
 
-**Usage:**
+Install Playwright browsers once per machine:
+
+```bash
+uv run playwright install chromium
+```
+
+### Environment variables
+
+Create/update `.env` next to `pyproject.toml` and set at minimum:
+
+```
+OPENAI_API_KEY=sk-...
+# Optional, used when falling back to Kernel live browsers during eval
+KERNEL_API_KEY=...
+# Optional override for data root (defaults to <repo>/data)
+TASK_COLLECTOR_DATA_ROOT=/absolute/path/to/storage
+```
+
+`uv run` automatically loads `.env` via `python-dotenv`.
+
+## Record a Task (CLI)
+
+Run:
+
 ```bash
 uv run web-envs
 ```
 
-**What it does:**
-- Prompts for task details (description, type, website)
-- Launches stealth browser with recording enabled
-- Captures screenshots, video, DOM snapshots, network traffic
-- Saves to `data/tasks.db` and creates capture bundle
-- Press Ctrl+C when task is complete
+The CLI prompts for:
 
-**Outputs:**
-- `data/captures/task_<id>/<timestamp>/` - Full environment bundle
-- `data/screenshots/task<id>/` - Screenshots
-- `data/videos/task<id>_*.webm` - Screen recording
-- Database entry in `tasks.db`
+1. **Source** (where the task came from: self, mind2web seed, etc.).
+2. **Task type** (information retrieval vs. action).
+3. **Natural-language description** and target **website**.
 
----
+Flags:
 
-### 2. Postprocessing Pipeline (Run in Order)
+- `--dev` — auto-fill prompts with defaults for faster debugging.
+- `--dev-url https://example.com` — open a URL on launch (requires `--dev`).
+- `--no-browser-console` — silence console logs.
 
-After recording tasks, run these scripts sequentially to process raw data into structured format.
+What happens:
 
-#### `postprocess-toolcalls` - Convert Events to Tool Calls
+- A stealth Playwright Chromium context launches with custom args and anti-detection scripts (`playwright-stealth` + custom JS).
+- Every DOM mutation, click, scroll, navigation, screenshot, video frame, HAR entry, console line, and storage snapshot is recorded.
+- Hitting **Enter** in the terminal (or Ctrl+C) stops recording. Information-retrieval tasks additionally prompt for the final answer before closing.
 
-**Purpose:** Parse raw browser events into structured tool call format.
+Outputs (per task):
 
-**When to use:** After recording tasks, before credential extraction or checkpoints.
+- SQLite rows in `data/tasks.db`.
+- Raw steps in `data/steps/task_<id>.jsonl`.
+- Bundle in `data/captures/task_<id>/`.
+- `data/screenshots/task_<id>/*.png`, `data/videos/task_<id>/*.webm`, `data/doms/task_<id>/step_<n>.txt`.
 
-**Usage:**
+## What Gets Captured
+
+The recorder performs a lossless export of everything needed for offline replay:
+
+- **Human trajectory:** ordered tool-call log with DOM context inline.
+- **Network layer:** HAR file + per-request JSON dumps + LM-assisted ignore lists.
+- **Storage:** cookies, localStorage, IndexedDB snapshots.
+- **Visuals:** high-rate screenshots and a 720p video stream per session.
+- **Console + metadata:** enriched with event timings, selectors, coordinates, and page-level events (tab opened/closed, focus changes, etc.).
+
+Default layout (configurable through `TASK_COLLECTOR_DATA_ROOT`):
+
+```
+data/
+├── captures/task_<id>/manifest.json, recording.har, resources/, storage/
+├── screenshots/task_<id>/*.png
+├── videos/task_<id>/*.webm
+├── doms/task_<id>/step_<n>.txt
+├── tasks.db / tasks.db-shm / tasks.db-wal
+├── tasks.jsonl
+└── debug/, steps/, ...
+```
+
+`data2/` in the repo contains real examples referenced in `paper.md`. Point `TASK_COLLECTOR_DATA_ROOT` to that folder to experiment without collecting new data.
+
+## Post-Processing Pipeline
+
+Run these after collecting tasks. Each command is defined in `pyproject.toml` and executed with `uv run <script>`.
+
+### 1. `postprocess-toolcalls`
+
+- **Command:** `uv run postprocess-toolcalls`
+- **What it does:** Reads `tasks.db`, converts low-level events into structured tool calls, snapshots DOM states, and stores everything in `data/tasks.jsonl`.
+
+### 2. `postprocess-credentials`
+
+- **Command:** `uv run postprocess-credentials`
+- **Requires:** `OPENAI_API_KEY`
+- **What it does:** Uses DSPy + GPT-5 to detect login flows (email/password/phone, MFA, etc.) and associates them with domains so evaluations can inject credentials safely.
+- **Output:** Augments each task entry in `tasks.jsonl` with a `credentials` array.
+
+### 3. `postprocess-set-checkpoints`
+
+- **Command:** `uv run postprocess-set-checkpoints`
+- **Requires:** `OPENAI_API_KEY`
+- **What it does:** Generates at least two semantic checkpoints (index + reasoning) per task, enabling partial-credit scoring.
+
+### 4. `postprocess-determine-ignore`
+
+- **Command:** `uv run postprocess-determine-ignore [--force]`
+- **Requires:** `OPENAI_API_KEY`
+- **What it does:** Cleans the HAR recordings by removing analytics/tracking requests via pattern matching + batched LLM classification. Produces `ignored.json` and `matches.json` per capture so the replay system can stay fully offline and cache LM matches when needed.
+
+Batch runner: `src/scripts/postprocessing/run.sh` executes all steps sequentially.
+
+## Replay Captured Environments
+
+Use `launch-environment` to inspect or debug a bundle entirely offline.
+
 ```bash
-uv run postprocess-toolcalls
+uv run launch-environment data/captures/task_10 \
+  --channel chrome \
+  --run-human-trajectory \
+  --ignore-cache
 ```
 
-**What it does:**
-- Reads from `data/tasks.db`
-- Processes events (clicks, types, navigations) into tool call format
-- Enriches with DOM context, element attributes, timestamps
-- Outputs to `data/tasks.jsonl`
+Key options:
 
-**Output format:**
-```json
-{
-  "task_id": 1,
-  "task_description": "Book a flight from NYC to SF",
-  "tool_calls": [
-    {
-      "type": "go_to",
-      "url": "https://example.com",
-      "timestamp": "2025-10-24T10:00:00.000Z"
-    },
-    {
-      "type": "click",
-      "selector": "#search-button",
-      "element": {...},
-      "timestamp": "2025-10-24T10:00:05.123Z"
-    }
-  ]
-}
-```
+- `--headless / --no-headless`
+- `--channel chrome|chromium|msedge`
+- `--allow-network-fallback` (default `False`) lets missing resources hit the live web.
+- `--include-storage-state` restores cookies/session storage.
+- `--run-human-trajectory` replays the recorded actions with original pacing.
+- `--ignore-cache` disables LM match caching if you want fresh matches.
 
-#### `postprocess-credentials` - Extract Login Credentials
+Behind the scenes the Typer app:
 
-**Purpose:** Identify and extract login credentials from task trajectories using LLM analysis.
+1. Loads the capture manifest + HAR.
+2. Builds a Chromium context with HAR replay routing.
+3. Aborts any URL matched in `ignored.json`.
+4. Uses LM-based request matching when multiple HAR candidates resemble the same URL.
+5. Optionally executes the human tool-call trajectory (`TaskStepExecutor`) for visual debugging.
 
-**When to use:** After tool call formatting, when tasks involve authentication.
+## Evaluation Runners
 
-**Usage:**
+### Browser-Use Harness (`eval-run-browseruse`)
+
 ```bash
-# Requires OpenAI API key
-export OPENAI_API_KEY=your_key
-uv run postprocess-credentials
+uv run eval-run-browseruse --model gpt-5-nano
 ```
 
-**What it does:**
-- Uses DSPy with GPT-5 to analyze trajectories
-- Identifies email, password, username, phone number fields
-- Associates credentials with website domains
-- Updates `data/tasks.jsonl` with credential metadata
+- Reads `data/tasks.jsonl`.
+- Uses the sandbox bundles under `DATA_DIR/captures` by default; if a capture fails to start it falls back to Kernel live browsers (requires `KERNEL_API_KEY`).
+- Captures agent DOM dumps per step in `results/<run>/doms/task_<id>/step_<n>.txt`.
+- Writes JSON per task under `results/<run>/results/task_<id>.json` plus a summary metadata file.
+- Limits concurrency to 1 when sandboxing to avoid cross-talk; uses up to 4 concurrent live sessions otherwise.
 
-**Why:** Enables proper handling of authentication during evaluation/replay.
+Result folder layout:
 
-#### `postprocess-set-checkpoints` - Generate Semantic Checkpoints
+```
+results/browseruse-gpt-5-nano-2025-11-18_04-12-27/
+├── doms/task_<id>/step_<n>.txt
+├── logs/
+├── results/task_<id>.json
+└── metadata.json
+```
 
-**Purpose:** LLM-based extraction of intermediate task checkpoints for granular evaluation.
 
-**When to use:** After tool call formatting, when preparing for evaluation.
+## Judges & Metrics
 
-**Usage:**
+Two Typer CLIs grade agent outputs after a run.
+
+### Binary grading (`eval-judge-binary`)
+
 ```bash
-# Requires OpenAI API key
-export OPENAI_API_KEY=your_key
-uv run postprocess-set-checkpoints
+uv run eval-judge-binary --results-dir results/browseruse-gpt-5-nano-2025-11-18_04-12-27 --judge-model gpt-5
 ```
 
-**What it does:**
-- Uses DSPy with GPT-5 (medium reasoning) to analyze trajectories
-- Identifies 2+ key steps that indicate task progress
-- Generates reasoning for each checkpoint
-- Updates `data/tasks.jsonl` with checkpoints
+- Compares each model trajectory against the human one.
+- Uses DSPy (`JudgeCompletion`) to decide correctness and produce reasoning + confidence.
+- Writes `grade.json` inside the results directory with accuracy and failure breakdowns.
 
-**Output:**
-```json
-{
-  "checkpoints": [5, 12],
-  "checkpoints_reasoning": [
-    "User successfully logged into account",
-    "Search results loaded with correct filters applied"
-  ]
-}
-```
+### Checkpointed grading (`eval-judge-checkpointed`)
 
-**Why:** Enables partial credit evaluation instead of binary pass/fail.
-
----
-
-### 3. `launch-environment` - Replay Recorded Environment
-
-**Purpose:** Launch a browser with a previously recorded environment for debugging or manual testing.
-
-**When to use:** 
-- Debugging recorded tasks
-- Manually testing environment replay
-- Verifying capture quality
-
-**Usage:**
 ```bash
-uv run launch-environment data/captures/task_10 [options]
-
-# Options:
-#   --headless                    Run without visible browser window
-#   --no-allow-network-fallback   Fail if resources missing (strict offline)
-#   --is-human-trajectory         Use human-like timing for replay
+uv run eval-judge-checkpointed --results-dir results/browseruse-gpt-5-nano-2025-11-18_04-12-27 --judge-model gpt-5
 ```
 
-**Examples:**
+- Loads `grade.json`, finds failed tasks, and evaluates each checkpoint sequentially with partial credit (default 2 checkpoints, 0.33 score each).
+- Adds `checkpoint_evaluation` and summary stats back into `grade.json`.
+
+Both graders expect `OPENAI_API_KEY` to be configured and will stream multiple LLM calls, so budget accordingly.
+
+## Workflow Overview
+
+1. **Collect**
+   ```
+   uv run web-envs
+   ```
+2. **Process**
+   ```
+   uv run postprocess-toolcalls
+   uv run postprocess-credentials
+   uv run postprocess-set-checkpoints
+   uv run postprocess-determine-ignore
+   ```
+3. **Replay / QA (optional)**
+   ```
+   uv run launch-environment data/captures/task_42
+   ```
+4. **Evaluate agents**
+   ```
+   uv run eval-run-browseruse --model gpt-5-nano
+   uv run python -m eval.run.openai_cua   # optional runner
+   ```
+5. **Grade + analyze**
+   ```
+   uv run eval-judge-binary --results-dir <results_path>
+   uv run eval-judge-checkpointed --results-dir <results_path>
+   ```
+6. **Upload / share** (see below).
+
+## Desktop Task Collector
+
+The `desktop_app/` directory ships a Tkinter UI for non-technical collectors:
+
 ```bash
-# Launch with visible browser
-uv run launch-environment data/captures/task_10
-
-# Headless replay
-uv run launch-environment data/captures/task_10 --headless
-
-# Strict offline mode
-uv run launch-environment data/captures/task_10 --no-allow-network-fallback
+./desktop_app/launch_task_collector.sh
+# or
+PYTHONPATH="$(pwd)/src:$(pwd):$PYTHONPATH" uv run python desktop_app/task_collector_app.py
 ```
 
-**What it does:**
-- Loads recorded network traffic from HAR files
-- Restores cookies, localStorage, IndexedDB
-- Intercepts network requests and serves from capture
-- Optionally replays human actions step-by-step
+Features:
 
----
+- Mirrors the CLI prompts in a GUI form.
+- Launches the stealth browser when the collector clicks **Start Task**.
+- Provides an **Upload Data** button wired to the GCS scripts.
+- Logs to the same `data/` directory configured by the backend.
 
-### 4. `evaluate-browseruse` - Run Agent Evaluation
+### Building a distributable app
 
-**Purpose:** Evaluate browser-use agent performance on recorded tasks in sandboxed environments.
-
-**When to use:** 
-- Running benchmark evaluations
-- Testing new agent versions
-- Comparing different models
-
-**Usage:**
 ```bash
-uv run evaluate-browseruse [options]
-
-# Options:
-#   --model MODEL              LLM model name (default: gpt-5-nano)
-#   --no-sandbox              Use live Kernel browser instead of replay
-#   --sandbox-allow-network   Allow fallback to live network
-#   --sandbox-headed          Show browser window
-#   --sandbox-safe-mode       Headless + reduced args for stability
+uv run python desktop_app/build_release.py --target macos
 ```
 
-**Examples:**
+This wraps the recorder with PyInstaller, bundles Playwright, and drops a ZIP under `desktop_app/dist/`. Replace `macos` with `windows` to build on Windows.
+
+## Data Review & Sharing
+
+Helper scripts live in `src/scripts/collection/` (run with `uv run python -m ...`):
+
+- `scripts.collection.view` — inspect tasks with a simple TUI.
+- `scripts.collection.merge` — merge multiple `data/` folders.
+- `scripts.collection.upload_gcp_data` — upload the entire `data/` directory to `gs://mind2web-subset/data/` (requires `google-credentials.json` in the repo root).
+- `scripts.collection.upload_gcp_results` — push the `results/` directory.
+- `scripts.collection.upload_hf` — publish a curated subset to Hugging Face (configure dataset + token inside the script).
+
+Example:
+
 ```bash
-# Default evaluation with GPT-5-nano
-uv run evaluate-browseruse
-
-# Use GPT-5 with visible browser
-uv run evaluate-browseruse --model gpt-5 --sandbox-headed
-
-# Live browser (no sandbox)
-uv run evaluate-browseruse --model gpt-5-nano --no-sandbox
-
-# Safe mode for stability
-uv run evaluate-browseruse --sandbox-safe-mode
+uv run python -m scripts.collection.upload_gcp_data
 ```
 
-**What it does:**
-- Loads tasks from `data/tasks.jsonl`
-- Spins up sandboxed browser environments
-- Runs browser-use agent on each task
-- Saves results to `results/browseruse-{model}-{timestamp}/`
-- Evaluates against human checkpoints
+The desktop app exposes the same functionality through its UI for collectors.
 
-**Output:**
-- Agent trajectories
-- Checkpoint completion metrics
-- Execution logs
-- Failure analysis
+## Configuration Reference
 
----
+- `OPENAI_API_KEY` — required for post-processing, grading, and LLM-powered evaluations.
+- `KERNEL_API_KEY` — required if you disable the sandbox or allow Kernel fallbacks during agent runs.
+- `RECORDER_BROWSER_CHANNEL` — Chromium channel (default `chrome`). Set to `chromium` or `msedge` if Chrome is not installed.
+- `RECORDER_USER_DATA_DIR` — persistent Chrome profile (defaults to `data/user-data`).
+- `TASK_COLLECTOR_DATA_ROOT` — override storage root (useful when shipping the desktop app).
+- `PLAYWRIGHT_BROWSERS_PATH` — optional custom Playwright cache location.
+- `DSPY_CACHE_DIR`, `UV_LINK_MODE`, etc. — advanced knobs documented inline in the respective modules.
 
-## Complete Workflow
+## Resources
 
-### 1. **Data Collection Phase**
-```bash
-# Record human demonstrations
-uv run web-envs
-# Repeat for multiple tasks
-```
+- Research notes & build logs: https://joan.so/learning/ml/research/browser-automation/0+main
+- Benchmark tracker: https://web-evals.streamlit.app/
+- Mind2Web subset demo dataset: https://huggingface.co/datasets/josancamon/mind2web-subset-human
+- `paper.md` in this repo for the in-progress write-up and additional context.
 
-### 2. **Processing Phase** (Run in order)
-```bash
-# Step 1: Convert raw events to tool calls
-uv run postprocess-toolcalls
+Questions or ideas? Open an issue or drop feedback in the discussions—the roadmap is driven by making browser agents genuinely useful, not just benchmark-good.
 
-# Step 2: Extract credentials (optional, for auth tasks)
-export OPENAI_API_KEY=your_key
-uv run postprocess-credentials
-
-# Step 3: Generate evaluation checkpoints
-uv run postprocess-set-checkpoints
-```
-
-### 3. **Validation Phase** (Optional)
-```bash
-# Verify environment replay works
-uv run launch-environment data/captures/task_10 --headless
-```
-
-### 4. **Evaluation Phase**
-```bash
-# Run agent evaluation
-uv run evaluate-browseruse --model gpt-5-nano
-```
-
-### 5. **Analysis**
-Results are saved to timestamped directories with:
-- Agent trajectories
-- Checkpoint completion rates
-- Execution logs
-- Failure modes
-
-## Evaluation Approach
-
-### Granular Checkpoints vs Binary Evals
-
-Unlike existing benchmarks that only check final outcomes, this tool enables:
-- **Semantic checkpoints:** LLM-generated intermediate goals from human trajectories
-- **Partial rewards:** Credit for progress even on incomplete tasks
-- **Failure analysis:** Identify where agents commonly fail
-
-### Comparison to Existing Benchmarks
-
-| Benchmark | Focus | Environment | Limitation |
-|-----------|-------|-------------|------------|
-| GAIA, BrowserComp | Deep research | Live web | Academic tasks, marginal economic value |
-| Mind2Web | Information seeking | Snapshots | Mostly information retrieval |
-| WebArena, WebVoyager | Execution | Clones (~10 sites) | 1+ years to build, not scalable |
-| Real, TheAgentCompany | Action-based | Custom clones | Hundreds of hours per environment |
-
-**This tool:** Automated collection of reproducible environments for any website at scale.
-
-### Resources
-- Benchmark analysis: https://web-evals.streamlit.app/
-- Data collection tool: https://github.com/josancamon19/web-envs  
-- Mind2Web subset: https://huggingface.co/datasets/josancamon/mind2web-subset-human
-
-## GCP Data Upload
-
-**Authenticate:**
-```bash
-gcloud auth application-default login
-# Or use the desktop app: python desktop_app/task_collector_app.py
-```
-
-**Upload data:**
-- Launch Task Collector app → "Upload Data"
-- Uploads to `collection-reports` bucket with timestamp: `web-envs-data-YYYY-MM-DD_HH-MM-SS.zip`
-
-## Configuration
-
-**Environment variables:**
-- `RECORDER_BROWSER_CHANNEL`: Browser to use (default: `chrome`)
-- `RECORDER_USER_DATA_DIR`: Profile directory (default: `data/user-data`)
-- `OPENAI_API_KEY`: Required for checkpoint generation and evaluation
-- `KERNEL_API_KEY`: Optional, for non-sandboxed evaluation
-
-**Notes:**
-- Response bodies can be large; consider size limits/redaction for production
-- Persistent Chrome profile reduces CAPTCHA/bot detection
