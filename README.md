@@ -33,6 +33,9 @@ This repository contains the full collection → replay → evaluation stack des
   - [Replay Captured Environments](#replay-captured-environments)
   - [Evaluation Runners](#evaluation-runners)
     - [Browser-Use Harness (`eval-run-browseruse`)](#browser-use-harness-eval-run-browseruse)
+  - [Evaluation Dashboard](#evaluation-dashboard)
+    - [Benchmarks Included](#benchmarks-included)
+    - [Features](#features)
   - [Judges \& Metrics](#judges--metrics)
     - [Binary grading (`eval-judge-binary`)](#binary-grading-eval-judge-binary)
     - [Checkpointed grading (`eval-judge-checkpointed`)](#checkpointed-grading-eval-judge-checkpointed)
@@ -244,6 +247,31 @@ results/browseruse-gpt-5-nano-2025-11-18_04-12-27/
 ├── results/task_<id>.json
 └── metadata.json
 ```
+
+## Evaluation Dashboard
+
+All of the benchmarks referenced in this repo feed into a shared dashboard at https://web-evals.streamlit.app that standardizes ingestion, filtering, and grading outputs across datasets. This was made for facilitating the exploration of them.
+
+### Benchmarks Included
+
+- GAIA (466 tasks) — general AI assistant benchmark with three difficulty tiers.
+- Mind2Web (1,009 tasks) — real-world website interaction tasks.
+- Mind2Web2 (130 tasks) — updated version with domain categorization.
+- BrowseComp (1,266 tasks) — web browsing comprehension.
+- WebArena (812 tasks) — realistic web navigation scenarios.
+- WebVoyager (643 tasks) — long-horizon web navigation.
+- REAL (113 tasks) — real-world web agent challenges with difficulty ratings.
+- Bearcubs (111 tasks) — web agent evaluation tasks.
+- Agent-Company (175 tasks) — domain-specific company workflows.
+- OSWorld (400+ tasks) — desktop automation across Chrome, GIMP, LibreOffice, VS Code, etc.
+
+### Features
+
+- Interactive Streamlit dashboard for filtering, sorting, and exploration.
+- REST API with full filtering, pagination, and schema stability guarantees.
+- Unified schema that normalizes metadata across every benchmark.
+- Advanced filtering by benchmark, difficulty, domain, website/app, and other tags.
+- Global task search with full-text indexing over descriptions and instructions.
 
 
 ## Judges & Metrics
