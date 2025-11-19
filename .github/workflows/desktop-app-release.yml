@@ -64,13 +64,13 @@ jobs:
           APP_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}" > google-credentials.json
-          uv run python desktop_app/build_release.py --target ${{ matrix.target }}
+          uv run python app/build_release.py --target ${{ matrix.target }}
 
       - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
         with:
           name: TaskCollector-${{ matrix.target }}-${{ needs.prepare.outputs.version }}
-          path: desktop_app/dist/TaskCollector-${{ matrix.target }}-${{ needs.prepare.outputs.version }}.zip
+          path: app/dist/TaskCollector-${{ matrix.target }}-${{ needs.prepare.outputs.version }}.zip
 
   release:
     name: Publish GitHub release

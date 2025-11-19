@@ -61,7 +61,7 @@ web-environments/
 │   │   └── collection/            # Merge/view/upload scripts
 │   ├── db/, config/, utils/       # Storage + helper modules
 │   └── models.py                  # Shared data models
-├── desktop_app/                   # Tk Task Collector + PyInstaller packaging
+├── app/                           # Tk Task Collector + PyInstaller packaging
 ├── data/                          # Default recording/output root (configurable)
 ├── data2/                         # Sample captures used for internal experiments
 ├── results/                       # Agent evaluation dumps (per run)
@@ -330,12 +330,12 @@ Both graders expect `OPENAI_API_KEY` to be configured and will stream multiple L
 
 ## Desktop Task Collector
 
-The `desktop_app/` directory ships a Tkinter UI for non-technical collectors:
+The `app/` directory ships a Tkinter UI for non-technical collectors:
 
 ```bash
-./desktop_app/launch_task_collector.sh
+./app/launch_task_collector.sh
 # or
-PYTHONPATH="$(pwd)/src:$(pwd):$PYTHONPATH" uv run python desktop_app/task_collector_app.py
+PYTHONPATH="$(pwd)/src:$(pwd):$PYTHONPATH" uv run python -m app.task_collector_app
 ```
 
 Features:
@@ -348,10 +348,10 @@ Features:
 ### Building a distributable app
 
 ```bash
-uv run python desktop_app/build_release.py --target macos
+uv run python app/build_release.py --target macos
 ```
 
-This wraps the recorder with PyInstaller, bundles Playwright, and drops a ZIP under `desktop_app/dist/`. Replace `macos` with `windows` to build on Windows.
+This wraps the recorder with PyInstaller, bundles Playwright, and drops a ZIP under `app/dist/`. Replace `macos` with `windows` to build on Windows.
 
 ## Data Review & Sharing
 

@@ -15,14 +15,14 @@ This folder contains a Tkinter-based desktop application that mirrors the origin
    ```
 3. Start the desktop app using the launch script (recommended):
    ```bash
-   ./desktop_app/launch_task_collector.sh
+   ./app/launch_task_collector.sh
    ```
    
    Or manually with the correct PYTHONPATH:
    ```bash
    cd /path/to/web-environments
    source .venv/bin/activate
-   PYTHONPATH="$(pwd)/src:$(pwd):$PYTHONPATH" python desktop_app/task_collector_app.py
+   PYTHONPATH="$(pwd)/src:$(pwd):$PYTHONPATH" python -m app.task_collector_app
    ```
 
 The GUI will prompt for the same inputs as the CLI (source, task type, description). After clicking **Launch Task**, a Chromium browser starts recording. When the task is done, click **Complete Task** to close the browser and persist recordings/answers.
@@ -33,7 +33,7 @@ The simplest way to ship the app to collectors is to package it with [PyInstalle
 
 ```bash
 python -m pip install pyinstaller
-python desktop_app/build_release.py --target macos  # or --target windows
+python app/build_release.py --target macos  # or --target windows
 ```
 
 This script automatically:
@@ -42,12 +42,12 @@ This script automatically:
 - Packages everything into a ready-to-distribute ZIP file
 - Includes installation instructions for end users
 
-The final ZIP will be created in `desktop_app/dist/` and can be shared directly with collaborators.
+The final ZIP will be created in `app/dist/` and can be shared directly with collaborators.
 
 Alternatively, you can build manually with PyInstaller:
 
 ```bash
-pyinstaller desktop_app/task_collector_app.py \
+pyinstaller app/task_collector_app.py \
   --name TaskCollector \
   --windowed \
   --noconfirm \

@@ -75,7 +75,7 @@ def build_with_pyinstaller(
 ) -> Path:
     """Invoke PyInstaller and return the path to the produced bundle."""
 
-    icon_candidate = repo_root / "desktop_app" / "resources" / "TaskCollector.icns"
+    icon_candidate = repo_root / "app" / "resources" / "TaskCollector.icns"
     icon_arg = str(icon_candidate) if icon_candidate.exists() else "NONE"
 
     # Build PyInstaller command with all necessary hidden imports and data
@@ -83,7 +83,7 @@ def build_with_pyinstaller(
         sys.executable,
         "-m",
         "PyInstaller",
-        str(repo_root / "desktop_app" / "task_collector_app.py"),
+        str(repo_root / "app" / "task_collector_app.py"),
         "--name",
         APP_NAME,
         "--windowed",
@@ -148,7 +148,7 @@ def build_with_pyinstaller(
         "--hidden-import",
         "db.models",
         "--hidden-import",
-        "desktop_app.task_worker",
+        "app.task_worker",
         "--hidden-import",
         "peewee",
         # Collect all submodules
@@ -274,7 +274,7 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        help="Directory where the final ZIP will be written (defaults to desktop_app/dist)",
+        help="Directory where the final ZIP will be written (defaults to app/dist)",
     )
     args = parser.parse_args()
 
@@ -282,10 +282,10 @@ def main() -> None:
     repo_root = Path(__file__).resolve().parents[1]
 
     version = args.version or os.environ.get("APP_VERSION") or "local"
-    output_root = args.output_dir or (repo_root / "desktop_app" / "dist")
+    output_root = args.output_dir or (repo_root / "app" / "dist")
     output_root.mkdir(parents=True, exist_ok=True)
 
-    build_root = repo_root / "desktop_app" / "build" / target
+    build_root = repo_root / "app" / "build" / target
     pyinstaller_work = build_root / "pyinstaller" / "build"
     pyinstaller_dist = build_root / "pyinstaller" / "dist"
     spec_dir = build_root / "pyinstaller"

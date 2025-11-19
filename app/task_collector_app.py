@@ -30,7 +30,7 @@ from tkinter import messagebox  # noqa: E402
 from tkinter.scrolledtext import ScrolledText  # noqa: E402
 from tkinter import ttk  # noqa: E402
 
-from desktop_app.task_worker import run_task_worker  # noqa: E402
+from app.task_worker import run_task_worker  # noqa: E402
 
 load_dotenv()
 

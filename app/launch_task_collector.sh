@@ -33,4 +33,4 @@ fi
 # Disable macOS App Nap and other optimizations that can cause issues
 # caffeinate prevents the system from sleeping and can help with GUI stability
 echo "Starting Task Collector with macOS optimizations disabled..."
-caffeinate -dis python desktop_app/task_collector_app.py
+caffeinate -dis python -m app.task_collector_app
