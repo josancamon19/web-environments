@@ -664,5 +664,3 @@ def _main() -> None:
 if __name__ == "__main__":
     app()
     # NOTE: eval headless=False fails playwright
-    # TODO: start writing paper.md
-    # TODO: hire collector for 10 tasks
