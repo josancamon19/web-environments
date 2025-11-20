@@ -13,8 +13,12 @@ from tenacity import (
 
 load_dotenv()
 
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-async_client: Any = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+# Initialize clients lazily or with empty string to prevent crash on import
+# if OPENAI_API_KEY is not in environment
+api_key = os.environ.get("OPENAI_API_KEY") or "dummy_key_for_initialization"
+
+client = OpenAI(api_key=api_key)
+async_client: Any = AsyncOpenAI(api_key=api_key)
 
 
 PROMPTS_DIR = Path("src/utils/prompts")
@@ -49,6 +53,14 @@ def openai_structured_output_request(
         group_logging: If True, automatically sets MLflow experiment to prompt_name
         **format_kwargs: Variables to format into the prompt template
     """
+    # Ensure we have a valid API key before making a request
+    if client.api_key == "dummy_key_for_initialization":
+        # Try to refresh key from environment in case it was set later
+        real_key = os.environ.get("OPENAI_API_KEY")
+        if real_key:
+            client.api_key = real_key
+        else:
+            raise ValueError("OPENAI_API_KEY environment variable is not set.")
 
     prompt = get_prompt(prompt_name).format(**format_kwargs)
     response = client.responses.parse(
@@ -79,6 +91,14 @@ async def openai_structured_output_request_async(
         auto_set_experiment: If True, automatically sets MLflow experiment to prompt_name
         **format_kwargs: Variables to format into the prompt template
     """
+    # Ensure we have a valid API key before making a request
+    if async_client.api_key == "dummy_key_for_initialization":
+        # Try to refresh key from environment in case it was set later
+        real_key = os.environ.get("OPENAI_API_KEY")
+        if real_key:
+            async_client.api_key = real_key
+        else:
+            raise ValueError("OPENAI_API_KEY environment variable is not set.")
 
     prompt = get_prompt(prompt_name).format(**format_kwargs)
 

@@ -162,6 +162,8 @@ def build_with_pyinstaller(
         "playwright",
         "--collect-all",
         "greenlet",
+        "--collect-all",
+        "playwright_stealth",
         # macOS specific
     ]
 

@@ -5,12 +5,39 @@ import queue
 import shutil
 import subprocess
 import sys
+import traceback
+from pathlib import Path
+
+# Setup emergency crash logging immediately
+if getattr(sys, "frozen", False):
+    # Write crashes to Desktop for immediate visibility during debugging
+    crash_log = Path.home() / "Desktop" / "TaskCollector_Crash_Log.txt"
+
+    def exception_hook(exc_type, exc_value, exc_traceback):
+        with open(crash_log, "a") as f:
+            f.write(f"\n--- CRASH at {datetime.now()} ---\n")
+            traceback.print_exception(exc_type, exc_value, exc_traceback, file=f)
+            f.write("\n--------------------------------\n")
+
+    sys.excepthook = exception_hook
+
+# Ensure imports work correctly in frozen environment by adding 'src' to sys.path
+if getattr(sys, "frozen", False):
+    base_path = Path(sys._MEIPASS)
+    src_path = base_path / "src"
+    # Add src first so it takes precedence
+    if src_path.exists() and str(src_path) not in sys.path:
+        sys.path.insert(0, str(src_path))
+    # Add base path as fallback
+    if str(base_path) not in sys.path:
+        sys.path.insert(0, str(base_path))
+
 import threading
 import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 import sqlite3
 from google.cloud import storage
 from config.storage import DATA_DIR
@@ -39,41 +66,6 @@ _GOOGLE_CREDS_ERROR: Optional[str] = None
 _GOOGLE_CREDS_PATH: Optional[Path] = None
 
 
-def _load_env_files() -> None:
-    """Attempt to load .env files from common locations."""
-
-    candidate_dirs = []
-
-    # Allow explicit override via environment variable
-    override = os.environ.get("TASK_COLLECTOR_ENV_PATH")
-    if override:
-        candidate_dirs.append(Path(override))
-
-    candidate_dirs.extend(
-        [
-            Path.cwd(),
-            Path(__file__).resolve().parent,
-            Path(__file__).resolve().parents[1],
-            Path(__file__).resolve().parents[2],
-            DATA_DIR,
-            Path.home() / ".taskcollector",
-        ]
-    )
-
-    seen = set()
-    for directory in candidate_dirs:
-        try:
-            directory = directory.resolve()
-        except FileNotFoundError:
-            continue
-        if directory in seen:
-            continue
-        seen.add(directory)
-        dotenv_path = directory / ".env"
-        if dotenv_path.exists():
-            load_dotenv(dotenv_path=dotenv_path, override=False)
-
-
 def ensure_google_credentials() -> tuple[bool, Optional[str]]:
     """Ensure Google credentials file exists for storage uploads.
 
@@ -88,14 +80,25 @@ def ensure_google_credentials() -> tuple[bool, Optional[str]]:
         logger.debug("Google credentials already ready")
         return True, None
 
-    # Look for google-credentials.json in the same directory as the script or the parent directory
-    #  - Current directory match on the bundle
-    #  - Parent directory match running directly from the script
-    creds_path = Path(__file__).resolve().with_name("google-credentials.json")
+    creds_path = None
+
+    # 1. Check frozen bundle root
+    if getattr(sys, "frozen", False):
+        creds_path = Path(sys._MEIPASS) / "google-credentials.json"
+
+    # 2. Check next to script (dev mode or if not found in bundle root)
+    if not creds_path or not creds_path.exists():
+        creds_path = Path(__file__).resolve().with_name("google-credentials.json")
+
+    # 3. Check parent directory (common in dev: app/../google-credentials.json)
     if not creds_path.exists():
         creds_path = (
             Path(__file__).resolve().parent.with_name("google-credentials.json")
         )
+
+    # 4. Check repo root in dev (parent of parent)
+    if not creds_path.exists():
+        creds_path = Path(__file__).resolve().parents[1] / "google-credentials.json"
 
     if creds_path.exists():
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(creds_path)
@@ -1029,18 +1032,43 @@ if getattr(sys, "frozen", False):
     print(f"PLAYWRIGHT_BROWSERS_DIR: {PLAYWRIGHT_BROWSERS_DIR}")
     print(f"Browsers exist: {PLAYWRIGHT_BROWSERS_DIR.exists()}")
 
-if str(BASE_PATH) not in sys.path:
-    sys.path.insert(0, str(BASE_PATH))
 
+# Determine log file path - use Desktop for frozen apps for easier debugging
+if getattr(sys, "frozen", False):
+    log_path = Path.home() / "Desktop" / "TaskCollector_Debug.log"
+else:
+    log_path = PROJECT_ROOT / "recorder_debug.log"
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler(str(PROJECT_ROOT / "recorder_debug.log")),
+        logging.FileHandler(str(log_path)),
+        logging.StreamHandler(sys.stdout),  # Also log to stdout/console
     ],
 )
 logger = logging.getLogger(__name__)
+
+
+def log_startup_diagnostics() -> None:
+    """Emit contextual information helpful for diagnosing frozen startup issues."""
+
+    diagnostics = {
+        "python_version": sys.version.replace("\n", " "),
+        "platform": sys.platform,
+        "frozen": getattr(sys, "frozen", False),
+        "executable": sys.executable,
+        "current_working_dir": os.getcwd(),
+        "data_dir": DATA_DIR,
+        "data_dir_exists": Path(DATA_DIR).exists(),
+        "playwright_dir": str(PLAYWRIGHT_BROWSERS_DIR),
+        "playwright_dir_exists": PLAYWRIGHT_BROWSERS_DIR.exists(),
+        "google_creds_env_set": bool(os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")),
+    }
+
+    logger.info("Startup diagnostics:")
+    for key, value in diagnostics.items():
+        logger.info(" • %s: %s", key, value)
 
 
 SOURCE_CHOICES = [
@@ -1065,12 +1093,26 @@ class TaskCollectorApp:
     """Tkinter application that mirrors the CLI task flow."""
 
     def __init__(self) -> None:
-        self.root = tk.Tk()
+        logger.info("Initializing TaskCollectorApp")
+        log_startup_diagnostics()
+
+        try:
+            self.root = tk.Tk()
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception("Failed to create Tkinter root window: %s", exc)
+            raise
+
+        self.root.report_callback_exception = self._tk_callback_exception
         self.root.title("Task Collector")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
         # Set dark theme background
         self.root.configure(bg="#2b2b2b")
+        logger.info(
+            "Tk root created (screen=%sx%s)",
+            self.root.winfo_screenwidth(),
+            self.root.winfo_screenheight(),
+        )
 
         # Set better default window size
         self.root.geometry("850x800")
@@ -1083,9 +1125,11 @@ class TaskCollectorApp:
         self._worker_conn = None
         self._listener_thread: Optional[threading.Thread] = None
 
-        self._build_ui()
-        self._process_log_queue()
-        self._warn_if_credentials_missing()
+        self._run_startup_step("build_ui", self._build_ui)
+        self._run_startup_step("process_log_queue_setup", self._process_log_queue)
+        self._run_startup_step(
+            "warn_if_credentials_missing", self._warn_if_credentials_missing
+        )
 
     def run(self) -> None:
         """Start the Tkinter main loop."""
@@ -1411,6 +1455,43 @@ class TaskCollectorApp:
             self.log_output.see(tk.END)
             self.log_output.config(state=tk.DISABLED)
         self.root.after(150, self._process_log_queue)
+
+    def _run_startup_step(self, label: str, func: Callable[[], None]) -> None:
+        """Execute a startup helper and surface errors in both logs and UI."""
+
+        logger.info("Running startup step: %s", label)
+        try:
+            func()
+        except Exception as exc:  # pylint: disable=broad-except
+            self._handle_startup_failure(label, exc)
+            raise
+
+    def _handle_startup_failure(self, label: str, exc: Exception) -> None:
+        logger.exception("Startup step '%s' failed: %s", label, exc)
+        self._show_error_dialog(
+            "Startup Error",
+            f"Task Collector failed while executing '{label}'.\n\n{exc}",
+        )
+
+    def _show_error_dialog(self, title: str, message: str) -> None:
+        """Display an error dialog, falling back to stderr when GUI is unavailable."""
+
+        try:
+            messagebox.showerror(title, message, parent=getattr(self, "root", None))
+        except Exception:  # pylint: disable=broad-except
+            print(f"{title}: {message}", file=sys.stderr)
+
+    def _tk_callback_exception(self, exc_type, exc_value, exc_traceback) -> None:
+        """Log Tkinter callback exceptions that would otherwise be silent."""
+
+        logger.error(
+            "Unhandled Tkinter callback error",
+            exc_info=(exc_type, exc_value, exc_traceback),
+        )
+        self._show_error_dialog(
+            "Application Error",
+            f"An unexpected UI error occurred:\n{exc_value}",
+        )
 
     def _warn_if_credentials_missing(self) -> None:
         if storage is None:
